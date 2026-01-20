@@ -1,0 +1,459 @@
+// Prisma Schema for AI 能力中台后台管理系统
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 用户管理模块 ====================
+
+// 管理员账号（后台系统用户）
+model Admin {
+  id        String   @id @default(cuid())
+  username  String   @unique
+  email     String   @unique
+  password  String
+  role      String   // super_admin, platform_admin, operator, risk_control, finance, read_only
+  status    String   @default("active") // active, inactive
+  lastLogin DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联的操作日志
+  operationLogs OperationLog[]
+  emailVerifications EmailVerification[]
+
+  @@index([username])
+  @@index([email])
+  @@map("admins")
+}
+
+// 邮箱验证码
+model EmailVerification {
+  id        String   @id @default(cuid())
+  email     String
+  code      String   // 6位数字验证码
+  type      String   // register, reset_password, etc.
+  adminId   String?  // 关联的管理员ID（注册时可能还未创建）
+  used      Boolean  @default(false) // 是否已使用
+  expiresAt DateTime // 过期时间
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  admin     Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([code])
+  @@index([type])
+  @@index([used])
+  @@index([expiresAt])
+  @@map("email_verifications")
+}
+
+// 终端用户（C端用户）
+model User {
+  id             String    @id @default(cuid())
+  email          String?   @unique
+  phone          String?   @unique
+  password       String?
+  role           String    @default("basic_user") // basic_user, user (未认证用户/已认证用户)
+  status         String    @default("normal") // normal, frozen, banned
+  banReason      String?
+  banUntil       DateTime?
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // 关联数据
+  packages       UserPackage[]
+  devices        Device[]
+  quotaRecords   QuotaRecord[]
+  quotas         UserQuota[]
+  authorizations Authorization[]
+  aiCallLogs     AICallLog[]
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+// 用户设备
+model Device {
+  id           String   @id @default(cuid())
+  userId       String
+  deviceFingerprint String //设备指纹
+  ipAddress    String?
+  region       String?
+  lastUsedAt   DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceFingerprint])
+  @@index([userId])
+  @@index([deviceFingerprint])
+  @@map("devices")
+}
+
+// ==================== 模型管理模块 ====================
+
+// AI 模型提供商
+model AIProvider {
+  id          String   @id @default(cuid())
+  name        String   @unique // 内部标识，如 "DeepSeek", "OpenAI"
+  displayName String
+  baseUrl     String?  // API 服务基地址
+  website     String?
+  logoUrl     String?
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联的模型
+  models      AIModel[]
+
+  @@index([name])
+  @@index([isActive])
+  @@map("ai_providers")
+}
+
+// AI 模型
+model AIModel {
+  id          String   @id @default(cuid())
+  name        String   // 模型内部标识，如 "deepseek-chat"
+  displayName String
+  type        String   // llm, video, image, tts
+  category    String?  // chat, completion, generation
+  providerId  String
+  baseUrl     String   // 接口路径，如 "/v1/draw/nano-banana"
+  description String?
+  isActive    Boolean  @default(true)
+  requiresKey Boolean  @default(false) // 是否需要 API 密钥
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联数据
+  provider    AIProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  prices      ModelPrice[]
+  authorizations Authorization[]
+  aiCallLogs  AICallLog[]
+
+  @@unique([providerId, name])
+  @@index([providerId])
+  @@index([type])
+  @@index([category])
+  @@index([isActive])
+  @@map("ai_models")
+}
+
+// 模型价格配置
+model ModelPrice {
+  id          String   @id @default(cuid())
+  modelId     String
+  packageId   String?  // 套餐ID，null表示默认价格
+  inputPrice  Decimal  @default(0) @db.Decimal(10, 6) // 输入Token单价
+  outputPrice Decimal  @default(0) @db.Decimal(10, 6) // 输出Token单价
+  callPrice   Decimal  @default(0) @db.Decimal(10, 2) // 调用次数单价
+  effectiveAt DateTime @default(now())
+  expiredAt   DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  model       AIModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([modelId])
+  @@index([packageId])
+  @@index([effectiveAt])
+  @@map("model_prices")
+}
+
+// ==================== 套餐管理模块 ====================
+
+// 套餐
+model Package {
+  id            String        @id @default(cuid())
+  name          String
+  displayName   String
+  description   String?
+  type          String        // free, paid, trial
+  duration      Int?          // 有效期（天），null表示永久
+  totalQuota    Decimal?      @db.Decimal(20, 2) // Token额度，null表示无限
+  totalCalls    Int?          // 调用次数额度，null表示无限
+  maxDevices    Int?          // 最大设备数量，null表示无限
+  availableModels String?     // 可用模型ID列表（JSON数组）
+  isStackable   Boolean       @default(false) // 是否可叠加
+  priority      Int           @default(0) // 优先级，数字越大优先级越高
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  // 关联数据
+  userPackages  UserPackage[]
+  quotaRecords  QuotaRecord[]
+
+  @@index([name])
+  @@index([type])
+  @@index([isActive])
+  @@map("packages")
+}
+
+// 用户套餐关系
+model UserPackage {
+  id          String   @id @default(cuid())
+  userId      String
+  packageId   String
+  startedAt   DateTime @default(now())
+  expiresAt   DateTime?
+  priority    Int      @default(0) // 套餐优先级
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package     Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, packageId])
+  @@index([userId])
+  @@index([packageId])
+  @@index([expiresAt])
+  @@map("user_packages")
+}
+
+// ==================== 额度管理模块 ====================
+
+// 用户额度
+model UserQuota {
+  id          String   @id @default(cuid())
+  userId      String
+  packageId   String?
+  available   Decimal  @default(0) @db.Decimal(20, 2) // 可用额度（Token）
+  frozen      Decimal  @default(0) @db.Decimal(20, 2) // 冻结额度
+  used        Decimal  @default(0) @db.Decimal(20, 2) // 已使用额度
+  availableCalls Int   @default(0) // 可用调用次数
+  usedCalls   Int      @default(0) // 已使用调用次数
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, packageId])
+  @@index([userId])
+  @@index([packageId])
+  @@map("user_quotas")
+}
+
+// 额度流水记录
+model QuotaRecord {
+  id          String   @id @default(cuid())
+  userId      String
+  packageId   String?
+  type        String   // increase, decrease, freeze, unfreeze
+  amount      Decimal  @db.Decimal(20, 2) // 变动额度（Token）
+  calls       Int      @default(0) // 变动调用次数
+  before      Decimal  @db.Decimal(20, 2) // 变动前额度
+  after       Decimal  @db.Decimal(20, 2) // 变动后额度
+  reason      String?
+  requestId   String?  // 关联的请求ID
+  createdAt   DateTime @default(now())
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package     Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([packageId])
+  @@index([type])
+  @@index([requestId])
+  @@index([createdAt])
+  @@map("quota_records")
+}
+
+// ==================== 提示词库管理模块 ====================
+
+// 提示词类型
+model PromptCategory {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  displayName String
+  description String?
+  type        String   // system, user, shared
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  prompts     Prompt[]
+
+  @@index([type])
+  @@map("prompt_categories")
+}
+
+// 提示词
+model Prompt {
+  id          String   @id @default(cuid())
+  title       String
+  content     String   @db.Text
+  description String?
+  categoryId  String
+  tags        String?  // JSON数组
+  type        String   // system, user, shared
+  userId      String?  // 创建者ID（如果是用户提示词）
+  version     Int      @default(1)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category    PromptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  versions    PromptVersion[]
+
+  @@index([categoryId])
+  @@index([type])
+  @@index([userId])
+  @@index([isActive])
+  @@index([title])
+  @@map("prompts")
+}
+
+// 提示词版本
+model PromptVersion {
+  id          String   @id @default(cuid())
+  promptId    String
+  version     Int
+  content     String   @db.Text
+  updatedBy   String?  // 更新者ID
+  createdAt   DateTime @default(now())
+
+  prompt      Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@unique([promptId, version])
+  @@index([promptId])
+  @@index([createdAt])
+  @@map("prompt_versions")
+}
+
+// ==================== 授权与调用管理模块 ====================
+
+// 授权记录
+model Authorization {
+  id          String   @id @default(cuid())
+  userId      String
+  modelId     String
+  deviceFingerprint String
+  ipAddress   String?
+  frozenQuota Decimal  @db.Decimal(20, 2) // 预冻结额度
+  sessionToken String? @unique
+  status      String   @default("active") // active, used, expired, revoked
+  expiresAt   DateTime
+  requestId   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model       AIModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([modelId])
+  @@index([sessionToken])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([requestId])
+  @@map("authorizations")
+}
+
+// ==================== 日志与审计模块 ====================
+
+// 管理员操作日志
+model OperationLog {
+  id          String   @id @default(cuid())
+  adminId     String
+  action      String   // CREATE, UPDATE, DELETE, UPDATE_STATUS, etc.
+  targetType  String   // user, model, package, etc.
+  targetId    String?
+  details     String?  @db.Text // JSON格式的操作详情
+  ipAddress   String?
+  result      String   @default("success") // success, failure
+  errorMessage String? @db.Text
+  createdAt   DateTime @default(now())
+
+  admin       Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+
+  @@index([adminId])
+  @@index([action])
+  @@index([targetType])
+  @@index([targetId])
+  @@index([createdAt])
+  @@map("operation_logs")
+}
+
+// AI 调用日志
+model AICallLog {
+  id          String   @id @default(cuid())
+  requestId   String   @unique
+  userId      String
+  modelId     String
+  inputTokens Int      @default(0)
+  outputTokens Int     @default(0)
+  totalTokens Int      @default(0)
+  cost        Decimal  @db.Decimal(10, 4) // 本次调用成本
+  status      String   // success, failure
+  errorMessage String? @db.Text
+  requestTime DateTime @default(now())
+  responseTime DateTime?
+  duration    Int?     // 响应时间（毫秒）
+  deviceFingerprint String?
+  ipAddress   String?
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model       AIModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([modelId])
+  @@index([status])
+  @@index([requestTime])
+  @@index([requestId])
+  @@map("ai_call_logs")
+}
+
+// ==================== 风控与监控模块 ====================
+
+// 风控规则
+model RiskRule {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  conditions  String   @db.Text // JSON格式的触发条件
+  action      String   // limit_rate, freeze_quota, ban_account, alert
+  actionParams String? @db.Text // JSON格式的动作参数
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([priority])
+  @@map("risk_rules")
+}
+
+// 风控触发记录
+model RiskTrigger {
+  id          String   @id @default(cuid())
+  ruleId      String
+  userId      String?
+  modelId     String?
+  conditions  String   @db.Text // JSON格式的触发条件详情
+  action      String
+  actionResult String? @db.Text // 动作执行结果
+  status      String   @default("pending") // pending, executed, failed
+  createdAt   DateTime @default(now())
+
+  @@index([ruleId])
+  @@index([userId])
+  @@index([modelId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("risk_triggers")
+}

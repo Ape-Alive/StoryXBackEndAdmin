@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: storyx-mysql
+    restart: always
+    environment:
+      # MySQL root 用户密码（开发环境示例，生产环境请修改）
+      MYSQL_ROOT_PASSWORD: rootpassword
+      # 自动创建的数据库名
+      MYSQL_DATABASE: storyx_admin
+      # 自动创建的普通用户（可选）
+      MYSQL_USER: storyx_user
+      # 普通用户密码（可选）
+      MYSQL_PASSWORD: storyx_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --max_connections=1000
+
+volumes:
+  mysql_data:
+    driver: local
+
