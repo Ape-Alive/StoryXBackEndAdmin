@@ -1,0 +1,35 @@
+{
+  "name": "storyx-backend-admin-frontend",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "AI 能力中台后台管理系统前端",
+  "scripts": {
+    "dev": "vite --mode development",
+    "dev:test": "vite --mode test",
+    "dev:staging": "vite --mode staging",
+    "build": "vite build --mode production",
+    "build:test": "vite build --mode test",
+    "build:staging": "vite build --mode staging",
+    "preview": "vite preview",
+    "preview:test": "vite preview --mode test",
+    "preview:staging": "vite preview --mode staging",
+    "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
+  },
+  "dependencies": {
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.7",
+    "axios": "^1.6.7",
+    "element-plus": "^2.5.6",
+    "@element-plus/icons-vue": "^2.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.4",
+    "vite": "^5.1.4",
+    "eslint": "^8.57.0",
+    "eslint-plugin-vue": "^9.23.0",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.2.5"
+  }
+}
+

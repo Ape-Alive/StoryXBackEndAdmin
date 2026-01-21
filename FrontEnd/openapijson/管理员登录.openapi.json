@@ -1,0 +1,218 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "认证"
+    }
+  ],
+  "paths": {
+    "/api/auth/captcha": {
+      "get": {
+        "summary": "获取登录图形验证码",
+        "deprecated": false,
+        "description": "获取管理员登录所需的图形验证码（SVG图片）。\n\n**验证码类型**：图形验证码（4位字符）\n- 格式：SVG图片，Base64编码\n- 字符数：4位（字母和数字组合）\n- 不区分大小写\n- 有效期：5分钟\n- 用于：管理员登录验证（防止暴力破解和脚本攻击）\n",
+        "tags": [
+          "认证"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "返回图形验证码图片和会话ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Captcha generated successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "sessionId": {
+                          "type": "string",
+                          "description": "验证码会话ID（用于登录时验证）",
+                          "example": "abc123def456ghi789"
+                        },
+                        "imageUrl": {
+                          "type": "string",
+                          "format": "data-uri",
+                          "description": "Base64编码的SVG图片（可直接在img标签中使用）",
+                          "example": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjQwIi4uLg=="
+                        },
+                        "expiresIn": {
+                          "type": "integer",
+                          "description": "验证码有效期（秒）",
+                          "example": 300
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "500": {
+            "description": "服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "管理员登录（使用邮箱 + 密码 + 图形验证码）",
+        "deprecated": false,
+        "description": "管理员登录接口，需要邮箱、密码和图形验证码，防止暴力破解和脚本攻击。\n\n**验证码类型**：图形验证码（4位字符）\n- 从 /api/auth/captcha 接口获取\n- 格式：4位字母和数字组合（如：A3B7）\n- 不区分大小写\n- 有效期：5分钟\n- 使用后自动失效\n",
+        "tags": [
+          "认证"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "password",
+                  "captchaCode",
+                  "sessionId"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "管理员邮箱地址",
+                    "example": "admin@example.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "description": "管理员密码",
+                    "example": "password123"
+                  },
+                  "captchaCode": {
+                    "type": "string",
+                    "minLength": 4,
+                    "maxLength": 4,
+                    "description": "4位图形验证码（从 /api/auth/captcha 获取，不区分大小写）",
+                    "example": "A3B7"
+                  },
+                  "sessionId": {
+                    "type": "string",
+                    "description": "验证码会话ID（从 /api/auth/captcha 获取）",
+                    "example": "abc123def456ghi789"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "登录成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Login successful",
+                  "data": {
+                    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "admin": {
+                      "id": "clx123456789",
+                      "username": "admin",
+                      "email": "admin@example.com",
+                      "role": "super_admin"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "登录失败（邮箱/密码错误或验证码错误）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Error message"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Success message"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}
