@@ -10,8 +10,8 @@ const getProvidersValidator = [
     .withMessage('Page must be a positive integer'),
   query('pageSize')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Page size must be between 1 and 100'),
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Page size must be between 1 and 1000'),
   query('name')
     .optional()
     .isString()
@@ -38,7 +38,9 @@ const createProviderValidator = [
     .notEmpty()
     .withMessage('Provider name is required')
     .isString()
-    .withMessage('Provider name must be a string'),
+    .withMessage('Provider name must be a string')
+    .matches(/^[a-zA-Z0-9_.-]+$/)
+    .withMessage('Provider name can only contain letters, numbers, underscores, dots, and hyphens'),
   body('displayName')
     .notEmpty()
     .withMessage('Display name is required')
@@ -64,7 +66,19 @@ const createProviderValidator = [
   body('isActive')
     .optional()
     .isBoolean()
-    .withMessage('isActive must be a boolean')
+    .withMessage('isActive must be a boolean'),
+  body('quota')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Quota must be a non-negative number'),
+  body('quotaUnit')
+    .optional()
+    .isIn(['points'])
+    .withMessage('Quota unit must be points (积分)'),
+  body('mainAccountToken')
+    .optional()
+    .isString()
+    .withMessage('Main account token must be a string')
 ];
 
 /**
@@ -97,7 +111,19 @@ const updateProviderValidator = [
   body('isActive')
     .optional()
     .isBoolean()
-    .withMessage('isActive must be a boolean')
+    .withMessage('isActive must be a boolean'),
+  body('quota')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Quota must be a non-negative number'),
+  body('quotaUnit')
+    .optional()
+    .isIn(['points'])
+    .withMessage('Quota unit must be points (积分)'),
+  body('mainAccountToken')
+    .optional()
+    .isString()
+    .withMessage('Main account token must be a string')
 ];
 
 /**

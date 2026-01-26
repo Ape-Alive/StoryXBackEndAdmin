@@ -113,7 +113,9 @@ class PackageRepository {
         type: data.type,
         duration: data.duration,
         totalQuota: data.totalQuota,
-        totalCalls: data.totalCalls,
+        price: data.price,
+        priceUnit: data.priceUnit,
+        discount: data.discount,
         availableModels: data.availableModels ? JSON.stringify(data.availableModels) : null,
         isStackable: data.isStackable !== undefined ? data.isStackable : false,
         priority: data.priority || 0,
@@ -133,7 +135,9 @@ class PackageRepository {
     if (data.type !== undefined) updateData.type = data.type;
     if (data.duration !== undefined) updateData.duration = data.duration;
     if (data.totalQuota !== undefined) updateData.totalQuota = data.totalQuota;
-    if (data.totalCalls !== undefined) updateData.totalCalls = data.totalCalls;
+    if (data.price !== undefined) updateData.price = data.price;
+    if (data.priceUnit !== undefined) updateData.priceUnit = data.priceUnit;
+    if (data.discount !== undefined) updateData.discount = data.discount;
     if (data.availableModels !== undefined) {
       updateData.availableModels = data.availableModels ? JSON.stringify(data.availableModels) : null;
     }
@@ -188,7 +192,9 @@ class PackageRepository {
         type: original.type,
         duration: original.duration,
         totalQuota: original.totalQuota,
-        totalCalls: original.totalCalls,
+        price: original.price,
+        priceUnit: original.priceUnit,
+        discount: original.discount,
         availableModels: original.availableModels,
         isStackable: original.isStackable,
         priority: original.priority,

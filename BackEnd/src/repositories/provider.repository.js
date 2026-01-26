@@ -108,6 +108,9 @@ class ProviderRepository {
         website: data.website,
         logoUrl: data.logoUrl,
         description: data.description,
+        quota: data.quota !== undefined ? data.quota : null,
+        quotaUnit: data.quotaUnit || null,
+        mainAccountToken: data.mainAccountToken || null,
         isActive: data.isActive !== undefined ? data.isActive : true
       }
     });
@@ -124,6 +127,9 @@ class ProviderRepository {
     if (data.website !== undefined) updateData.website = data.website;
     if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
     if (data.description !== undefined) updateData.description = data.description;
+    if (data.quota !== undefined) updateData.quota = data.quota;
+    if (data.quotaUnit !== undefined) updateData.quotaUnit = data.quotaUnit;
+    if (data.mainAccountToken !== undefined) updateData.mainAccountToken = data.mainAccountToken;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     updateData.updatedAt = new Date();

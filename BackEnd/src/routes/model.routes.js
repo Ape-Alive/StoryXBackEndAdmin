@@ -8,7 +8,9 @@ const {
     createModelValidator,
     updateModelValidator,
     batchUpdateStatusValidator,
-    batchDeleteValidator
+    batchDeleteValidator,
+    createModelPriceValidator,
+    updateModelPriceValidator
 } = require('../validators/model.validator');
 const { ROLES } = require('../constants/roles');
 
@@ -189,6 +191,10 @@ router.get(
  *                 type: boolean
  *                 default: false
  *                 description: 是否需要API密钥
+ *               apiConfig:
+ *                 type: string
+ *                 example: '{"temperature": 0.7, "max_tokens": 2000}'
+ *                 description: API配置参数（JSON字符串），存储每个模型独有的请求参数
  *     responses:
  *       201:
  *         description: 创建成功
@@ -250,6 +256,10 @@ router.post(
  *               requiresKey:
  *                 type: boolean
  *                 description: 是否需要API密钥
+ *               apiConfig:
+ *                 type: string
+ *                 example: '{"temperature": 0.7, "max_tokens": 2000}'
+ *                 description: API配置参数（JSON字符串），存储每个模型独有的请求参数
  *     responses:
  *       200:
  *         description: 更新成功
@@ -471,21 +481,27 @@ router.get(
  *               packageId:
  *                 type: string
  *                 description: 套餐ID（可选，null表示默认价格）
+ *               pricingType:
+ *                 type: string
+ *                 enum: [token, call]
+ *                 default: token
+ *                 description: 计价类型：token(按Token计价)、call(按调用次数计价)
+ *                 example: token
  *               inputPrice:
  *                 type: number
  *                 format: decimal
  *                 example: 0.001
- *                 description: 输入Token单价
+ *                 description: 输入Token单价（积分），pricingType为token时使用
  *               outputPrice:
  *                 type: number
  *                 format: decimal
  *                 example: 0.002
- *                 description: 输出Token单价
+ *                 description: 输出Token单价（积分），pricingType为token时使用
  *               callPrice:
  *                 type: number
  *                 format: decimal
  *                 example: 0.1
- *                 description: 调用次数单价
+ *                 description: 调用次数单价（积分），pricingType为call时使用
  *               effectiveAt:
  *                 type: string
  *                 format: date-time
@@ -502,6 +518,7 @@ router.get(
 router.post(
     '/:id/prices',
     authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+    createModelPriceValidator,
     validate,
     modelController.createModelPrice.bind(modelController)
 );
@@ -534,18 +551,22 @@ router.post(
  *           schema:
  *             type: object
  *             properties:
+ *               pricingType:
+ *                 type: string
+ *                 enum: [token, call]
+ *                 description: 计价类型：token(按Token计价)、call(按调用次数计价)
  *               inputPrice:
  *                 type: number
  *                 format: decimal
- *                 description: 输入Token单价
+ *                 description: 输入Token单价（积分），pricingType为token时使用
  *               outputPrice:
  *                 type: number
  *                 format: decimal
- *                 description: 输出Token单价
+ *                 description: 输出Token单价（积分），pricingType为token时使用
  *               callPrice:
  *                 type: number
  *                 format: decimal
- *                 description: 调用次数单价
+ *                 description: 调用次数单价（积分），pricingType为call时使用
  *               effectiveAt:
  *                 type: string
  *                 format: date-time
@@ -564,6 +585,7 @@ router.post(
 router.put(
     '/:id/prices/:priceId',
     authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+    updateModelPriceValidator,
     validate,
     modelController.updateModelPrice.bind(modelController)
 );

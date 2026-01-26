@@ -144,7 +144,8 @@ class ModelRepository {
         baseUrl: data.baseUrl,
         description: data.description,
         isActive: data.isActive !== undefined ? data.isActive : true,
-        requiresKey: data.requiresKey !== undefined ? data.requiresKey : false
+        requiresKey: data.requiresKey !== undefined ? data.requiresKey : false,
+        apiConfig: data.apiConfig || null
       },
       include: {
         provider: true
@@ -165,6 +166,7 @@ class ModelRepository {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
     if (data.requiresKey !== undefined) updateData.requiresKey = data.requiresKey;
+    if (data.apiConfig !== undefined) updateData.apiConfig = data.apiConfig || null;
 
     updateData.updatedAt = new Date();
 
@@ -240,6 +242,7 @@ class ModelRepository {
       data: {
         modelId: data.modelId,
         packageId: data.packageId || null,
+        pricingType: data.pricingType || 'token',
         inputPrice: data.inputPrice || 0,
         outputPrice: data.outputPrice || 0,
         callPrice: data.callPrice || 0,
@@ -255,6 +258,7 @@ class ModelRepository {
   async updatePrice(id, data) {
     const updateData = {};
 
+    if (data.pricingType !== undefined) updateData.pricingType = data.pricingType;
     if (data.inputPrice !== undefined) updateData.inputPrice = data.inputPrice;
     if (data.outputPrice !== undefined) updateData.outputPrice = data.outputPrice;
     if (data.callPrice !== undefined) updateData.callPrice = data.callPrice;

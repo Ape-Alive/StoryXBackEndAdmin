@@ -52,11 +52,19 @@ const createPackageValidator = [
   body('totalQuota')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Total quota must be a non-negative number'),
-  body('totalCalls')
+    .withMessage('Total quota must be a non-negative number (积分)'),
+  body('price')
     .optional()
-    .isInt({ min: 0 })
-    .withMessage('Total calls must be a non-negative integer'),
+    .isFloat({ min: 0 })
+    .withMessage('Price must be a non-negative number'),
+  body('priceUnit')
+    .optional()
+    .isIn(['yuan', 'usd'])
+    .withMessage('Price unit must be one of: yuan, usd'),
+  body('discount')
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
     .optional()
     .isArray()
@@ -93,11 +101,19 @@ const updatePackageValidator = [
   body('totalQuota')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Total quota must be a non-negative number'),
-  body('totalCalls')
+    .withMessage('Total quota must be a non-negative number (积分)'),
+  body('price')
     .optional()
-    .isInt({ min: 0 })
-    .withMessage('Total calls must be a non-negative integer'),
+    .isFloat({ min: 0 })
+    .withMessage('Price must be a non-negative number'),
+  body('priceUnit')
+    .optional()
+    .isIn(['yuan', 'usd'])
+    .withMessage('Price unit must be one of: yuan, usd'),
+  body('discount')
+    .optional()
+    .isFloat({ min: 0, max: 100 })
+    .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
     .optional()
     .isArray()

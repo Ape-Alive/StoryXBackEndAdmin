@@ -102,9 +102,7 @@ class QuotaRepository {
         data: {
           available: data.available !== undefined ? data.available : existing.available,
           frozen: data.frozen !== undefined ? data.frozen : existing.frozen,
-          used: data.used !== undefined ? data.used : existing.used,
-          availableCalls: data.availableCalls !== undefined ? data.availableCalls : existing.availableCalls,
-          usedCalls: data.usedCalls !== undefined ? data.usedCalls : existing.usedCalls
+          used: data.used !== undefined ? data.used : existing.used
         }
       });
     } else {
@@ -115,9 +113,7 @@ class QuotaRepository {
           packageId: packageId || null,
           available: data.available || 0,
           frozen: data.frozen || 0,
-          used: data.used || 0,
-          availableCalls: data.availableCalls || 0,
-          usedCalls: data.usedCalls || 0
+          used: data.used || 0
         }
       });
     }
@@ -174,7 +170,7 @@ class QuotaRepository {
   /**
    * 扣减额度（结算）
    */
-  async deductQuota(userId, packageId, amount, calls = 0) {
+  async deductQuota(userId, packageId, amount) {
     const quota = await this.findByUserAndPackage(userId, packageId);
     if (!quota) {
       throw new Error('Quota not found');
@@ -188,12 +184,6 @@ class QuotaRepository {
         },
         used: {
           increment: amount
-        },
-        availableCalls: {
-          decrement: calls
-        },
-        usedCalls: {
-          increment: calls
         }
       }
     });
@@ -202,7 +192,7 @@ class QuotaRepository {
   /**
    * 增加额度
    */
-  async increaseQuota(userId, packageId, amount, calls = 0) {
+  async increaseQuota(userId, packageId, amount) {
     const quota = await this.findByUserAndPackage(userId, packageId);
     if (!quota) {
       throw new Error('Quota not found');
@@ -213,9 +203,6 @@ class QuotaRepository {
       data: {
         available: {
           increment: amount
-        },
-        availableCalls: {
-          increment: calls
         }
       }
     });

@@ -33,8 +33,8 @@ service.interceptors.response.use(
   (response) => {
     const res = response.data
 
-    // 如果返回的状态码不是 200，说明有错误
-    if (response.status !== 200) {
+    // 如果返回的状态码不是 2开头的，说明有错误
+    if (response.status.toString().startsWith('2') === false) {
       ElMessage.error(res.message || '请求失败')
       return Promise.reject(new Error(res.message || '请求失败'))
     }

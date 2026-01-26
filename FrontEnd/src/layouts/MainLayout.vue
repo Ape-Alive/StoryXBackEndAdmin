@@ -140,6 +140,8 @@
       <!-- 主内容区 -->
       <main class="main-content">
         <div class="content-wrapper">
+          <!-- 面包屑导航 -->
+          <Breadcrumb />
           <router-view />
         </div>
       </main>
@@ -154,6 +156,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 // Element Plus 图标已全局注册，直接使用组件名
 import { useAuthStore } from '@/stores/auth'
 import { MENU_STRUCTURE, TOP_NAV_MENU } from '@/config/menu'
+import Breadcrumb from './components/Breadcrumb.vue'
 
 const route = useRoute()
 const router = useRouter()

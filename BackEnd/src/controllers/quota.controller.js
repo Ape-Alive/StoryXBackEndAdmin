@@ -65,12 +65,11 @@ class QuotaController {
   async adjustQuota(req, res, next) {
     try {
       const { userId } = req.params;
-      const { packageId, amount, calls, reason } = req.body;
+      const { packageId, amount, reason } = req.body;
       const quota = await quotaService.adjustQuota(
         userId,
         packageId || null,
         amount || 0,
-        calls || 0,
         reason,
         req.user?.id,
         req.ip

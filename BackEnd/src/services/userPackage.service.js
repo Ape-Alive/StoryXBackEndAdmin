@@ -101,9 +101,7 @@ class UserPackageService {
           packageId,
           available: pkg.totalQuota || 0,
           frozen: 0,
-          used: 0,
-          availableCalls: pkg.totalCalls || 0,
-          usedCalls: 0
+          used: 0
         }
       });
 
@@ -118,21 +116,6 @@ class UserPackageService {
             before: 0,
             after: pkg.totalQuota,
             reason: `Package assigned: ${pkg.name}`
-          }
-        });
-      }
-
-      if (pkg.totalCalls && pkg.totalCalls > 0) {
-        await prisma.quotaRecord.create({
-          data: {
-            userId,
-            packageId,
-            type: 'increase',
-            amount: 0,
-            calls: pkg.totalCalls,
-            before: 0,
-            after: 0,
-            reason: `Package assigned: ${pkg.name} - calls`
           }
         });
       }

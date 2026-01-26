@@ -103,7 +103,6 @@ class QuotaRecordRepository {
         packageId: data.packageId || null,
         type: data.type,
         amount: data.amount,
-        calls: data.calls || 0,
         before: data.before,
         after: data.after,
         reason: data.reason || null,

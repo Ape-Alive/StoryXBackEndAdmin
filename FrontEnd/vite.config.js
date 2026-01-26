@@ -19,7 +19,20 @@ export default defineConfig(({ mode }) => {
             }
         },
         server: {
-            port: 3000,
+            host: '0.0.0.0', // 允许外部访问，可通过局域网 IP 访问
+            port: 3001,
+            hmr: {
+                // 热更新配置
+                overlay: true, // 显示错误覆盖层
+                clientPort: 3001 // HMR 客户端端口
+            },
+            watch: {
+                // 监听文件变化
+                usePolling: false, // 使用轮询（某些文件系统需要）
+                interval: 500, // 轮询间隔（ms）
+                // 忽略某些文件，提高性能
+                ignored: ['**/node_modules/**', '**/.git/**']
+            },
             proxy: useProxy
                 ? {
                     '/api': {

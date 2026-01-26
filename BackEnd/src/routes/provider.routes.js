@@ -149,6 +149,21 @@ router.get(
  *                 type: boolean
  *                 default: true
  *                 description: 是否启用
+ *               quota:
+ *                 type: number
+ *                 format: float
+ *                 example: 10000.00
+ *                 description: 额度
+ *               quotaUnit:
+ *                 type: string
+ *                 enum: [points]
+ *                 default: points
+ *                 example: points
+ *                 description: 额度单位（仅支持points=积分）
+ *               mainAccountToken:
+ *                 type: string
+ *                 example: sk-xxxxx
+ *                 description: 主账户token
  *     responses:
  *       201:
  *         description: 创建成功
@@ -217,6 +232,21 @@ router.post(
  *               isActive:
  *                 type: boolean
  *                 description: 是否启用
+ *               quota:
+ *                 type: number
+ *                 format: float
+ *                 example: 10000.00
+ *                 description: 额度
+ *               quotaUnit:
+ *                 type: string
+ *                 enum: [points]
+ *                 default: points
+ *                 example: points
+ *                 description: 额度单位（仅支持points=积分）
+ *               mainAccountToken:
+ *                 type: string
+ *                 example: sk-xxxxx
+ *                 description: 主账户token
  *     responses:
  *       200:
  *         description: 更新成功

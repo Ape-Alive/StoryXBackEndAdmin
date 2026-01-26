@@ -107,22 +107,26 @@ model Device {
 
 // AI 模型提供商
 model AIProvider {
-  id          String   @id @default(cuid())
-  name        String   @unique // 内部标识，如 "DeepSeek", "OpenAI"
-  displayName String
-  baseUrl     String?  // API 服务基地址
-  website     String?
-  logoUrl     String?
-  description String?
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String   @id @default(cuid())
+  name            String   @unique // 内部标识，如 "DeepSeek", "OpenAI"
+  displayName     String
+  baseUrl         String?  // API 服务基地址
+  website         String?
+  logoUrl         String?
+  description     String?
+  quota           Decimal? @db.Decimal(20, 2) // 额度（积分）
+  quotaUnit       String?  @default("points") // 额度单位：points(积分)
+  mainAccountToken String? // 主账户token
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // 关联的模型
   models      AIModel[]
 
   @@index([name])
   @@index([isActive])
+  @@index([quotaUnit])
   @@map("ai_providers")
 }
 
@@ -138,6 +142,7 @@ model AIModel {
   description String?
   isActive    Boolean  @default(true)
   requiresKey Boolean  @default(false) // 是否需要 API 密钥
+  apiConfig   String? @db.Text // API配置参数（JSON字符串），存储每个模型独有的请求参数
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -160,9 +165,10 @@ model ModelPrice {
   id          String   @id @default(cuid())
   modelId     String
   packageId   String?  // 套餐ID，null表示默认价格
-  inputPrice  Decimal  @default(0) @db.Decimal(10, 6) // 输入Token单价
-  outputPrice Decimal  @default(0) @db.Decimal(10, 6) // 输出Token单价
-  callPrice   Decimal  @default(0) @db.Decimal(10, 2) // 调用次数单价
+  pricingType String   @default("token") // 计价类型：token(按Token计价)、call(按调用次数计价)
+  inputPrice  Decimal  @default(0) @db.Decimal(10, 6) // 输入Token单价（积分），pricingType为token时使用
+  outputPrice Decimal  @default(0) @db.Decimal(10, 6) // 输出Token单价（积分），pricingType为token时使用
+  callPrice   Decimal  @default(0) @db.Decimal(10, 2) // 调用次数单价（积分），pricingType为call时使用
   effectiveAt DateTime @default(now())
   expiredAt   DateTime?
   createdAt   DateTime @default(now())
@@ -172,6 +178,7 @@ model ModelPrice {
 
   @@index([modelId])
   @@index([packageId])
+  @@index([pricingType])
   @@index([effectiveAt])
   @@map("model_prices")
 }
@@ -186,8 +193,10 @@ model Package {
   description   String?
   type          String        // free, paid, trial
   duration      Int?          // 有效期（天），null表示永久
-  totalQuota    Decimal?      @db.Decimal(20, 2) // Token额度，null表示无限
-  totalCalls    Int?          // 调用次数额度，null表示无限
+  totalQuota    Decimal?      @db.Decimal(20, 2) // 额度（积分），null表示无限
+  price         Decimal?      @db.Decimal(20, 2) // 套餐金额
+  priceUnit     String?       // 套餐金额单位：yuan(元)、usd(美元)
+  discount      Decimal?      @db.Decimal(5, 2) // 套餐折扣（百分比），如10表示10%折扣
   maxDevices    Int?          // 最大设备数量，null表示无限
   availableModels String?     // 可用模型ID列表（JSON数组）
   isStackable   Boolean       @default(false) // 是否可叠加
@@ -234,11 +243,9 @@ model UserQuota {
   id          String   @id @default(cuid())
   userId      String
   packageId   String?
-  available   Decimal  @default(0) @db.Decimal(20, 2) // 可用额度（Token）
-  frozen      Decimal  @default(0) @db.Decimal(20, 2) // 冻结额度
-  used        Decimal  @default(0) @db.Decimal(20, 2) // 已使用额度
-  availableCalls Int   @default(0) // 可用调用次数
-  usedCalls   Int      @default(0) // 已使用调用次数
+  available   Decimal  @default(0) @db.Decimal(20, 2) // 可用额度（积分）
+  frozen      Decimal  @default(0) @db.Decimal(20, 2) // 冻结额度（积分）
+  used        Decimal  @default(0) @db.Decimal(20, 2) // 已使用额度（积分）
   updatedAt   DateTime @updatedAt
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -255,10 +262,9 @@ model QuotaRecord {
   userId      String
   packageId   String?
   type        String   // increase, decrease, freeze, unfreeze
-  amount      Decimal  @db.Decimal(20, 2) // 变动额度（Token）
-  calls       Int      @default(0) // 变动调用次数
-  before      Decimal  @db.Decimal(20, 2) // 变动前额度
-  after       Decimal  @db.Decimal(20, 2) // 变动后额度
+  amount      Decimal  @db.Decimal(20, 2) // 变动额度（积分）
+  before      Decimal  @db.Decimal(20, 2) // 变动前额度（积分）
+  after       Decimal  @db.Decimal(20, 2) // 变动后额度（积分）
   reason      String?
   requestId   String?  // 关联的请求ID
   createdAt   DateTime @default(now())

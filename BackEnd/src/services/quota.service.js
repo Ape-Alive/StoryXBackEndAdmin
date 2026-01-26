@@ -42,7 +42,7 @@ class QuotaService {
   /**
    * 手动调整额度（管理员操作）
    */
-  async adjustQuota(userId, packageId, amount, calls, reason, adminId = null, ipAddress = null) {
+  async adjustQuota(userId, packageId, amount, reason, adminId = null, ipAddress = null) {
     const user = await prisma.user.findUnique({
       where: { id: userId }
     });
@@ -55,17 +55,14 @@ class QuotaService {
 
     const before = quota ? quota.available : 0;
     const newAmount = before + amount;
-    const beforeCalls = quota ? quota.availableCalls : 0;
-    const newCalls = beforeCalls + calls;
 
-    if (newAmount < 0 || newCalls < 0) {
+    if (newAmount < 0) {
       throw new BadRequestError('Resulting quota cannot be negative');
     }
 
     // 更新或创建额度
     quota = await quotaRepository.upsertQuota(userId, packageId, {
-      available: newAmount,
-      availableCalls: newCalls
+      available: newAmount
     });
 
     // 记录流水
@@ -75,7 +72,6 @@ class QuotaService {
       packageId,
       type: recordType,
       amount: Math.abs(amount),
-      calls: Math.abs(calls),
       before,
       after: newAmount,
       reason: reason || `Manual adjustment by admin`
@@ -89,7 +85,7 @@ class QuotaService {
         action: 'ADJUST_QUOTA',
         targetType: 'quota',
         targetId: quota.id,
-        details: { userId, packageId, amount, calls, reason },
+        details: { userId, packageId, amount, reason },
         ipAddress
       });
     }

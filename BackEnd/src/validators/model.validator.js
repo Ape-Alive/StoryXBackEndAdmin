@@ -47,7 +47,9 @@ const createModelValidator = [
     .notEmpty()
     .withMessage('Model name is required')
     .isString()
-    .withMessage('Model name must be a string'),
+    .withMessage('Model name must be a string')
+    .matches(/^[a-zA-Z0-9_.-]+$/)
+    .withMessage('Model name can only contain letters, numbers, underscores, dots, and hyphens'),
   body('displayName')
     .notEmpty()
     .withMessage('Display name is required')
@@ -83,7 +85,23 @@ const createModelValidator = [
   body('requiresKey')
     .optional()
     .isBoolean()
-    .withMessage('requiresKey must be a boolean')
+    .withMessage('requiresKey must be a boolean'),
+  body('apiConfig')
+    .optional()
+    .isString()
+    .withMessage('API config must be a string')
+    .custom((value) => {
+      if (value) {
+        try {
+          JSON.parse(value);
+          return true;
+        } catch (e) {
+          throw new Error('API config must be a valid JSON string');
+        }
+      }
+      return true;
+    })
+    .withMessage('API config must be a valid JSON string')
 ];
 
 /**
@@ -116,7 +134,23 @@ const updateModelValidator = [
   body('requiresKey')
     .optional()
     .isBoolean()
-    .withMessage('requiresKey must be a boolean')
+    .withMessage('requiresKey must be a boolean'),
+  body('apiConfig')
+    .optional()
+    .isString()
+    .withMessage('API config must be a string')
+    .custom((value) => {
+      if (value) {
+        try {
+          JSON.parse(value);
+          return true;
+        } catch (e) {
+          throw new Error('API config must be a valid JSON string');
+        }
+      }
+      return true;
+    })
+    .withMessage('API config must be a valid JSON string')
 ];
 
 /**
@@ -148,10 +182,85 @@ const batchDeleteValidator = [
     .withMessage('Each ID must be a string')
 ];
 
+/**
+ * 创建模型价格验证
+ */
+const createModelPriceValidator = [
+  param('id')
+    .notEmpty()
+    .withMessage('Model ID is required'),
+  body('packageId')
+    .optional()
+    .isString()
+    .withMessage('Package ID must be a string'),
+  body('pricingType')
+    .optional()
+    .isIn(['token', 'call'])
+    .withMessage('Pricing type must be either token or call'),
+  body('inputPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Input price must be a non-negative number'),
+  body('outputPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Output price must be a non-negative number'),
+  body('callPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Call price must be a non-negative number'),
+  body('effectiveAt')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid effective date format'),
+  body('expiredAt')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid expired date format')
+];
+
+/**
+ * 更新模型价格验证
+ */
+const updateModelPriceValidator = [
+  param('id')
+    .notEmpty()
+    .withMessage('Model ID is required'),
+  param('priceId')
+    .notEmpty()
+    .withMessage('Price ID is required'),
+  body('pricingType')
+    .optional()
+    .isIn(['token', 'call'])
+    .withMessage('Pricing type must be either token or call'),
+  body('inputPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Input price must be a non-negative number'),
+  body('outputPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Output price must be a non-negative number'),
+  body('callPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Call price must be a non-negative number'),
+  body('effectiveAt')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid effective date format'),
+  body('expiredAt')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid expired date format')
+];
+
 module.exports = {
   getModelsValidator,
   createModelValidator,
   updateModelValidator,
   batchUpdateStatusValidator,
-  batchDeleteValidator
+  batchDeleteValidator,
+  createModelPriceValidator,
+  updateModelPriceValidator
 };
