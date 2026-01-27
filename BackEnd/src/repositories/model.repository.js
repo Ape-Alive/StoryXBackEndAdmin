@@ -215,23 +215,79 @@ class ModelRepository {
   }
 
   /**
-   * 获取模型价格列表
+   * 获取模型价格列表（分页）
+   * @param {string|null} modelId - 模型ID，如果为null则查询全部模型的价格
+   * @param {object} filters - 筛选条件
+   * @param {object} pagination - 分页参数
    */
-  async findPrices(modelId, packageId = null) {
-    const where = {
-      modelId
-    };
+  async findPrices(modelId, filters = {}, pagination = { page: 1, pageSize: 20 }) {
+    const { page = 1, pageSize = 20 } = pagination;
+    const skip = (page - 1) * pageSize;
 
-    if (packageId !== null) {
-      where.packageId = packageId;
+    const where = {};
+
+    // 如果传了模型ID，则添加筛选条件
+    if (modelId) {
+      where.modelId = modelId;
     }
 
-    return await prisma.modelPrice.findMany({
-      where,
-      orderBy: {
-        effectiveAt: 'desc'
+    if (filters.packageId !== undefined && filters.packageId !== null) {
+      where.packageId = filters.packageId;
+    }
+
+    if (filters.pricingType) {
+      where.pricingType = filters.pricingType;
+    }
+
+    if (filters.effectiveAt) {
+      where.effectiveAt = {};
+      if (filters.effectiveAt.gte) {
+        where.effectiveAt.gte = new Date(filters.effectiveAt.gte);
       }
-    });
+      if (filters.effectiveAt.lte) {
+        where.effectiveAt.lte = new Date(filters.effectiveAt.lte);
+      }
+    }
+
+    if (filters.expiredAt) {
+      where.expiredAt = {};
+      if (filters.expiredAt.gte) {
+        where.expiredAt.gte = new Date(filters.expiredAt.gte);
+      }
+      if (filters.expiredAt.lte) {
+        where.expiredAt.lte = new Date(filters.expiredAt.lte);
+      }
+    }
+
+    const orderBy = {
+      effectiveAt: 'desc'
+    };
+
+    const [data, total] = await Promise.all([
+      prisma.modelPrice.findMany({
+        where,
+        skip,
+        take: pageSize,
+        orderBy,
+        include: {
+          model: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true
+            }
+          }
+        }
+      }),
+      prisma.modelPrice.count({ where })
+    ]);
+
+    return {
+      data,
+      total,
+      page,
+      pageSize
+    };
   }
 
   /**

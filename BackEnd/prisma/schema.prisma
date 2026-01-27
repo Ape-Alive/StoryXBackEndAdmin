@@ -198,7 +198,7 @@ model Package {
   priceUnit     String?       // 套餐金额单位：yuan(元)、usd(美元)
   discount      Decimal?      @db.Decimal(5, 2) // 套餐折扣（百分比），如10表示10%折扣
   maxDevices    Int?          // 最大设备数量，null表示无限
-  availableModels String?     // 可用模型ID列表（JSON数组）
+  availableModels String?     // 可用模型ID列表（JSON数组），null或空数组表示所有模型都可用
   isStackable   Boolean       @default(false) // 是否可叠加
   priority      Int           @default(0) // 优先级，数字越大优先级越高
   isActive      Boolean       @default(true)

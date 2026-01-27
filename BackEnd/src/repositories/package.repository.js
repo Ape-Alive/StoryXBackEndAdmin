@@ -112,11 +112,15 @@ class PackageRepository {
         description: data.description,
         type: data.type,
         duration: data.duration,
-        totalQuota: data.totalQuota,
+        quota: data.quota,
         price: data.price,
         priceUnit: data.priceUnit,
         discount: data.discount,
-        availableModels: data.availableModels ? JSON.stringify(data.availableModels) : null,
+        maxDevices: data.maxDevices,
+        // availableModels: null 或空数组表示所有模型都可用
+        availableModels: data.availableModels && Array.isArray(data.availableModels) && data.availableModels.length > 0
+          ? JSON.stringify(data.availableModels)
+          : null,
         isStackable: data.isStackable !== undefined ? data.isStackable : false,
         priority: data.priority || 0,
         isActive: data.isActive !== undefined ? data.isActive : true
@@ -134,12 +138,16 @@ class PackageRepository {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.type !== undefined) updateData.type = data.type;
     if (data.duration !== undefined) updateData.duration = data.duration;
-    if (data.totalQuota !== undefined) updateData.totalQuota = data.totalQuota;
+    if (data.quota !== undefined) updateData.quota = data.quota;
     if (data.price !== undefined) updateData.price = data.price;
     if (data.priceUnit !== undefined) updateData.priceUnit = data.priceUnit;
     if (data.discount !== undefined) updateData.discount = data.discount;
+    if (data.maxDevices !== undefined) updateData.maxDevices = data.maxDevices;
     if (data.availableModels !== undefined) {
-      updateData.availableModels = data.availableModels ? JSON.stringify(data.availableModels) : null;
+      // availableModels: null 或空数组表示所有模型都可用
+      updateData.availableModels = data.availableModels && Array.isArray(data.availableModels) && data.availableModels.length > 0
+        ? JSON.stringify(data.availableModels)
+        : null;
     }
     if (data.isStackable !== undefined) updateData.isStackable = data.isStackable;
     if (data.priority !== undefined) updateData.priority = data.priority;
@@ -191,16 +199,70 @@ class PackageRepository {
         description: original.description,
         type: original.type,
         duration: original.duration,
-        totalQuota: original.totalQuota,
+        quota: original.quota,
         price: original.price,
         priceUnit: original.priceUnit,
         discount: original.discount,
+        maxDevices: original.maxDevices,
         availableModels: original.availableModels,
         isStackable: original.isStackable,
         priority: original.priority,
         isActive: false // 复制的套餐默认不启用
       }
     });
+  }
+
+  /**
+   * 批量更新套餐
+   */
+  async batchUpdate(ids, data) {
+    const result = await prisma.package.updateMany({
+      where: {
+        id: { in: ids }
+      },
+      data: {
+        ...data,
+        updatedAt: new Date()
+      }
+    });
+
+    return {
+      count: result.count,
+      ids: ids
+    };
+  }
+
+  /**
+   * 批量删除套餐
+   */
+  async batchDelete(ids) {
+    const result = await prisma.package.deleteMany({
+      where: {
+        id: { in: ids }
+      }
+    });
+
+    return {
+      count: result.count,
+      ids: ids
+    };
+  }
+
+  /**
+   * 查找正在使用的套餐ID列表
+   */
+  async findPackagesInUse(ids) {
+    const userPackages = await prisma.userPackage.findMany({
+      where: {
+        packageId: { in: ids }
+      },
+      select: {
+        packageId: true
+      },
+      distinct: ['packageId']
+    });
+
+    return userPackages.map(up => up.packageId);
   }
 }
 

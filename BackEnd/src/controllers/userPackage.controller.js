@@ -115,6 +115,100 @@ class UserPackageController {
       next(error);
     }
   }
+
+  /**
+   * 获取可订阅的套餐列表（终端用户）
+   */
+  async getAvailablePackages(req, res, next) {
+    try {
+      const { type } = req.query;
+      const packages = await userPackageService.getAvailablePackages(type);
+      return ResponseHandler.success(res, packages, 'Available packages retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 订阅套餐（终端用户）
+   */
+  async subscribePackage(req, res, next) {
+    try {
+      const userId = req.user.id; // 从 token 中获取用户ID
+      const { packageId, priority } = req.body;
+      const userPackage = await userPackageService.subscribePackage(userId, packageId, priority, req.ip);
+      return ResponseHandler.success(res, userPackage, 'Package subscribed successfully', 201);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 获取我的套餐列表（终端用户）
+   */
+  async getMyPackages(req, res, next) {
+    try {
+      const userId = req.user.id; // 从 token 中获取用户ID
+      const filters = {
+        activeOnly: req.query.activeOnly === 'true'
+      };
+      const pagination = {
+        page: parseInt(req.query.page) || 1,
+        pageSize: parseInt(req.query.pageSize) || 20
+      };
+      const result = await userPackageService.getUserPackages({ ...filters, userId }, pagination);
+      return ResponseHandler.paginated(res, result.data, {
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 获取我的套餐详情（终端用户）
+   */
+  async getMyPackageDetail(req, res, next) {
+    try {
+      const userId = req.user.id; // 从 token 中获取用户ID
+      const { id } = req.params;
+      const userPackage = await userPackageService.getMyPackageDetail(id, userId);
+      return ResponseHandler.success(res, userPackage, 'Package detail retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 续费套餐（终端用户）
+   */
+  async renewPackage(req, res, next) {
+    try {
+      const userId = req.user.id; // 从 token 中获取用户ID
+      const { id } = req.params;
+      const { days } = req.body;
+      const userPackage = await userPackageService.renewPackage(id, userId, days, req.ip);
+      return ResponseHandler.success(res, userPackage, 'Package renewed successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 取消订阅（终端用户）
+   */
+  async unsubscribePackage(req, res, next) {
+    try {
+      const userId = req.user.id; // 从 token 中获取用户ID
+      const { id } = req.params;
+      await userPackageService.unsubscribePackage(id, userId, req.ip);
+      return ResponseHandler.success(res, null, 'Package unsubscribed successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new UserPackageController();

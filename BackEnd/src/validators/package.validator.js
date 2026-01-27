@@ -10,19 +10,29 @@ const getPackagesValidator = [
     .withMessage('Page must be a positive integer'),
   query('pageSize')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Page size must be between 1 and 100'),
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Page size must be between 1 and 1000'),
   query('type')
     .optional()
     .isIn(['free', 'paid', 'trial'])
     .withMessage('Invalid package type'),
   query('isActive')
     .optional()
-    .isBoolean()
+    .custom((value) => {
+      if (value === 'true' || value === 'false' || value === true || value === false) {
+        return true;
+      }
+      throw new Error('isActive must be a boolean');
+    })
     .withMessage('isActive must be a boolean'),
   query('isStackable')
     .optional()
-    .isBoolean()
+    .custom((value) => {
+      if (value === 'true' || value === 'false' || value === true || value === false) {
+        return true;
+      }
+      throw new Error('isStackable must be a boolean');
+    })
     .withMessage('isStackable must be a boolean')
 ];
 
@@ -49,18 +59,18 @@ const createPackageValidator = [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Duration must be a positive integer'),
-  body('totalQuota')
+  body('quota')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Total quota must be a non-negative number (积分)'),
+    .withMessage('Quota must be a non-negative number (积分)'),
   body('price')
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Price must be a non-negative number'),
   body('priceUnit')
     .optional()
-    .isIn(['yuan', 'usd'])
-    .withMessage('Price unit must be one of: yuan, usd'),
+    .isIn(['CNY', 'USD'])
+    .withMessage('Price unit must be one of: CNY, USD'),
   body('discount')
     .optional()
     .isFloat({ min: 0, max: 100 })
@@ -69,6 +79,10 @@ const createPackageValidator = [
     .optional()
     .isArray()
     .withMessage('Available models must be an array'),
+  body('maxDevices')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Max devices must be a positive integer'),
   body('isStackable')
     .optional()
     .isBoolean()
@@ -98,18 +112,18 @@ const updatePackageValidator = [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Duration must be a positive integer'),
-  body('totalQuota')
+  body('quota')
     .optional()
     .isFloat({ min: 0 })
-    .withMessage('Total quota must be a non-negative number (积分)'),
+    .withMessage('Quota must be a non-negative number (积分)'),
   body('price')
     .optional()
     .isFloat({ min: 0 })
     .withMessage('Price must be a non-negative number'),
   body('priceUnit')
     .optional()
-    .isIn(['yuan', 'usd'])
-    .withMessage('Price unit must be one of: yuan, usd'),
+    .isIn(['CNY', 'USD'])
+    .withMessage('Price unit must be one of: CNY, USD'),
   body('discount')
     .optional()
     .isFloat({ min: 0, max: 100 })
@@ -118,6 +132,10 @@ const updatePackageValidator = [
     .optional()
     .isArray()
     .withMessage('Available models must be an array'),
+  body('maxDevices')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Max devices must be a positive integer'),
   body('isStackable')
     .optional()
     .isBoolean()

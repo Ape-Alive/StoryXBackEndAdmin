@@ -110,6 +110,46 @@ class PackageController {
       next(error);
     }
   }
+
+  /**
+   * 更新套餐状态
+   */
+  async updatePackageStatus(req, res, next) {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      const pkg = await packageService.updatePackageStatus(id, isActive, req.user?.id, req.ip);
+      return ResponseHandler.success(res, pkg, 'Package status updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 批量更新套餐状态
+   */
+  async batchUpdateStatus(req, res, next) {
+    try {
+      const { ids, isActive } = req.body;
+      const result = await packageService.batchUpdateStatus(ids, isActive, req.user?.id, req.ip);
+      return ResponseHandler.success(res, result, 'Package statuses updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 批量删除套餐
+   */
+  async batchDeletePackages(req, res, next) {
+    try {
+      const { ids } = req.body;
+      const result = await packageService.batchDeletePackages(ids, req.user?.id, req.ip);
+      return ResponseHandler.success(res, result, 'Packages deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new PackageController();

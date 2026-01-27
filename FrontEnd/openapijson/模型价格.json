@@ -1,0 +1,443 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "模型管理"
+    }
+  ],
+  "paths": {
+    "/api/models/{id}/prices": {
+      "post": {
+        "summary": "获取模型价格列表（分页查询）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "模型管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "模型ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "page": {
+                    "type": "integer",
+                    "default": 1,
+                    "minimum": 1,
+                    "description": "页码",
+                    "example": 1
+                  },
+                  "pageSize": {
+                    "type": "integer",
+                    "default": 20,
+                    "minimum": 1,
+                    "maximum": 1000,
+                    "description": "每页数量",
+                    "example": 20
+                  },
+                  "packageId": {
+                    "type": "string",
+                    "description": "套餐ID（可选，用于筛选特定套餐的价格）",
+                    "example": "clx123456789"
+                  },
+                  "pricingType": {
+                    "type": "string",
+                    "enum": [
+                      "token",
+                      "call"
+                    ],
+                    "description": "计价类型筛选（可选）",
+                    "example": "token"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "生效开始时间（可选）",
+                    "example": "2024-01-01T00:00:00Z"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "生效结束时间（可选）",
+                    "example": "2024-12-31T23:59:59Z"
+                  },
+                  "expiredStartDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "过期开始时间（可选）",
+                    "example": "2024-01-01T00:00:00Z"
+                  },
+                  "expiredEndDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "过期结束时间（可选）",
+                    "example": "2024-12-31T23:59:59Z"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        },
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "价格ID"
+                              },
+                              "modelId": {
+                                "type": "string",
+                                "description": "模型ID"
+                              },
+                              "packageId": {
+                                "type": "string",
+                                "description": "套餐ID",
+                                "nullable": true
+                              },
+                              "pricingType": {
+                                "type": "string",
+                                "enum": [
+                                  "token",
+                                  "call"
+                                ],
+                                "description": "计价类型"
+                              },
+                              "inputPrice": {
+                                "type": "number",
+                                "format": "decimal",
+                                "description": "输入Token单价（积分）"
+                              },
+                              "outputPrice": {
+                                "type": "number",
+                                "format": "decimal",
+                                "description": "输出Token单价（积分）"
+                              },
+                              "callPrice": {
+                                "type": "number",
+                                "format": "decimal",
+                                "description": "调用次数单价（积分）"
+                              },
+                              "effectiveAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "生效时间"
+                              },
+                              "expiredAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "过期时间",
+                                "nullable": true
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "创建时间"
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "更新时间"
+                              },
+                              "model": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "displayName": {
+                                    "type": "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/models/{id}/prices/{priceId}": {
+      "put": {
+        "summary": "更新模型价格",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "模型管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "模型ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "priceId",
+            "in": "path",
+            "description": "价格ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "pricingType": {
+                    "type": "string",
+                    "enum": [
+                      "token",
+                      "call"
+                    ],
+                    "description": "计价类型：token(按Token计价)、call(按调用次数计价)"
+                  },
+                  "inputPrice": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "输入Token单价（积分），pricingType为token时使用"
+                  },
+                  "outputPrice": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "输出Token单价（积分），pricingType为token时使用"
+                  },
+                  "callPrice": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "调用次数单价（积分），pricingType为call时使用"
+                  },
+                  "effectiveAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "生效时间"
+                  },
+                  "expiredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "过期时间（可选）"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "headers": {}
+          },
+          "404": {
+            "description": "价格不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/models/{id}/prices/create": {
+      "post": {
+        "summary": "创建模型价格",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "模型管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "模型ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "packageId": {
+                    "type": "string",
+                    "description": "套餐ID（可选，null表示默认价格）"
+                  },
+                  "pricingType": {
+                    "type": "string",
+                    "enum": [
+                      "token",
+                      "call"
+                    ],
+                    "default": "token",
+                    "description": "计价类型：token(按Token计价)、call(按调用次数计价)",
+                    "example": "token"
+                  },
+                  "inputPrice": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "输入Token单价（积分），pricingType为token时使用",
+                    "example": 0.001
+                  },
+                  "outputPrice": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "输出Token单价（积分），pricingType为token时使用",
+                    "example": 0.002
+                  },
+                  "callPrice": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "调用次数单价（积分），pricingType为call时使用",
+                    "example": 0.1
+                  },
+                  "effectiveAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "生效时间"
+                  },
+                  "expiredAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "过期时间（可选）"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Success message"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

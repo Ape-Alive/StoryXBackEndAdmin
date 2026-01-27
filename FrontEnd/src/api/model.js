@@ -70,19 +70,20 @@ export function batchDeleteModels(ids) {
   })
 }
 
-// 获取模型价格列表
-export function getModelPrices(modelId, params) {
+// 获取模型价格列表（POST分页查询）
+// modelId 可选，不传则返回全部模型的价格列表
+export function getModelPrices(data) {
   return request({
-    url: `/models/${modelId}/prices`,
-    method: 'get',
-    params
+    url: '/models/prices',
+    method: 'post',
+    data
   })
 }
 
 // 创建模型价格
 export function createModelPrice(modelId, data) {
   return request({
-    url: `/models/${modelId}/prices`,
+    url: `/models/${modelId}/prices/create`,
     method: 'post',
     data
   })

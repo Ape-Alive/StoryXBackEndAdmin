@@ -11,8 +11,8 @@ const getModelsValidator = [
     .withMessage('Page must be a positive integer'),
   query('pageSize')
     .optional()
-    .isInt({ min: 1, max: 100 })
-    .withMessage('Page size must be between 1 and 100'),
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Page size must be between 1 and 1000'),
   query('name')
     .optional()
     .isString()
@@ -27,7 +27,12 @@ const getModelsValidator = [
     .withMessage('Provider ID must be a string'),
   query('isActive')
     .optional()
-    .isBoolean()
+    .custom((value) => {
+      if (value === 'true' || value === 'false' || value === true || value === false) {
+        return true;
+      }
+      throw new Error('isActive must be a boolean');
+    })
     .withMessage('isActive must be a boolean'),
   query('startDate')
     .optional()
@@ -183,12 +188,21 @@ const batchDeleteValidator = [
 ];
 
 /**
- * 创建模型价格验证
+ * 获取模型价格列表验证（POST分页查询）
  */
-const createModelPriceValidator = [
-  param('id')
-    .notEmpty()
-    .withMessage('Model ID is required'),
+const getModelPricesValidator = [
+  body('modelId')
+    .optional()
+    .isString()
+    .withMessage('Model ID must be a string'),
+  body('page')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Page must be a positive integer'),
+  body('pageSize')
+    .optional()
+    .isInt({ min: 1, max: 1000 })
+    .withMessage('Page size must be between 1 and 1000'),
   body('packageId')
     .optional()
     .isString()
@@ -197,25 +211,111 @@ const createModelPriceValidator = [
     .optional()
     .isIn(['token', 'call'])
     .withMessage('Pricing type must be either token or call'),
+  body('startDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid start date format'),
+  body('endDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid end date format'),
+  body('expiredStartDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid expired start date format'),
+  body('expiredEndDate')
+    .optional()
+    .isISO8601()
+    .withMessage('Invalid expired end date format')
+];
+
+/**
+ * 创建模型价格验证
+ */
+const createModelPriceValidator = [
+  param('id')
+    .notEmpty()
+    .withMessage('Model ID is required'),
+  body('packageId')
+    .optional()
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true; // 允许 null 或空字符串
+      }
+      if (typeof value === 'string') {
+        return true;
+      }
+      throw new Error('Package ID must be a string or null');
+    })
+    .withMessage('Package ID must be a string or null'),
+  body('pricingType')
+    .notEmpty()
+    .withMessage('Pricing type is required')
+    .isIn(['token', 'call'])
+    .withMessage('Pricing type must be either token or call'),
   body('inputPrice')
     .optional()
-    .isFloat({ min: 0 })
+    .custom((value, { req }) => {
+      if (req.body.pricingType === 'token') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Input price is required when pricing type is token');
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Input price must be a non-negative number');
+        }
+      }
+      return true;
+    })
     .withMessage('Input price must be a non-negative number'),
   body('outputPrice')
     .optional()
-    .isFloat({ min: 0 })
+    .custom((value, { req }) => {
+      if (req.body.pricingType === 'token') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Output price is required when pricing type is token');
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Output price must be a non-negative number');
+        }
+      }
+      return true;
+    })
     .withMessage('Output price must be a non-negative number'),
   body('callPrice')
     .optional()
-    .isFloat({ min: 0 })
+    .custom((value, { req }) => {
+      if (req.body.pricingType === 'call') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Call price is required when pricing type is call');
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Call price must be a non-negative number');
+        }
+      }
+      return true;
+    })
     .withMessage('Call price must be a non-negative number'),
   body('effectiveAt')
-    .optional()
+    .notEmpty()
+    .withMessage('Effective date is required')
     .isISO8601()
     .withMessage('Invalid effective date format'),
   body('expiredAt')
     .optional()
-    .isISO8601()
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true; // 允许 null 或空字符串
+      }
+      // 验证 ISO8601 格式
+      const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+      if (!iso8601Regex.test(value) && !Date.parse(value)) {
+        throw new Error('Invalid expired date format');
+      }
+      return true;
+    })
     .withMessage('Invalid expired date format')
 ];
 
@@ -235,23 +335,97 @@ const updateModelPriceValidator = [
     .withMessage('Pricing type must be either token or call'),
   body('inputPrice')
     .optional()
-    .isFloat({ min: 0 })
+    .custom((value, { req }) => {
+      // 如果提供了 pricingType，则根据类型验证
+      if (req.body.pricingType === 'token') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Input price is required when pricing type is token');
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Input price must be a non-negative number');
+        }
+      } else if (value !== undefined && value !== null && value !== '') {
+        // 如果提供了值但不是 token 类型，也要验证格式
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Input price must be a non-negative number');
+        }
+      }
+      return true;
+    })
     .withMessage('Input price must be a non-negative number'),
   body('outputPrice')
     .optional()
-    .isFloat({ min: 0 })
+    .custom((value, { req }) => {
+      // 如果提供了 pricingType，则根据类型验证
+      if (req.body.pricingType === 'token') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Output price is required when pricing type is token');
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Output price must be a non-negative number');
+        }
+      } else if (value !== undefined && value !== null && value !== '') {
+        // 如果提供了值但不是 token 类型，也要验证格式
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Output price must be a non-negative number');
+        }
+      }
+      return true;
+    })
     .withMessage('Output price must be a non-negative number'),
   body('callPrice')
     .optional()
-    .isFloat({ min: 0 })
+    .custom((value, { req }) => {
+      // 如果提供了 pricingType，则根据类型验证
+      if (req.body.pricingType === 'call') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Call price is required when pricing type is call');
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Call price must be a non-negative number');
+        }
+      } else if (value !== undefined && value !== null && value !== '') {
+        // 如果提供了值但不是 call 类型，也要验证格式
+        const numValue = typeof value === 'string' ? parseFloat(value) : value;
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Call price must be a non-negative number');
+        }
+      }
+      return true;
+    })
     .withMessage('Call price must be a non-negative number'),
   body('effectiveAt')
     .optional()
-    .isISO8601()
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true; // 允许不更新
+      }
+      // 验证 ISO8601 格式
+      const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+      if (!iso8601Regex.test(value) && !Date.parse(value)) {
+        throw new Error('Invalid effective date format');
+      }
+      return true;
+    })
     .withMessage('Invalid effective date format'),
   body('expiredAt')
     .optional()
-    .isISO8601()
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true; // 允许 null 或空字符串
+      }
+      // 验证 ISO8601 格式
+      const iso8601Regex = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/;
+      if (!iso8601Regex.test(value) && !Date.parse(value)) {
+        throw new Error('Invalid expired date format');
+      }
+      return true;
+    })
     .withMessage('Invalid expired date format')
 ];
 
@@ -261,6 +435,7 @@ module.exports = {
   updateModelValidator,
   batchUpdateStatusValidator,
   batchDeleteValidator,
+  getModelPricesValidator,
   createModelPriceValidator,
   updateModelPriceValidator
 };

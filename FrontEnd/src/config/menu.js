@@ -13,12 +13,21 @@ export const MENU_STRUCTURE = [
         ]
     },
     {
-        title: '用户身份',
+        title: '系统用户管理',
         icon: 'User',
         children: [
-            { id: 'user-list', label: '用户实体列表', path: '/user/list', icon: 'User' },
-            { id: 'user-status', label: '权限状态管控', path: '/user/status', icon: 'Lock' },
-            { id: 'device-manage', label: '安全设备管理', path: '/user/device', icon: 'Monitor' }
+            { id: 'system-user-list', label: '系统用户列表', path: '/system-user/list', icon: 'User' },
+            { id: 'system-user-status', label: '权限状态管控', path: '/system-user/status', icon: 'Lock' },
+        ]
+    },
+    {
+        title: '终端用户管理',
+        icon: 'User',
+        children: [
+            { id: 'terminal-user-list', label: '终端用户列表', path: '/terminal-user/list', icon: 'User' },
+            { id: 'device-manage', label: '安全设备管理', path: '/terminal-user/device', icon: 'Monitor' },
+            { id: 'user-package', label: '用户套餐管理', path: '/terminal-user/package', icon: 'Box' },
+            { id: 'user-quota', label: '用户额度管理', path: '/terminal-user/quota', icon: 'PieChart' }
         ]
     },
     {
@@ -35,8 +44,8 @@ export const MENU_STRUCTURE = [
         icon: 'Wallet',
         children: [
             { id: 'packages', label: '商业套餐定义', path: '/package/list', icon: 'Box' },
-            { id: 'quota', label: '配额分配管理', path: '/quota/list', icon: 'PieChart' },
-            { id: 'billing-logs', label: '结算账务流水', path: '/quota/billing', icon: 'Document' }
+            { id: 'quota', label: '订单结算管理', path: '/quota/list', icon: 'PieChart' },
+            { id: 'billing-logs', label: '额度流水管理', path: '/quota/billing', icon: 'Document' }
         ]
     },
     {
@@ -51,8 +60,8 @@ export const MENU_STRUCTURE = [
         title: '提示词库',
         icon: 'Document',
         children: [
-            { id: 'prompt-category', label: '提示词分类', path: '/prompt/category', icon: 'Folder' },
-            { id: 'prompt-list', label: '提示词列表', path: '/prompt/list', icon: 'Document' }
+            { id: 'prompt-category', label: '系统提示词库', path: '/system-prompt/category', icon: 'Folder' },
+            { id: 'prompt-list', label: '用户提示词库', path: '/user-prompt/list', icon: 'Document' }
         ]
     },
     {

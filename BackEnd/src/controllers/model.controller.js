@@ -140,14 +140,52 @@ class ModelController {
   }
 
   /**
-   * 获取模型价格列表
+   * 获取模型价格列表（分页查询）
    */
   async getModelPrices(req, res, next) {
     try {
-      const { id } = req.params;
-      const { packageId } = req.query;
-      const prices = await modelService.getModelPrices(id, packageId || null);
-      return ResponseHandler.success(res, prices, 'Model prices retrieved successfully');
+      const modelId = req.body.modelId; // 从请求体获取，可选
+      const filters = {
+        packageId: req.body.packageId,
+        pricingType: req.body.pricingType,
+        effectiveAt: {
+          gte: req.body.startDate,
+          lte: req.body.endDate
+        },
+        expiredAt: {
+          gte: req.body.expiredStartDate,
+          lte: req.body.expiredEndDate
+        }
+      };
+
+      // 移除空值
+      Object.keys(filters).forEach(key => {
+        if (filters[key] === undefined || filters[key] === null) {
+          delete filters[key];
+        } else if (typeof filters[key] === 'object' && !Array.isArray(filters[key])) {
+          const obj = filters[key];
+          Object.keys(obj).forEach(subKey => {
+            if (obj[subKey] === undefined || obj[subKey] === null) {
+              delete obj[subKey];
+            }
+          });
+          if (Object.keys(obj).length === 0) {
+            delete filters[key];
+          }
+        }
+      });
+
+      const pagination = {
+        page: parseInt(req.body.page) || 1,
+        pageSize: parseInt(req.body.pageSize) || 20
+      };
+
+      const result = await modelService.getModelPrices(modelId, filters, pagination);
+      return ResponseHandler.paginated(res, result.data, {
+        page: result.page,
+        pageSize: result.pageSize,
+        total: result.total
+      });
     } catch (error) {
       next(error);
     }
@@ -159,7 +197,19 @@ class ModelController {
   async createModelPrice(req, res, next) {
     try {
       const { id } = req.params;
-      const data = { ...req.body, modelId: id };
+      const data = {
+        ...req.body,
+        modelId: id,
+        // 处理 packageId：空字符串转换为 null
+        packageId: req.body.packageId && req.body.packageId !== '' ? req.body.packageId : null,
+        // 确保数字字段是数字类型
+        inputPrice: req.body.inputPrice !== undefined && req.body.inputPrice !== null && req.body.inputPrice !== ''
+          ? parseFloat(req.body.inputPrice) : undefined,
+        outputPrice: req.body.outputPrice !== undefined && req.body.outputPrice !== null && req.body.outputPrice !== ''
+          ? parseFloat(req.body.outputPrice) : undefined,
+        callPrice: req.body.callPrice !== undefined && req.body.callPrice !== null && req.body.callPrice !== ''
+          ? parseFloat(req.body.callPrice) : undefined
+      };
       const price = await modelService.createModelPrice(data, req.user?.id, req.ip);
       return ResponseHandler.success(res, price, 'Model price created successfully', 201);
     } catch (error) {
@@ -173,7 +223,16 @@ class ModelController {
   async updateModelPrice(req, res, next) {
     try {
       const { id, priceId } = req.params;
-      const data = req.body;
+      const data = {
+        ...req.body,
+        // 确保数字字段是数字类型
+        inputPrice: req.body.inputPrice !== undefined && req.body.inputPrice !== null && req.body.inputPrice !== ''
+          ? parseFloat(req.body.inputPrice) : undefined,
+        outputPrice: req.body.outputPrice !== undefined && req.body.outputPrice !== null && req.body.outputPrice !== ''
+          ? parseFloat(req.body.outputPrice) : undefined,
+        callPrice: req.body.callPrice !== undefined && req.body.callPrice !== null && req.body.callPrice !== ''
+          ? parseFloat(req.body.callPrice) : undefined
+      };
       const price = await modelService.updateModelPrice(priceId, data, req.user?.id, req.ip);
       return ResponseHandler.success(res, price, 'Model price updated successfully');
     } catch (error) {

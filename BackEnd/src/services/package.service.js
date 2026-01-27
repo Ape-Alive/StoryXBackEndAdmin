@@ -22,12 +22,16 @@ class PackageService {
     }
 
     // 解析 availableModels JSON
+    // null 或空数组表示所有模型都可用
     if (pkg.availableModels) {
       try {
-        pkg.availableModels = JSON.parse(pkg.availableModels);
+        const parsed = JSON.parse(pkg.availableModels);
+        pkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
       } catch (e) {
-        pkg.availableModels = [];
+        pkg.availableModels = null; // 解析失败时视为所有模型都可用
       }
+    } else {
+      pkg.availableModels = null; // 明确设置为 null 表示所有模型都可用
     }
 
     return pkg;
@@ -50,11 +54,8 @@ class PackageService {
     }
 
     // 验证额度
-    if (data.totalQuota !== null && data.totalQuota < 0) {
-      throw new BadRequestError('Total quota cannot be negative');
-    }
-    if (data.totalCalls !== null && data.totalCalls < 0) {
-      throw new BadRequestError('Total calls cannot be negative');
+    if (data.quota !== null && data.quota !== undefined && data.quota < 0) {
+      throw new BadRequestError('Quota cannot be negative');
     }
 
     const pkg = await packageRepository.create(data);
@@ -96,11 +97,8 @@ class PackageService {
     }
 
     // 验证额度
-    if (data.totalQuota !== undefined && data.totalQuota !== null && data.totalQuota < 0) {
-      throw new BadRequestError('Total quota cannot be negative');
-    }
-    if (data.totalCalls !== undefined && data.totalCalls !== null && data.totalCalls < 0) {
-      throw new BadRequestError('Total calls cannot be negative');
+    if (data.quota !== undefined && data.quota !== null && data.quota < 0) {
+      throw new BadRequestError('Quota cannot be negative');
     }
 
     const updated = await packageRepository.update(id, data);
@@ -185,6 +183,97 @@ class PackageService {
     }
 
     return duplicated;
+  }
+
+  /**
+   * 更新套餐状态
+   */
+  async updatePackageStatus(id, isActive, adminId = null, ipAddress = null) {
+    const pkg = await packageRepository.findById(id);
+    if (!pkg) {
+      throw new NotFoundError('Package not found');
+    }
+
+    const updated = await packageRepository.update(id, { isActive });
+
+    // 记录操作日志
+    if (adminId) {
+      const logService = require('./log.service');
+      await logService.logAdminAction({
+        adminId,
+        action: 'UPDATE_PACKAGE_STATUS',
+        targetType: 'package',
+        targetId: id,
+        details: { isActive },
+        ipAddress
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * 批量更新套餐状态
+   */
+  async batchUpdateStatus(ids, isActive, adminId = null, ipAddress = null) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestError('IDs array is required');
+    }
+
+    const result = await packageRepository.batchUpdate(ids, { isActive });
+
+    // 记录操作日志
+    if (adminId) {
+      const logService = require('./log.service');
+      await logService.logAdminAction({
+        adminId,
+        action: 'BATCH_UPDATE_PACKAGE_STATUS',
+        targetType: 'package',
+        targetId: null,
+        details: { ids, isActive },
+        ipAddress
+      });
+    }
+
+    return {
+      updated: result.count,
+      ids: result.ids
+    };
+  }
+
+  /**
+   * 批量删除套餐
+   */
+  async batchDeletePackages(ids, adminId = null, ipAddress = null) {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      throw new BadRequestError('IDs array is required');
+    }
+
+    // 检查是否有套餐正在使用
+    const packagesInUse = await packageRepository.findPackagesInUse(ids);
+    if (packagesInUse.length > 0) {
+      throw new ConflictError(`Packages in use: ${packagesInUse.join(', ')}`);
+    }
+
+    const result = await packageRepository.batchDelete(ids);
+
+    // 记录操作日志
+    if (adminId) {
+      const logService = require('./log.service');
+      await logService.logAdminAction({
+        adminId,
+        action: 'BATCH_DELETE_PACKAGES',
+        targetType: 'package',
+        targetId: null,
+        details: { ids },
+        ipAddress
+      });
+    }
+
+    return {
+      deleted: result.count,
+      ids: result.ids
+    };
   }
 }
 

@@ -178,15 +178,21 @@ class ModelService {
   }
 
   /**
-   * 获取模型价格列表
+   * 获取模型价格列表（分页）
+   * @param {string|null} modelId - 模型ID，如果为null则查询全部模型的价格
+   * @param {object} filters - 筛选条件
+   * @param {object} pagination - 分页参数
    */
-  async getModelPrices(modelId, packageId = null) {
-    const model = await modelRepository.findById(modelId);
-    if (!model) {
-      throw new NotFoundError('Model not found');
+  async getModelPrices(modelId, filters = {}, pagination = {}) {
+    // 如果传了模型ID，验证模型是否存在
+    if (modelId) {
+      const model = await modelRepository.findById(modelId);
+      if (!model) {
+        throw new NotFoundError('Model not found');
+      }
     }
 
-    return await modelRepository.findPrices(modelId, packageId);
+    return await modelRepository.findPrices(modelId, filters, pagination);
   }
 
   /**

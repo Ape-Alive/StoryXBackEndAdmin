@@ -9,6 +9,7 @@ const {
     updateModelValidator,
     batchUpdateStatusValidator,
     batchDeleteValidator,
+    getModelPricesValidator,
     createModelPriceValidator,
     updateModelPriceValidator
 } = require('../validators/model.validator');
@@ -426,39 +427,147 @@ router.delete(
 
 /**
  * @swagger
- * /api/models/{id}/prices:
- *   get:
- *     summary: 获取模型价格列表
+ * /api/models/prices:
+ *   post:
+ *     summary: 获取模型价格列表（分页查询）
  *     tags: [模型管理]
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: 模型ID
- *       - in: query
- *         name: packageId
- *         schema:
- *           type: string
- *         description: 套餐ID（可选，用于筛选特定套餐的价格）
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               modelId:
+ *                 type: string
+ *                 description: 模型ID（可选，不传则返回全部模型的价格列表）
+ *                 example: clx123456789
+ *               page:
+ *                 type: integer
+ *                 default: 1
+ *                 minimum: 1
+ *                 description: 页码
+ *                 example: 1
+ *               pageSize:
+ *                 type: integer
+ *                 default: 20
+ *                 minimum: 1
+ *                 maximum: 1000
+ *                 description: 每页数量
+ *                 example: 20
+ *               packageId:
+ *                 type: string
+ *                 description: 套餐ID（可选，用于筛选特定套餐的价格）
+ *                 example: clx123456789
+ *               pricingType:
+ *                 type: string
+ *                 enum: [token, call]
+ *                 description: 计价类型筛选（可选）
+ *                 example: token
+ *               startDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 生效开始时间（可选）
+ *                 example: "2024-01-01T00:00:00Z"
+ *               endDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 生效结束时间（可选）
+ *                 example: "2024-12-31T23:59:59Z"
+ *               expiredStartDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 过期开始时间（可选）
+ *                 example: "2024-01-01T00:00:00Z"
+ *               expiredEndDate:
+ *                 type: string
+ *                 format: date-time
+ *                 description: 过期结束时间（可选）
+ *                 example: "2024-12-31T23:59:59Z"
  *     responses:
  *       200:
  *         description: 获取成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     pagination:
+ *                       $ref: '#/components/schemas/Pagination'
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                             description: 价格ID
+ *                           modelId:
+ *                             type: string
+ *                             description: 模型ID
+ *                           packageId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 套餐ID
+ *                           pricingType:
+ *                             type: string
+ *                             enum: [token, call]
+ *                             description: 计价类型
+ *                           inputPrice:
+ *                             type: number
+ *                             format: decimal
+ *                             description: 输入Token单价（积分）
+ *                           outputPrice:
+ *                             type: number
+ *                             format: decimal
+ *                             description: 输出Token单价（积分）
+ *                           callPrice:
+ *                             type: number
+ *                             format: decimal
+ *                             description: 调用次数单价（积分）
+ *                           effectiveAt:
+ *                             type: string
+ *                             format: date-time
+ *                             description: 生效时间
+ *                           expiredAt:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *                             description: 过期时间
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                             description: 创建时间
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                             description: 更新时间
+ *                           model:
+ *                             type: object
+ *                             properties:
+ *                               id:
+ *                                 type: string
+ *                               name:
+ *                                 type: string
+ *                               displayName:
+ *                                 type: string
  */
-// 获取模型价格列表
-router.get(
-    '/:id/prices',
+// 获取模型价格列表（POST分页查询）
+router.post(
+    '/prices',
     authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+    getModelPricesValidator,
     validate,
     modelController.getModelPrices.bind(modelController)
 );
 
 /**
  * @swagger
- * /api/models/{id}/prices:
+ * /api/models/{id}/prices/create:
  *   post:
  *     summary: 创建模型价格
  *     tags: [模型管理]
@@ -516,7 +625,7 @@ router.get(
  */
 // 创建模型价格
 router.post(
-    '/:id/prices',
+    '/:id/prices/create',
     authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
     createModelPriceValidator,
     validate,
