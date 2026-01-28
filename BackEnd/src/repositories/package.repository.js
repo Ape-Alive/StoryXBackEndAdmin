@@ -96,7 +96,8 @@ class PackageRepository {
    * 根据名称获取套餐
    */
   async findByName(name) {
-    return await prisma.package.findUnique({
+    // name 在业务上应唯一，但数据库层面目前只是普通索引，这里使用 findFirst 以避免 Prisma 唯一约束错误
+    return await prisma.package.findFirst({
       where: { name }
     });
   }

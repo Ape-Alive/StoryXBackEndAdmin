@@ -33,13 +33,13 @@ class UserService {
       if (filters.endDate) queryFilters.createdAt.$lte = new Date(filters.endDate);
     }
 
-    // 构建排序
+    // 构建排序（Prisma 要求使用小写 'asc' / 'desc'）
     const sortOrder = {};
     if (sort.orderBy) {
-      const order = sort.order === 'desc' ? 'DESC' : 'ASC';
+      const order = sort.order === 'asc' ? 'asc' : 'desc';
       sortOrder[sort.orderBy] = order;
     } else {
-      sortOrder.createdAt = 'DESC'; // 默认按注册时间倒序
+      sortOrder.createdAt = 'desc'; // 默认按注册时间倒序
     }
 
     // 获取数据
@@ -180,6 +180,145 @@ class UserService {
     }
 
     return { success: true };
+  }
+
+  /**
+   * 更新用户信息
+   */
+  async updateUser(userId, data, adminId = null, ipAddress = null) {
+    const user = await userRepository.findById(userId);
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // 如果修改邮箱，检查是否已存在
+    if (data.email && data.email !== user.email) {
+      const existingEmail = await userRepository.findByEmail(data.email);
+      if (existingEmail) {
+        throw new BadRequestError('Email already exists');
+      }
+    }
+
+    // 如果修改手机号，检查是否已存在
+    if (data.phone && data.phone !== user.phone) {
+      const existingPhone = await userRepository.findByPhone(data.phone);
+      if (existingPhone) {
+        throw new BadRequestError('Phone already exists');
+      }
+    }
+
+    const updated = await userRepository.updateUser(userId, data);
+
+    // 记录操作日志
+    if (adminId) {
+      const logService = require('./log.service');
+      await logService.logAdminAction({
+        adminId,
+        action: 'UPDATE_USER',
+        targetType: 'user',
+        targetId: userId,
+        details: data,
+        ipAddress
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * 批量更新用户状态
+   */
+  async batchUpdateStatus(ids, status, reason = null, banDuration = null, adminId = null, ipAddress = null) {
+    // 计算封禁到期时间
+    let banUntil = null;
+    if (status === USER_STATUS.BANNED && banDuration) {
+      banUntil = new Date();
+      banUntil.setDate(banUntil.getDate() + banDuration);
+    }
+
+    // 执行批量更新
+    const result = await userRepository.batchUpdateStatus(ids, status, reason, banUntil);
+
+    // 如果是封禁状态，需要使所有 Session 失效
+    if (status === USER_STATUS.BANNED) {
+      const prisma = require('../config/database');
+      await prisma.authorization.updateMany({
+        where: {
+          userId: { in: ids },
+          status: 'active'
+        },
+        data: {
+          status: 'revoked',
+          updatedAt: new Date()
+        }
+      });
+    }
+
+    // 记录操作日志
+    if (adminId) {
+      const logService = require('./log.service');
+      await logService.logAdminAction({
+        adminId,
+        action: 'BATCH_UPDATE_USER_STATUS',
+        targetType: 'user',
+        targetId: null,
+        details: { ids, status, reason, banDuration, banUntil, count: result.count },
+        ipAddress
+      });
+    }
+
+    return { count: result.count };
+  }
+
+  /**
+   * 批量解绑设备
+   */
+  async batchUnbindDevices(userId, deviceIds, adminId = null, ipAddress = null) {
+    const user = await userRepository.findById(userId);
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    const result = await userRepository.unbindDevices(userId, deviceIds);
+
+    // 记录操作日志
+    if (adminId) {
+      const logService = require('./log.service');
+      await logService.logAdminAction({
+        adminId,
+        action: 'BATCH_UNBIND_DEVICES',
+        targetType: 'device',
+        targetId: null,
+        details: { userId, deviceIds, count: result.count },
+        ipAddress
+      });
+    }
+
+    return { count: result.count };
+  }
+
+  /**
+   * 批量删除用户
+   */
+  async batchDeleteUsers(ids, adminId = null, ipAddress = null) {
+    const result = await userRepository.batchDelete(ids);
+
+    // 记录操作日志
+    if (adminId) {
+      const logService = require('./log.service');
+      await logService.logAdminAction({
+        adminId,
+        action: 'BATCH_DELETE_USERS',
+        targetType: 'user',
+        targetId: null,
+        details: { ids, count: result.count },
+        ipAddress
+      });
+    }
+
+    return { count: result.count };
   }
 
   /**

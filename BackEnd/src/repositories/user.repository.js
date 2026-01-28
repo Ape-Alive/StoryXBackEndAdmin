@@ -231,6 +231,54 @@ class UserRepository {
   }
 
   /**
+   * 更新用户信息
+   */
+  async updateUser(userId, data) {
+    const updateData = {};
+
+    if (data.email !== undefined) updateData.email = data.email;
+    if (data.phone !== undefined) updateData.phone = data.phone;
+    if (data.role !== undefined) updateData.role = data.role;
+
+    updateData.updatedAt = new Date();
+
+    return await prisma.user.update({
+      where: { id: userId },
+      data: updateData
+    });
+  }
+
+  /**
+   * 批量更新用户状态
+   */
+  async batchUpdateStatus(ids, status, reason = null, banUntil = null) {
+    const updateData = {
+      status,
+      banReason: reason || null,
+      banUntil: banUntil || null,
+      updatedAt: new Date()
+    };
+
+    return await prisma.user.updateMany({
+      where: {
+        id: { in: ids }
+      },
+      data: updateData
+    });
+  }
+
+  /**
+   * 批量删除用户
+   */
+  async batchDelete(ids) {
+    return await prisma.user.deleteMany({
+      where: {
+        id: { in: ids }
+      }
+    });
+  }
+
+  /**
    * 批量导出用户数据
    */
   async exportUsers(filters = {}) {

@@ -43,3 +43,40 @@ export function deletePackage(id) {
   })
 }
 
+// 复制套餐
+export function duplicatePackage(id, data) {
+  return request({
+    url: `/packages/${id}/duplicate`,
+    method: 'post',
+    data
+  })
+}
+
+// 更新套餐状态
+export function updatePackageStatus(id, isActive) {
+  return request({
+    url: `/packages/${id}/status`,
+    method: 'patch',
+    data: { isActive }
+  })
+}
+
+// 批量更新套餐状态
+export function batchUpdatePackageStatus(data) {
+  return request({
+    url: '/packages/batch/status',
+    method: 'patch',
+    data
+  })
+}
+
+// 批量删除套餐
+export function batchDeletePackages(data) {
+  return request({
+    url: '/packages/batch',
+    method: 'delete',
+    data
+  })
+}
+
+

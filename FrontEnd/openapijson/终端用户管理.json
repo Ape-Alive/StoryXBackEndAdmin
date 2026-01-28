@@ -1,0 +1,1290 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "终端用户管理"
+    }
+  ],
+  "paths": {
+    "/api/users": {
+      "get": {
+        "summary": "获取用户列表",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "用户ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "description": "邮箱",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "phone",
+            "in": "query",
+            "description": "手机号",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "用户状态",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "normal",
+                "frozen",
+                "banned"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "开始日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "结束日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "description": "排序字段",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "lastLoginAt"
+              ]
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "排序顺序",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "example": "clx123456789"
+                              },
+                              "email": {
+                                "type": "string",
+                                "format": "email",
+                                "example": "user@example.com"
+                              },
+                              "phone": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": "+8613800138000"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "basic_user",
+                                  "user"
+                                ],
+                                "example": "basic_user"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "normal",
+                                  "frozen",
+                                  "banned"
+                                ],
+                                "example": "normal"
+                              },
+                              "banReason": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "banUntil": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "lastLoginAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "currentPackage": {
+                                "type": "object",
+                                "description": "当前套餐信息",
+                                "properties": {},
+                                "nullable": true
+                              },
+                              "deviceCount": {
+                                "type": "integer",
+                                "description": "设备数量",
+                                "example": 2
+                              },
+                              "quotaRecordCount": {
+                                "type": "integer",
+                                "description": "额度记录数量",
+                                "example": 10
+                              }
+                            }
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/{userId}": {
+      "get": {
+        "summary": "获取用户详情",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "example": "clx123456789"
+                            },
+                            "email": {
+                              "type": "string",
+                              "format": "email",
+                              "example": "user@example.com"
+                            },
+                            "phone": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "basic_user",
+                                "user"
+                              ]
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "normal",
+                                "frozen",
+                                "banned"
+                              ]
+                            },
+                            "banReason": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "banUntil": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "lastLoginAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "nullable": true
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "packages": {
+                              "type": "array",
+                              "description": "用户套餐列表",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "packageId": {
+                                    "type": "string"
+                                  },
+                                  "startedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "expiresAt": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "nullable": true
+                                  },
+                                  "priority": {
+                                    "type": "integer"
+                                  },
+                                  "package": {
+                                    "type": "object",
+                                    "description": "套餐详情",
+                                    "properties": {}
+                                  }
+                                }
+                              }
+                            },
+                            "devices": {
+                              "type": "array",
+                              "description": "用户设备列表（最多10个）",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "userId": {
+                                    "type": "string"
+                                  },
+                                  "fingerprint": {
+                                    "type": "string"
+                                  },
+                                  "ipAddress": {
+                                    "type": "string",
+                                    "nullable": true
+                                  },
+                                  "lastUsedAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "createdAt": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  }
+                                }
+                              }
+                            },
+                            "quotas": {
+                              "type": "array",
+                              "description": "用户额度列表",
+                              "items": {
+                                "type": "object",
+                                "properties": {}
+                              }
+                            },
+                            "statistics": {
+                              "type": "object",
+                              "description": "用户使用统计",
+                              "properties": {
+                                "callsLast7Days": {
+                                  "type": "integer",
+                                  "description": "近7天调用次数"
+                                },
+                                "callsLast30Days": {
+                                  "type": "integer",
+                                  "description": "近30天调用次数"
+                                },
+                                "tokenUsage": {
+                                  "type": "array",
+                                  "description": "Token使用趋势（按天）",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "modelDistribution": {
+                                  "type": "array",
+                                  "description": "模型使用分布",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                },
+                                "costStatistics": {
+                                  "type": "object",
+                                  "properties": {
+                                    "last7Days": {
+                                      "type": "object",
+                                      "description": "近7天成本统计",
+                                      "properties": {}
+                                    },
+                                    "last30Days": {
+                                      "type": "object",
+                                      "description": "近30天成本统计",
+                                      "properties": {}
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "用户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "更新用户信息",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "邮箱（可选）"
+                  },
+                  "phone": {
+                    "type": "string",
+                    "description": "手机号（可选）"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "basic_user",
+                      "user"
+                    ],
+                    "description": "角色（可选）"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "email": {
+                              "type": "string",
+                              "format": "email"
+                            },
+                            "phone": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "basic_user",
+                                "user"
+                              ]
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误或邮箱/手机号已存在",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/{userId}/status": {
+      "patch": {
+        "summary": "更新用户状态",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "frozen",
+                      "banned"
+                    ],
+                    "description": "用户状态",
+                    "example": "frozen"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "状态变更原因",
+                    "example": "违规操作"
+                  },
+                  "banDuration": {
+                    "type": "integer",
+                    "description": "封禁天数（仅当status为banned时有效，null表示永久封禁）",
+                    "example": 7
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "User status updated successfully",
+                  "data": null
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/{userId}/devices": {
+      "get": {
+        "summary": "获取用户设备列表",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "example": "clx123456789"
+                              },
+                              "userId": {
+                                "type": "string",
+                                "example": "clx987654321"
+                              },
+                              "fingerprint": {
+                                "type": "string",
+                                "example": "device_fingerprint_hash_12345"
+                              },
+                              "ipAddress": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": "192.168.1.100"
+                              },
+                              "lastUsedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "example": "2024-01-15T10:30:00Z"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "example": "2024-01-01T08:00:00Z"
+                              }
+                            }
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "强制解绑用户设备",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "deviceId"
+                ],
+                "properties": {
+                  "deviceId": {
+                    "type": "string",
+                    "description": "设备ID",
+                    "example": "clx123456789"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "解绑成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Device unbound successfully",
+                  "data": null
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "设备不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/batch/status": {
+      "patch": {
+        "summary": "批量更新用户状态",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "status"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "用户ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "frozen",
+                      "banned"
+                    ],
+                    "description": "用户状态",
+                    "example": "frozen"
+                  },
+                  "reason": {
+                    "type": "string",
+                    "description": "状态变更原因（可选）",
+                    "example": "批量冻结违规用户"
+                  },
+                  "banDuration": {
+                    "type": "integer",
+                    "description": "封禁天数（仅当status为banned时有效，null表示永久封禁）",
+                    "example": 7
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "User statuses updated successfully",
+                  "data": {
+                    "count": 2
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/{userId}/devices/batch": {
+      "delete": {
+        "summary": "批量解绑用户设备",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "deviceIds"
+                ],
+                "properties": {
+                  "deviceIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "设备ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "解绑成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Devices unbound successfully",
+                  "data": {
+                    "count": 2
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "用户不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/batch": {
+      "delete": {
+        "summary": "批量删除用户",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "用户ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Users deleted successfully",
+                  "data": {
+                    "count": 2
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/users/export": {
+      "post": {
+        "summary": "导出用户数据",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "终端用户管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "用户ID（可选）"
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "邮箱（可选）"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "normal",
+                      "frozen",
+                      "banned"
+                    ],
+                    "description": "用户状态（可选）"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "开始日期（可选）"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "结束日期（可选）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "导出成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "description": "用户数据列表",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string",
+                                "format": "email"
+                              },
+                              "phone": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "basic_user",
+                                  "user"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "normal",
+                                  "frozen",
+                                  "banned"
+                                ]
+                              },
+                              "banReason": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "banUntil": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "lastLoginAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "packages": {
+                                "type": "array",
+                                "description": "用户套餐列表",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "deviceCount": {
+                                "type": "integer",
+                                "description": "设备数量"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Error message"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Success message"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

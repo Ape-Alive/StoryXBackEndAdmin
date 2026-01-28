@@ -56,33 +56,54 @@ const createPackageValidator = [
     .isIn(['free', 'paid', 'trial'])
     .withMessage('Invalid package type'),
   body('duration')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Duration must be a positive integer'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      return Number.isInteger(value) && value >= 1;
+    })
+    .withMessage('Duration must be a positive integer or null (永久)'),
   body('quota')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Quota must be a non-negative number (积分)'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0;
+    })
+    .withMessage('Quota must be a non-negative number or null (无限)'),
   body('price')
-    .optional()
-    .isFloat({ min: 0 })
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0;
+    })
     .withMessage('Price must be a non-negative number'),
   body('priceUnit')
-    .optional()
+    .optional({ nullable: true })
     .isIn(['CNY', 'USD'])
     .withMessage('Price unit must be one of: CNY, USD'),
   body('discount')
-    .optional()
-    .isFloat({ min: 0, max: 100 })
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0 && num <= 100;
+    })
     .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
-    .optional()
-    .isArray()
-    .withMessage('Available models must be an array'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      return Array.isArray(value);
+    })
+    .withMessage('Available models must be an array or null'),
   body('maxDevices')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Max devices must be a positive integer'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      return Number.isInteger(value) && value >= 1;
+    })
+    .withMessage('Max devices must be a positive integer or null (无限)'),
   body('isStackable')
     .optional()
     .isBoolean()
@@ -109,33 +130,54 @@ const updatePackageValidator = [
     .isIn(['free', 'paid', 'trial'])
     .withMessage('Invalid package type'),
   body('duration')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Duration must be a positive integer'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      return Number.isInteger(value) && value >= 1;
+    })
+    .withMessage('Duration must be a positive integer or null (永久)'),
   body('quota')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Quota must be a non-negative number (积分)'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0;
+    })
+    .withMessage('Quota must be a non-negative number or null (无限)'),
   body('price')
-    .optional()
-    .isFloat({ min: 0 })
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0;
+    })
     .withMessage('Price must be a non-negative number'),
   body('priceUnit')
-    .optional()
+    .optional({ nullable: true })
     .isIn(['CNY', 'USD'])
     .withMessage('Price unit must be one of: CNY, USD'),
   body('discount')
-    .optional()
-    .isFloat({ min: 0, max: 100 })
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      const num = parseFloat(value);
+      return !isNaN(num) && num >= 0 && num <= 100;
+    })
     .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
-    .optional()
-    .isArray()
-    .withMessage('Available models must be an array'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      return Array.isArray(value);
+    })
+    .withMessage('Available models must be an array or null'),
   body('maxDevices')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Max devices must be a positive integer'),
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined) return true;
+      return Number.isInteger(value) && value >= 1;
+    })
+    .withMessage('Max devices must be a positive integer or null (无限)'),
   body('isStackable')
     .optional()
     .isBoolean()

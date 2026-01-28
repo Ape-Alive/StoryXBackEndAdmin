@@ -12,11 +12,14 @@ const logger = require('./src/utils/logger');
 
 // Import routes
 const authRoutes = require('./src/routes/auth.routes');
+const adminRoutes = require('./src/routes/admin.routes');
 const userRoutes = require('./src/routes/user.routes');
 const modelRoutes = require('./src/routes/model.routes');
 const providerRoutes = require('./src/routes/provider.routes');
 const packageRoutes = require('./src/routes/package.routes');
 const userPackageRoutes = require('./src/routes/userPackage.routes');
+const deviceRoutes = require('./src/routes/device.routes');
+const adminDeviceRoutes = require('./src/routes/adminDevice.routes');
 const quotaRoutes = require('./src/routes/quota.routes');
 const promptRoutes = require('./src/routes/prompt.routes');
 const riskRoutes = require('./src/routes/risk.routes');
@@ -74,11 +77,14 @@ app.get('/api-docs.json', (req, res) => {
 
 // API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/admins', adminRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/models', modelRoutes);
 app.use('/api/providers', providerRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/user/packages', userPackageRoutes);
+app.use('/api/user/devices', deviceRoutes);
+app.use('/api/devices', adminDeviceRoutes);
 app.use('/api/quotas', quotaRoutes);
 app.use('/api/prompts', promptRoutes);
 app.use('/api/risk', riskRoutes);

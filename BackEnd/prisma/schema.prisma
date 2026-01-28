@@ -86,20 +86,24 @@ model User {
 
 // 用户设备
 model Device {
-  id           String   @id @default(cuid())
-  userId       String
-  deviceFingerprint String //设备指纹
-  ipAddress    String?
-  region       String?
-  lastUsedAt   DateTime @default(now())
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                String   @id @default(cuid())
+  userId            String
+  deviceFingerprint String   // 设备指纹
+  name              String?  // 设备名称（用户自定义）
+  remark            String?  // 备注
+  ipAddress         String?
+  region            String?
+  status            String   @default("active") // active, revoked
+  lastUsedAt        DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deviceFingerprint])
   @@index([userId])
   @@index([deviceFingerprint])
+  @@index([status])
   @@map("devices")
 }
 
@@ -187,27 +191,27 @@ model ModelPrice {
 
 // 套餐
 model Package {
-  id            String        @id @default(cuid())
-  name          String
-  displayName   String
-  description   String?
-  type          String        // free, paid, trial
-  duration      Int?          // 有效期（天），null表示永久
-  totalQuota    Decimal?      @db.Decimal(20, 2) // 额度（积分），null表示无限
-  price         Decimal?      @db.Decimal(20, 2) // 套餐金额
-  priceUnit     String?       // 套餐金额单位：yuan(元)、usd(美元)
-  discount      Decimal?      @db.Decimal(5, 2) // 套餐折扣（百分比），如10表示10%折扣
-  maxDevices    Int?          // 最大设备数量，null表示无限
-  availableModels String?     // 可用模型ID列表（JSON数组），null或空数组表示所有模型都可用
-  isStackable   Boolean       @default(false) // 是否可叠加
-  priority      Int           @default(0) // 优先级，数字越大优先级越高
-  isActive      Boolean       @default(true)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  name           String
+  displayName    String
+  description    String?
+  type           String        // free, paid, trial
+  duration       Int?          // 有效期（天），null表示永久
+  quota          Decimal?      @map("totalQuota") @db.Decimal(20, 2) // 额度（积分），null表示无限
+  price          Decimal?      @db.Decimal(20, 2) // 套餐金额
+  priceUnit      String?       // 套餐金额单位：CNY, USD
+  discount       Decimal?      @db.Decimal(5, 2) // 套餐折扣（百分比，0-100）
+  maxDevices     Int?          // 最大设备数量，null表示无限
+  availableModels String?      // 可用模型ID列表（JSON数组），null或空数组表示所有模型都可用
+  isStackable    Boolean       @default(false) // 是否可叠加
+  priority       Int           @default(0) // 优先级，数字越大优先级越高
+  isActive       Boolean       @default(true)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   // 关联数据
-  userPackages  UserPackage[]
-  quotaRecords  QuotaRecord[]
+  userPackages   UserPackage[]
+  quotaRecords   QuotaRecord[]
 
   @@index([name])
   @@index([type])

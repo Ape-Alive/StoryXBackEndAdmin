@@ -113,6 +113,59 @@ class UserController {
   }
 
   /**
+   * 更新用户信息
+   */
+  async updateUser(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const updated = await userService.updateUser(userId, req.body, req.user?.id, req.ip);
+      return ResponseHandler.success(res, updated, 'User updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 批量更新用户状态
+   */
+  async batchUpdateStatus(req, res, next) {
+    try {
+      const { ids, status, reason, banDuration } = req.body;
+      const result = await userService.batchUpdateStatus(ids, status, reason, banDuration, req.user?.id, req.ip);
+      return ResponseHandler.success(res, result, 'User statuses updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 批量解绑设备
+   */
+  async batchUnbindDevices(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const { deviceIds } = req.body;
+      const result = await userService.batchUnbindDevices(userId, deviceIds, req.user?.id, req.ip);
+      return ResponseHandler.success(res, result, 'Devices unbound successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 批量删除用户
+   */
+  async batchDeleteUsers(req, res, next) {
+    try {
+      const { ids } = req.body;
+      const result = await userService.batchDeleteUsers(ids, req.user?.id, req.ip);
+      return ResponseHandler.success(res, result, 'Users deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * 导出用户数据
    */
   async exportUsers(req, res, next) {

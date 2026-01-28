@@ -43,9 +43,9 @@ export const MENU_STRUCTURE = [
         title: '财务治理',
         icon: 'Wallet',
         children: [
-            { id: 'packages', label: '商业套餐定义', path: '/package/list', icon: 'Box' },
-            { id: 'quota', label: '订单结算管理', path: '/quota/list', icon: 'PieChart' },
-            { id: 'billing-logs', label: '额度流水管理', path: '/quota/billing', icon: 'Document' }
+            { id: 'packages', label: '商业套餐定义', path: '/finance/package/list', icon: 'Box' },
+            { id: 'quota', label: '订单结算管理', path: '/finance/quota/list', icon: 'PieChart' },
+            { id: 'billing-logs', label: '额度流水管理', path: '/finance/quota/billing', icon: 'Document' }
         ]
     },
     {

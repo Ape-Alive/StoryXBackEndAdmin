@@ -143,9 +143,12 @@ class UserAuthService {
       }
     });
 
-    // 获取用户当前设备数量
+    // 获取用户当前活跃设备数量（只统计 active 状态的设备）
     const deviceCount = await prisma.device.count({
-      where: { userId }
+      where: {
+        userId,
+        status: 'active'
+      }
     });
 
     // 查找最高优先级的套餐，获取最大设备数限制
@@ -189,12 +192,21 @@ class UserAuthService {
     });
 
     if (existingDevice) {
-      // 更新设备最后使用时间
+      // 如果设备已被 revoke，需要先检查设备数量限制
+      if (existingDevice.status === 'revoked') {
+        const limitCheck = await this.checkDeviceLimit(userId);
+        if (!limitCheck.allowed) {
+          throw new BadRequestError(limitCheck.message);
+        }
+      }
+
+      // 更新设备最后使用时间和状态（如果是 revoked，恢复为 active）
       const device = await prisma.device.update({
         where: { id: existingDevice.id },
         data: {
           lastUsedAt: new Date(),
-          ipAddress: ipAddress || existingDevice.ipAddress
+          ipAddress: ipAddress || existingDevice.ipAddress,
+          status: 'active' // 恢复为 active 状态
         }
       });
       return device;
@@ -212,6 +224,7 @@ class UserAuthService {
         userId,
         deviceFingerprint,
         ipAddress,
+        status: 'active',
         lastUsedAt: new Date()
       }
     });

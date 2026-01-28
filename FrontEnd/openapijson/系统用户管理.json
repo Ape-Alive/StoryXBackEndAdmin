@@ -1,0 +1,937 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "系统用户管理"
+    }
+  ],
+  "paths": {
+    "/api/admins": {
+      "get": {
+        "summary": "获取管理员列表",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          },
+          {
+            "name": "adminId",
+            "in": "query",
+            "description": "管理员ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "description": "用户名（模糊搜索）",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "email",
+            "in": "query",
+            "description": "邮箱（模糊搜索）",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "description": "角色",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "super_admin",
+                "platform_admin",
+                "operator",
+                "risk_control",
+                "finance",
+                "read_only"
+              ]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "状态",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive"
+              ]
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "创建开始日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "创建结束日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "lastLoginStart",
+            "in": "query",
+            "description": "最后登录开始日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "lastLoginEnd",
+            "in": "query",
+            "description": "最后登录结束日期",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "description": "排序字段",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "lastLogin"
+              ],
+              "default": "createdAt"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "排序顺序",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "username": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string"
+                              },
+                              "role": {
+                                "type": "string"
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "lastLogin": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "operationLogCount": {
+                                "type": "integer"
+                              }
+                            }
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "post": {
+        "summary": "创建管理员（仅 super_admin）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "email",
+                  "password",
+                  "role"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 20,
+                    "pattern": "^[a-zA-Z0-9_]+$",
+                    "description": "用户名（3-20个字符，只能包含字母、数字和下划线）",
+                    "example": "admin001"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "邮箱地址",
+                    "example": "admin001@example.com"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 50,
+                    "description": "密码（6-50个字符）",
+                    "example": "password123"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "platform_admin",
+                      "operator",
+                      "risk_control",
+                      "finance",
+                      "read_only"
+                    ],
+                    "description": "角色（不能是 super_admin）",
+                    "example": "platform_admin"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive"
+                    ],
+                    "default": "active",
+                    "description": "状态"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "创建成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（非 super_admin）",
+            "headers": {}
+          },
+          "409": {
+            "description": "用户名或邮箱已存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/{id}": {
+      "get": {
+        "summary": "获取管理员详情",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "管理员ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "管理员不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "put": {
+        "summary": "更新管理员信息（仅 super_admin）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "管理员ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 20,
+                    "pattern": "^[a-zA-Z0-9_]+$",
+                    "description": "用户名（可选）"
+                  },
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "description": "邮箱（可选）"
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 6,
+                    "maxLength": 50,
+                    "description": "密码（可选）"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "platform_admin",
+                      "operator",
+                      "risk_control",
+                      "finance",
+                      "read_only"
+                    ],
+                    "description": "角色（可选，不能是 super_admin）"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive"
+                    ],
+                    "description": "状态（可选）"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（非 super_admin）",
+            "headers": {}
+          },
+          "404": {
+            "description": "管理员不存在",
+            "headers": {}
+          },
+          "409": {
+            "description": "用户名或邮箱已存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "删除管理员（仅 super_admin）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "管理员ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误（不能删除自己或最后一个 super_admin）",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（非 super_admin）",
+            "headers": {}
+          },
+          "404": {
+            "description": "管理员不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/{id}/status": {
+      "patch": {
+        "summary": "更新管理员状态（仅 super_admin）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "管理员ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "status"
+                ],
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive"
+                    ],
+                    "description": "状态",
+                    "example": "inactive"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误（不能禁用自己或最后一个 super_admin）",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（非 super_admin）",
+            "headers": {}
+          },
+          "404": {
+            "description": "管理员不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/{id}/role": {
+      "patch": {
+        "summary": "更新管理员角色（仅 super_admin）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "管理员ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "role"
+                ],
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "platform_admin",
+                      "operator",
+                      "risk_control",
+                      "finance",
+                      "read_only"
+                    ],
+                    "description": "角色（不能是 super_admin）",
+                    "example": "operator"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误（不能修改自己的角色或最后一个 super_admin 的角色）",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（非 super_admin）",
+            "headers": {}
+          },
+          "404": {
+            "description": "管理员不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/batch/status": {
+      "patch": {
+        "summary": "批量更新管理员状态（仅 super_admin）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "status"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "管理员ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive"
+                    ],
+                    "description": "状态",
+                    "example": "inactive"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Admin statuses updated successfully",
+                  "data": {
+                    "count": 2
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误（不能禁用自己或所有 super_admin）",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（非 super_admin）",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/batch": {
+      "delete": {
+        "summary": "批量删除管理员（仅 super_admin）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "管理员ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                },
+                "example": {
+                  "success": true,
+                  "message": "Admins deleted successfully",
+                  "data": {
+                    "count": 2
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误（不能删除自己或所有 super_admin）",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（非 super_admin）",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/admins/export": {
+      "post": {
+        "summary": "导出管理员数据",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "系统用户管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "adminId": {
+                    "type": "string",
+                    "description": "管理员ID（可选）"
+                  },
+                  "username": {
+                    "type": "string",
+                    "description": "用户名（可选）"
+                  },
+                  "email": {
+                    "type": "string",
+                    "description": "邮箱（可选）"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": [
+                      "super_admin",
+                      "platform_admin",
+                      "operator",
+                      "risk_control",
+                      "finance",
+                      "read_only"
+                    ],
+                    "description": "角色（可选）"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "inactive"
+                    ],
+                    "description": "状态（可选）"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "创建开始日期（可选）"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "创建结束日期（可选）"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "导出成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Success"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Success message"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

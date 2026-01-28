@@ -75,9 +75,92 @@ const unbindDeviceValidator = [
     .withMessage('Device ID is required')
 ];
 
+/**
+ * 批量更新用户状态验证
+ */
+const batchUpdateStatusValidator = [
+  body('ids')
+    .notEmpty()
+    .withMessage('IDs are required')
+    .isArray({ min: 1 })
+    .withMessage('IDs must be a non-empty array'),
+  body('ids.*')
+    .isString()
+    .withMessage('Each ID must be a string'),
+  body('status')
+    .notEmpty()
+    .withMessage('Status is required')
+    .isIn(['normal', 'frozen', 'banned'])
+    .withMessage('Invalid status'),
+  body('reason')
+    .optional()
+    .isString()
+    .withMessage('Reason must be a string'),
+  body('banDuration')
+    .optional()
+    .isInt({ min: 1 })
+    .withMessage('Ban duration must be a positive integer')
+];
+
+/**
+ * 批量解绑设备验证
+ */
+const batchUnbindDevicesValidator = [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('deviceIds')
+    .notEmpty()
+    .withMessage('Device IDs are required')
+    .isArray({ min: 1 })
+    .withMessage('Device IDs must be a non-empty array'),
+  body('deviceIds.*')
+    .isString()
+    .withMessage('Each device ID must be a string')
+];
+
+/**
+ * 更新用户信息验证
+ */
+const updateUserValidator = [
+  param('userId')
+    .notEmpty()
+    .withMessage('User ID is required'),
+  body('email')
+    .optional()
+    .isEmail()
+    .withMessage('Invalid email format'),
+  body('phone')
+    .optional()
+    .isString()
+    .withMessage('Phone must be a string'),
+  body('role')
+    .optional()
+    .isIn(['basic_user', 'user'])
+    .withMessage('Invalid role')
+];
+
+/**
+ * 批量删除用户验证
+ */
+const batchDeleteUsersValidator = [
+  body('ids')
+    .notEmpty()
+    .withMessage('IDs are required')
+    .isArray({ min: 1 })
+    .withMessage('IDs must be a non-empty array'),
+  body('ids.*')
+    .isString()
+    .withMessage('Each ID must be a string')
+];
+
 module.exports = {
   getUsersValidator,
   updateUserStatusValidator,
   getUserDetailValidator,
-  unbindDeviceValidator
+  unbindDeviceValidator,
+  batchUpdateStatusValidator,
+  batchUnbindDevicesValidator,
+  updateUserValidator,
+  batchDeleteUsersValidator
 };
