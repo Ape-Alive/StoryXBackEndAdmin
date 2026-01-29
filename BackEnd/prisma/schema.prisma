@@ -75,6 +75,7 @@ model User {
   quotas         UserQuota[]
   authorizations Authorization[]
   aiCallLogs     AICallLog[]
+  orders         Order[]
 
   @@index([email])
   @@index([phone])
@@ -212,6 +213,7 @@ model Package {
   // 关联数据
   userPackages   UserPackage[]
   quotaRecords   QuotaRecord[]
+  orders         Order[]
 
   @@index([name])
   @@index([type])
@@ -265,6 +267,7 @@ model QuotaRecord {
   id          String   @id @default(cuid())
   userId      String
   packageId   String?
+  orderId     String?  // 关联的订单ID（如果是购买套餐产生的额度增加）
   type        String   // increase, decrease, freeze, unfreeze
   amount      Decimal  @db.Decimal(20, 2) // 变动额度（积分）
   before      Decimal  @db.Decimal(20, 2) // 变动前额度（积分）
@@ -275,13 +278,80 @@ model QuotaRecord {
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   package     Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
+  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([packageId])
+  @@index([orderId])
   @@index([type])
   @@index([requestId])
   @@index([createdAt])
   @@map("quota_records")
+}
+
+// ==================== 订单与支付模块 ====================
+
+// 订单
+model Order {
+  id              String   @id @default(cuid())
+  orderNo         String   @unique // 订单号（全局唯一）
+  userId          String
+  packageId       String
+  type            String   // purchase, renewal, upgrade
+  status          String   @default("pending") // pending, paid, cancelled, refunded, expired
+  amount          Decimal  @db.Decimal(20, 2) // 订单金额（元）
+  currency        String   @default("CNY") // 货币单位
+  discount        Decimal? @db.Decimal(5, 2) // 折扣（百分比，0-100）
+  finalAmount     Decimal  @db.Decimal(20, 2) // 实付金额（元）
+  description     String?  // 订单描述
+  expiresAt       DateTime? // 订单过期时间
+  paidAt          DateTime? // 支付时间
+  cancelledAt     DateTime? // 取消时间
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  package         Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  payments        Payment[]
+  quotaRecords    QuotaRecord[]
+
+  @@index([userId])
+  @@index([orderNo])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+// 支付记录
+model Payment {
+  id              String   @id @default(cuid())
+  orderId         String
+  paymentNo       String   @unique // 支付单号（全局唯一）
+  thirdPartyNo    String?  // 第三方支付交易号
+  paymentMethod   String   // wxpay_native, alipay, stripe, etc.
+  paymentPlatform String   // yungouos, wechat_official, alipay_official, stripe
+  amount          Decimal  @db.Decimal(20, 2) // 支付金额（元）
+  currency        String   @default("CNY")
+  status          String   @default("pending") // pending, success, failed, cancelled, refunded
+  qrCodeUrl       String?  // 二维码地址（Native 支付）
+  payUrl          String?  // 支付链接
+  callbackData    String?  @db.Text // 回调数据（JSON）
+  notifyUrl       String?  // 回调通知地址
+  paidAt          DateTime? // 支付成功时间
+  failedAt        DateTime? // 支付失败时间
+  failureReason   String?  // 失败原因
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([paymentNo])
+  @@index([thirdPartyNo])
+  @@index([status])
+  @@index([paymentPlatform])
+  @@index([createdAt])
+  @@map("payments")
 }
 
 // ==================== 提示词库管理模块 ====================

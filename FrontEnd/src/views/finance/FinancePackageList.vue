@@ -184,7 +184,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="200" align="center" fixed="right">
+        <el-table-column label="操作" width="250" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button
@@ -966,7 +966,7 @@ onMounted(() => {
 .action-buttons {
   display: flex;
   justify-content: center;
-  gap: 8px;
+  /* gap: 8px; */
 }
 
 .status-badge {

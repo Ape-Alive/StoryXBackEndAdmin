@@ -101,6 +101,7 @@ class QuotaRecordRepository {
       data: {
         userId: data.userId,
         packageId: data.packageId || null,
+        orderId: data.orderId || null,
         type: data.type,
         amount: data.amount,
         before: data.before,

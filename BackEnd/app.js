@@ -26,6 +26,9 @@ const riskRoutes = require('./src/routes/risk.routes');
 const authorizationRoutes = require('./src/routes/authorization.routes');
 const logRoutes = require('./src/routes/log.routes');
 const docsRoutes = require('./src/routes/docs.routes');
+const orderRoutes = require('./src/routes/order.routes');
+const paymentRoutes = require('./src/routes/payment.routes');
+const paymentCallbackRoutes = require('./src/routes/paymentCallback.routes');
 
 const app = express();
 
@@ -39,6 +42,7 @@ app.use(cors({
 }));
 
 // Body parsing middleware
+// 注意：支付回调可能使用 form-urlencoded 格式，需要支持
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -91,6 +95,10 @@ app.use('/api/risk', riskRoutes);
 app.use('/api/authorization', authorizationRoutes);
 app.use('/api/logs', logRoutes);
 app.use('/api/docs', docsRoutes);
+app.use('/api/user/orders', orderRoutes);
+app.use('/api/orders', orderRoutes);
+app.use('/api/user', paymentRoutes);
+app.use('/api/payment/callback', paymentCallbackRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

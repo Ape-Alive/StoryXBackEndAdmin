@@ -1,7 +1,8 @@
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { getToken, removeToken } from '@/utils/auth'
+import { getToken } from '@/utils/auth'
 import router from '@/router'
+import { useAuthStore } from '@/stores/auth'
 import { API_BASE_URL, API_TIMEOUT, USE_PROXY } from '@/config/env'
 
 // 创建 axios 实例
@@ -15,14 +16,14 @@ const service = axios.create({
 
 // 请求拦截器
 service.interceptors.request.use(
-  (config) => {
+  config => {
     const token = getToken()
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
     return config
   },
-  (error) => {
+  error => {
     console.error('Request error:', error)
     return Promise.reject(error)
   }
@@ -30,7 +31,7 @@ service.interceptors.request.use(
 
 // 响应拦截器
 service.interceptors.response.use(
-  (response) => {
+  response => {
     const res = response.data
 
     // 如果返回的状态码不是 2开头的，说明有错误
@@ -41,18 +42,24 @@ service.interceptors.response.use(
 
     return res
   },
-  (error) => {
+  error => {
     console.error('Response error:', error)
 
     if (error.response) {
       const { status, data } = error.response
 
       switch (status) {
-        case 401:
+        case 401: {
           ElMessage.error('未授权，请重新登录')
-          removeToken()
-          router.push('/login')
+          // 清除认证状态
+          const authStore = useAuthStore()
+          authStore.logout()
+          // 使用 replace 避免在历史记录中留下当前页面
+          router.replace('/login').catch(() => {
+            // 如果已经在登录页面，忽略错误
+          })
           break
+        }
         case 403:
           ElMessage.error('拒绝访问')
           break
@@ -74,4 +81,3 @@ service.interceptors.response.use(
 )
 
 export default service
-

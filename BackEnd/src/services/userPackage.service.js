@@ -260,6 +260,7 @@ class UserPackageService {
 
   /**
    * 订阅套餐（终端用户）
+   * 注意：付费套餐必须通过订单流程，此方法仅用于免费套餐或管理员手动分配
    */
   async subscribePackage(userId, packageId, priority = null, ipAddress = null) {
     // 验证用户是否存在
@@ -277,6 +278,11 @@ class UserPackageService {
     }
     if (!pkg.isActive) {
       throw new BadRequestError('Package is not available');
+    }
+
+    // 如果是付费套餐，必须走订单流程
+    if (pkg.type === 'paid' && pkg.price) {
+      throw new BadRequestError('Paid packages must be purchased through the order process. Please create an order first.');
     }
 
     // 检查用户是否已有该套餐

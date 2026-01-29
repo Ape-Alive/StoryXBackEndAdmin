@@ -39,7 +39,8 @@
     "xlsx": "^0.18.5",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.0",
-    "svg-captcha": "^1.4.0"
+    "svg-captcha": "^1.4.0",
+    "axios": "^1.6.0"
   },
   "devDependencies": {
     "prisma": "^5.7.1",

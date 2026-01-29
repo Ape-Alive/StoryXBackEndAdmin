@@ -42,7 +42,7 @@ class QuotaService {
   /**
    * 手动调整额度（管理员操作）
    */
-  async adjustQuota(userId, packageId, amount, reason, adminId = null, ipAddress = null) {
+  async adjustQuota(userId, packageId, amount, reason, adminId = null, ipAddress = null, orderId = null) {
     const user = await prisma.user.findUnique({
       where: { id: userId }
     });
@@ -70,6 +70,7 @@ class QuotaService {
     await quotaRecordRepository.create({
       userId,
       packageId,
+      orderId,
       type: recordType,
       amount: Math.abs(amount),
       before,
@@ -85,7 +86,7 @@ class QuotaService {
         action: 'ADJUST_QUOTA',
         targetType: 'quota',
         targetId: quota.id,
-        details: { userId, packageId, amount, reason },
+        details: { userId, packageId, amount, reason, orderId },
         ipAddress
       });
     }
