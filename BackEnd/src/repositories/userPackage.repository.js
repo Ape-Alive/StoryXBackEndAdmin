@@ -21,25 +21,54 @@ class UserPackageRepository {
       where.packageId = filters.packageId;
     }
 
-    // 筛选未过期的套餐
-    if (filters.activeOnly) {
+    // 优先级筛选
+    if (filters.priority) {
+      if (filters.priority === 'high') {
+        where.priority = { gte: 80, lte: 100 };
+      } else if (filters.priority === 'medium') {
+        where.priority = { gte: 40, lt: 80 };
+      } else if (filters.priority === 'low') {
+        where.priority = { gte: 0, lt: 40 };
+      }
+    }
+
+    // 开始时间筛选
+    if (filters.startDate) {
+      const startDate = new Date(filters.startDate);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(filters.startDate);
+      endDate.setHours(23, 59, 59, 999);
+      where.startedAt = {
+        gte: startDate,
+        lte: endDate
+      };
+    }
+
+    // 筛选活跃或非活跃套餐
+    if (filters.activeOnly === true) {
+      // 只返回活跃套餐（未过期）
       where.OR = [
         { expiresAt: null },
         { expiresAt: { gt: new Date() } }
       ];
+    } else if (filters.activeOnly === false) {
+      // 只返回已过期套餐
+      where.expiresAt = {
+        lt: new Date()
+      };
     }
 
-    if (filters.expiresAt) {
-      where.expiresAt = {};
-      if (filters.expiresAt.lte) {
-        where.expiresAt.lte = new Date(filters.expiresAt.lte);
-      }
+    if (filters.expiresBefore) {
+      where.expiresAt = {
+        lte: new Date(filters.expiresBefore)
+      };
     }
 
-    const orderBy = {
-      priority: 'desc',
-      createdAt: 'desc'
-    };
+    // Prisma 多字段排序需要使用数组格式
+    const orderBy = [
+      { priority: 'desc' },
+      { createdAt: 'desc' }
+    ];
 
     const [data, total] = await Promise.all([
       prisma.userPackage.findMany({

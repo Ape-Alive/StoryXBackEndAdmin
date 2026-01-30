@@ -21,7 +21,7 @@ const {
  * @swagger
  * /api/user/orders:
  *   post:
- *     summary: 创建订单
+ *     summary: 创建订单 [仅终端用户]
  *     description: 为用户创建套餐购买订单，计算订单金额（考虑折扣）
  *     tags: [订单管理]
  *     security:
@@ -192,7 +192,7 @@ router.post(
  * @swagger
  * /api/user/orders:
  *   get:
- *     summary: 获取我的订单列表
+ *     summary: 获取我的订单列表 [仅终端用户]
  *     description: 获取当前用户的订单列表，支持分页和筛选
  *     tags: [订单管理]
  *     security:
@@ -347,8 +347,8 @@ router.get(
  * @swagger
  * /api/user/orders/{id}:
  *   get:
- *     summary: 获取订单详情
- *     description: 获取指定订单的详细信息，包括关联的套餐、用户和支付记录
+ *     summary: 获取订单详情 [仅终端用户]
+ *     description: 获取指定订单的详细信息，包括关联的套餐、用户和支付记录（只能查看自己的订单）
  *     tags: [订单管理]
  *     security:
  *       - bearerAuth: []
@@ -514,8 +514,8 @@ router.get(
  * @swagger
  * /api/user/orders/{id}/cancel:
  *   post:
- *     summary: 取消订单
- *     description: 取消指定订单，只有待支付状态的订单才能取消
+ *     summary: 取消订单 [仅终端用户]
+ *     description: 取消指定订单，只有待支付状态的订单才能取消（只能取消自己的订单）
  *     tags: [订单管理]
  *     security:
  *       - bearerAuth: []
@@ -584,7 +584,7 @@ router.post(
  * @swagger
  * /api/orders:
  *   get:
- *     summary: 管理员查询订单列表
+ *     summary: 管理员查询订单列表 [super_admin, platform_admin, finance, operator]
  *     description: 管理员查询所有订单列表，支持多条件筛选和分页
  *     tags: [订单管理]
  *     security:
@@ -704,7 +704,7 @@ router.get(
  * @swagger
  * /api/orders/{id}:
  *   get:
- *     summary: 管理员查询订单详情
+ *     summary: 管理员查询订单详情 [super_admin, platform_admin, finance, operator]
  *     description: 管理员查询指定订单的详细信息（不限制订单所属用户）
  *     tags: [订单管理]
  *     security:

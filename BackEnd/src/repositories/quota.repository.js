@@ -54,6 +54,40 @@ class QuotaRepository {
   }
 
   /**
+   * 根据ID获取额度
+   */
+  async findById(id) {
+    const quota = await prisma.userQuota.findUnique({
+      where: { id },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            status: true
+          }
+        }
+      }
+    });
+
+    // 如果有 packageId，查询套餐信息
+    if (quota && quota.packageId) {
+      const pkg = await prisma.package.findUnique({
+        where: { id: quota.packageId },
+        select: {
+          id: true,
+          name: true,
+          displayName: true
+        }
+      });
+      quota.package = pkg;
+    }
+
+    return quota;
+  }
+
+  /**
    * 根据用户ID和套餐ID获取额度
    */
   async findByUserAndPackage(userId, packageId) {
@@ -206,6 +240,165 @@ class QuotaRepository {
         }
       }
     });
+  }
+
+  /**
+   * 根据ID冻结额度
+   */
+  async freezeQuotaById(id, amount) {
+    const quota = await this.findById(id);
+    if (!quota) {
+      throw new Error('Quota not found');
+    }
+
+    if (parseFloat(quota.available) < amount) {
+      throw new Error('Insufficient quota');
+    }
+
+    return await prisma.userQuota.update({
+      where: { id },
+      data: {
+        available: {
+          decrement: amount
+        },
+        frozen: {
+          increment: amount
+        }
+      }
+    });
+  }
+
+  /**
+   * 根据ID解冻额度
+   */
+  async unfreezeQuotaById(id, amount) {
+    const quota = await this.findById(id);
+    if (!quota) {
+      throw new Error('Quota not found');
+    }
+
+    if (parseFloat(quota.frozen) < amount) {
+      throw new Error('Insufficient frozen quota');
+    }
+
+    return await prisma.userQuota.update({
+      where: { id },
+      data: {
+        available: {
+          increment: amount
+        },
+        frozen: {
+          decrement: amount
+        }
+      }
+    });
+  }
+
+  /**
+   * 根据ID设置额度
+   */
+  async setQuotaById(id, data) {
+    return await prisma.userQuota.update({
+      where: { id },
+      data: {
+        available: data.available !== undefined ? data.available : undefined,
+        frozen: data.frozen !== undefined ? data.frozen : undefined,
+        used: data.used !== undefined ? data.used : undefined
+      }
+    });
+  }
+
+  /**
+   * 根据ID重置额度（清零）
+   */
+  async resetQuotaById(id) {
+    return await prisma.userQuota.update({
+      where: { id },
+      data: {
+        available: 0,
+        frozen: 0,
+        used: 0
+      }
+    });
+  }
+
+  /**
+   * 根据ID批量查询额度
+   */
+  async findByIds(ids) {
+    return await prisma.userQuota.findMany({
+      where: {
+        id: {
+          in: ids
+        }
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            status: true
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * 获取额度统计信息
+   */
+  async getStatistics(filters = {}) {
+    const where = {};
+
+    if (filters.userId) {
+      where.userId = filters.userId;
+    }
+
+    if (filters.packageId) {
+      where.packageId = filters.packageId;
+    }
+
+    const [quotas, userQuotas, packageQuotas] = await Promise.all([
+      prisma.userQuota.findMany({
+        where,
+        select: {
+          available: true,
+          frozen: true,
+          used: true
+        }
+      }),
+      filters.userId
+        ? Promise.resolve([{ userId: filters.userId }])
+        : prisma.userQuota.findMany({
+            where,
+            select: { userId: true }
+          }),
+      filters.packageId
+        ? Promise.resolve([{ packageId: filters.packageId }])
+        : prisma.userQuota.findMany({
+            where,
+            select: { packageId: true }
+          })
+    ]);
+
+    const totalAvailable = quotas.reduce((sum, q) => sum + parseFloat(q.available || 0), 0);
+    const totalFrozen = quotas.reduce((sum, q) => sum + parseFloat(q.frozen || 0), 0);
+    const totalUsed = quotas.reduce((sum, q) => sum + parseFloat(q.used || 0), 0);
+    const totalQuota = totalAvailable + totalFrozen + totalUsed;
+
+    // 去重统计用户数和套餐数
+    const uniqueUserIds = new Set(userQuotas.map(q => q.userId).filter(Boolean));
+    const uniquePackageIds = new Set(packageQuotas.map(q => q.packageId).filter(Boolean));
+
+    return {
+      totalAvailable,
+      totalFrozen,
+      totalUsed,
+      totalQuota,
+      terminalUserCount: uniqueUserIds.size,
+      packageCount: uniquePackageIds.size
+    };
   }
 }
 

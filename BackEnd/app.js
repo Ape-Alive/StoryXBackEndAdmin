@@ -21,6 +21,8 @@ const userPackageRoutes = require('./src/routes/userPackage.routes');
 const deviceRoutes = require('./src/routes/device.routes');
 const adminDeviceRoutes = require('./src/routes/adminDevice.routes');
 const quotaRoutes = require('./src/routes/quota.routes');
+const quotaRecordRoutes = require('./src/routes/quotaRecord.routes');
+const userQuotaRoutes = require('./src/routes/userQuota.routes');
 const promptRoutes = require('./src/routes/prompt.routes');
 const riskRoutes = require('./src/routes/risk.routes');
 const authorizationRoutes = require('./src/routes/authorization.routes');
@@ -89,7 +91,9 @@ app.use('/api/packages', packageRoutes);
 app.use('/api/user/packages', userPackageRoutes);
 app.use('/api/user/devices', deviceRoutes);
 app.use('/api/devices', adminDeviceRoutes);
-app.use('/api/quotas', quotaRoutes);
+app.use('/api/quotas', quotaRoutes); // 管理员额度管理接口
+app.use('/api/quota-records', quotaRecordRoutes); // 管理员额度流水接口
+app.use('/api/user/quotas', userQuotaRoutes); // 终端用户额度查询接口
 app.use('/api/prompts', promptRoutes);
 app.use('/api/risk', riskRoutes);
 app.use('/api/authorization', authorizationRoutes);

@@ -1,0 +1,652 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "额度流水管理"
+    }
+  ],
+  "paths": {
+    "/api/quota-records": {
+      "get": {
+        "summary": "获取额度流水列表 [super_admin, platform_admin, finance, read_only]",
+        "deprecated": false,
+        "description": "查询额度流水记录，支持多条件筛选和分页",
+        "tags": [
+          "额度流水管理"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "用户ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "packageId",
+            "in": "query",
+            "description": "套餐ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orderId",
+            "in": "query",
+            "description": "订单ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "流水类型筛选（increase=增加，decrease=减少，freeze=冻结，unfreeze=解冻）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "increase",
+                "decrease",
+                "freeze",
+                "unfreeze"
+              ]
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "query",
+            "description": "请求ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "开始时间",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "结束时间",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "description": "流水记录ID",
+                            "example": "clx123456789"
+                          },
+                          "userId": {
+                            "type": "string",
+                            "description": "用户ID"
+                          },
+                          "packageId": {
+                            "type": "string",
+                            "description": "套餐ID",
+                            "nullable": true
+                          },
+                          "orderId": {
+                            "type": "string",
+                            "description": "订单ID",
+                            "nullable": true
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "increase",
+                              "decrease",
+                              "freeze",
+                              "unfreeze"
+                            ],
+                            "description": "流水类型"
+                          },
+                          "amount": {
+                            "type": "number",
+                            "format": "decimal",
+                            "description": "变动额度（积分）",
+                            "example": 100
+                          },
+                          "before": {
+                            "type": "number",
+                            "format": "decimal",
+                            "description": "变动前额度",
+                            "example": 500
+                          },
+                          "after": {
+                            "type": "number",
+                            "format": "decimal",
+                            "description": "变动后额度",
+                            "example": 600
+                          },
+                          "reason": {
+                            "type": "string",
+                            "description": "变动原因",
+                            "nullable": true
+                          },
+                          "requestId": {
+                            "type": "string",
+                            "description": "关联的请求ID",
+                            "nullable": true
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "创建时间"
+                          },
+                          "user": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "email": {
+                                "type": "string"
+                              },
+                              "phone": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            }
+                          },
+                          "package": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "displayName": {
+                                "type": "string"
+                              }
+                            },
+                            "nullable": true
+                          }
+                        }
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer"
+                        },
+                        "pageSize": {
+                          "type": "integer"
+                        },
+                        "total": {
+                          "type": "integer"
+                        },
+                        "totalPages": {
+                          "type": "integer"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quota-records/{id}": {
+      "get": {
+        "summary": "获取额度流水详情 [super_admin, platform_admin, finance, read_only]",
+        "deprecated": false,
+        "description": "获取单条额度流水记录的详细信息",
+        "tags": [
+          "额度流水管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "流水记录ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quota record retrieved successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "流水记录详情（包含关联的用户、套餐、订单信息）",
+                      "properties": {}
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "流水记录不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "删除额度流水记录 [super_admin, platform_admin]",
+        "deprecated": false,
+        "description": "删除单条额度流水记录",
+        "tags": [
+          "额度流水管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "流水记录ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quota record deleted successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          },
+          "404": {
+            "description": "流水记录不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quota-records/request/{requestId}": {
+      "get": {
+        "summary": "根据 requestId 查询流水 [super_admin, platform_admin, finance, read_only]",
+        "deprecated": false,
+        "description": "根据请求ID查询相关的所有额度流水记录",
+        "tags": [
+          "额度流水管理"
+        ],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "description": "请求ID",
+            "required": true,
+            "example": "req_123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quota records retrieved successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "流水记录列表（按创建时间正序）",
+                      "items": {
+                        "type": "object",
+                        "properties": {}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "未找到相关流水记录",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quota-records/export": {
+      "post": {
+        "summary": "导出额度流水 [super_admin, platform_admin, finance]",
+        "deprecated": false,
+        "description": "根据筛选条件导出额度流水记录",
+        "tags": [
+          "额度流水管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "用户ID筛选"
+                  },
+                  "packageId": {
+                    "type": "string",
+                    "description": "套餐ID筛选"
+                  },
+                  "orderId": {
+                    "type": "string",
+                    "description": "订单ID筛选"
+                  },
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "increase",
+                      "decrease",
+                      "freeze",
+                      "unfreeze"
+                    ],
+                    "description": "流水类型筛选"
+                  },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "开始时间"
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "结束时间"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "导出成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quota records exported successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "description": "流水记录列表",
+                      "items": {
+                        "type": "object",
+                        "properties": {}
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quota-records/batch": {
+      "delete": {
+        "summary": "批量删除额度流水记录 [super_admin, platform_admin]",
+        "deprecated": false,
+        "description": "批量删除额度流水记录",
+        "tags": [
+          "额度流水管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "流水记录ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quota records deleted successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "boolean"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "count": {
+                          "type": "integer",
+                          "description": "删除的记录数量",
+                          "example": 2
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          },
+          "404": {
+            "description": "部分流水记录不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

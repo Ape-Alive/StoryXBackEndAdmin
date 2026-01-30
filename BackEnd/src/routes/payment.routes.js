@@ -21,8 +21,8 @@ const {
  * @swagger
  * /api/user/orders/{orderId}/payment:
  *   post:
- *     summary: 发起支付
- *     description: 为指定订单创建支付记录，返回支付二维码或支付链接
+ *     summary: 发起支付 [仅终端用户]
+ *     description: 为指定订单创建支付记录，返回支付二维码或支付链接（只能为自己的订单发起支付）
  *     tags: [支付管理]
  *     security:
  *       - bearerAuth: []
@@ -196,8 +196,8 @@ router.post(
  * @swagger
  * /api/user/payments/{id}:
  *   get:
- *     summary: 获取支付详情
- *     description: 查询指定支付记录的详细信息，包括订单信息
+ *     summary: 获取支付详情 [仅终端用户]
+ *     description: 查询指定支付记录的详细信息，包括订单信息（只能查看自己的支付记录）
  *     tags: [支付管理]
  *     security:
  *       - bearerAuth: []
@@ -347,8 +347,8 @@ router.get(
  * @swagger
  * /api/user/payments/{id}/query:
  *   post:
- *     summary: 查询支付状态
- *     description: 主动查询支付状态，如果支付平台支持查询接口，会同步最新状态
+ *     summary: 查询支付状态 [仅终端用户]
+ *     description: 主动查询支付状态，如果支付平台支持查询接口，会同步最新状态（只能查询自己的支付记录）
  *     tags: [支付管理]
  *     security:
  *       - bearerAuth: []

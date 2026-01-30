@@ -10,14 +10,35 @@ class UserPackageController {
    */
   async getUserPackages(req, res, next) {
     try {
-      const filters = {
-        userId: req.query.userId,
-        packageId: req.query.packageId,
-        activeOnly: req.query.activeOnly === 'true',
-        expiresAt: {
-          lte: req.query.expiresBefore
-        }
-      };
+      const filters = {};
+
+      if (req.query.userId) {
+        filters.userId = req.query.userId;
+      }
+
+      if (req.query.packageId) {
+        filters.packageId = req.query.packageId;
+      }
+
+      // 处理 priority 参数
+      if (req.query.priority) {
+        filters.priority = req.query.priority;
+      }
+
+      // 处理 startDate 参数
+      if (req.query.startDate) {
+        filters.startDate = req.query.startDate;
+      }
+
+      // 处理 activeOnly 参数
+      if (req.query.activeOnly !== undefined) {
+        filters.activeOnly = req.query.activeOnly === 'true';
+      }
+
+      // 处理 expiresBefore 参数
+      if (req.query.expiresBefore) {
+        filters.expiresBefore = req.query.expiresBefore;
+      }
 
       const pagination = {
         page: parseInt(req.query.page) || 1,

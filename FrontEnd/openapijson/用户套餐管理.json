@@ -1,0 +1,398 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "套餐管理"
+    }
+  ],
+  "paths": {
+    "/api/packages/user-packages/list": {
+      "get": {
+        "summary": "获取用户套餐列表（管理员）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "套餐管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "用户ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "packageId",
+            "in": "query",
+            "description": "套餐ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "activeOnly",
+            "in": "query",
+            "description": "是否只返回活跃套餐",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "expiresBefore",
+            "in": "query",
+            "description": "过期时间筛选（在此之前过期）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "每页数量",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/packages/user-packages/{id}": {
+      "get": {
+        "summary": "获取用户套餐详情（管理员）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "套餐管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "用户套餐ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户套餐不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "delete": {
+        "summary": "取消用户套餐（管理员）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "套餐管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "用户套餐ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "取消成功",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户套餐不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/packages/user-packages/assign": {
+      "post": {
+        "summary": "分配套餐给用户（管理员）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "套餐管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "userId",
+                  "packageId"
+                ],
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "用户ID",
+                    "example": "clx123456789"
+                  },
+                  "packageId": {
+                    "type": "string",
+                    "description": "套餐ID",
+                    "example": "clx987654321"
+                  },
+                  "priority": {
+                    "type": "integer",
+                    "description": "套餐优先级（可选）",
+                    "example": 10
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "分配成功",
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户或套餐不存在",
+            "headers": {}
+          },
+          "409": {
+            "description": "用户已拥有该套餐",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/packages/user-packages/{id}/priority": {
+      "patch": {
+        "summary": "更新用户套餐优先级（管理员）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "套餐管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "用户套餐ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "priority"
+                ],
+                "properties": {
+                  "priority": {
+                    "type": "integer",
+                    "description": "新的优先级",
+                    "example": 20
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户套餐不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/packages/user-packages/{id}/extend": {
+      "patch": {
+        "summary": "延期用户套餐（管理员）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "套餐管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "用户套餐ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "days"
+                ],
+                "properties": {
+                  "days": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "延期天数",
+                    "example": 30
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "延期成功",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户套餐不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/packages/users/{userId}/active-packages": {
+      "get": {
+        "summary": "获取用户的活跃套餐列表（管理员）",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "套餐管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "headers": {}
+          },
+          "404": {
+            "description": "用户不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

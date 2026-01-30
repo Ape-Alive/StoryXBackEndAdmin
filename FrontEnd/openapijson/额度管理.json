@@ -1,0 +1,773 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "额度管理（管理员）"
+    }
+  ],
+  "paths": {
+    "/api/quotas": {
+      "get": {
+        "summary": "获取额度列表 [管理员]",
+        "deprecated": false,
+        "description": "管理员查询所有终端用户的额度列表",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/users/{userId}": {
+      "get": {
+        "summary": "获取用户的所有额度 [管理员]",
+        "deprecated": false,
+        "description": "管理员查询指定终端用户的所有额度记录",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/users/{userId}/detail": {
+      "get": {
+        "summary": "获取用户额度详情 [管理员]",
+        "deprecated": false,
+        "description": "管理员查询指定终端用户的额度详情",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/users/{userId}/adjust": {
+      "patch": {
+        "summary": "手动调整额度 [管理员]",
+        "deprecated": false,
+        "description": "管理员手动调整指定终端用户的额度",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/{id}/freeze": {
+      "patch": {
+        "summary": "冻结额度 [管理员]",
+        "deprecated": false,
+        "description": "管理员手动冻结终端用户额度（将可用额度转移到冻结额度）",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "额度记录ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount"
+                ],
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "冻结金额（必须大于0）",
+                    "example": 100
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "冻结原因",
+                    "example": "违规操作，冻结额度"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "冻结成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quota frozen successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "description": "更新后的额度记录",
+                      "properties": {}
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "可用额度不足",
+            "headers": {}
+          },
+          "404": {
+            "description": "额度记录不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/{id}/unfreeze": {
+      "patch": {
+        "summary": "解冻额度 [管理员]",
+        "deprecated": false,
+        "description": "管理员手动解冻终端用户额度（将冻结额度转移到可用额度）",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "额度记录ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "amount"
+                ],
+                "properties": {
+                  "amount": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "解冻金额（必须大于0）",
+                    "example": 100
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "解冻原因",
+                    "example": "问题已解决，解冻额度"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "解冻成功",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/{id}": {
+      "put": {
+        "summary": "设置额度 [管理员]",
+        "deprecated": false,
+        "description": "管理员直接设置终端用户额度（覆盖现有值）",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "额度记录ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "available": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "可用额度（可选）",
+                    "example": 1000
+                  },
+                  "frozen": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "冻结额度（可选）",
+                    "example": 0
+                  },
+                  "used": {
+                    "type": "number",
+                    "format": "decimal",
+                    "description": "已使用额度（可选）",
+                    "example": 0
+                  },
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "设置原因（必填）",
+                    "example": "重置用户额度"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "设置成功",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/{id}/reset": {
+      "post": {
+        "summary": "重置额度 [管理员]",
+        "deprecated": false,
+        "description": "重置终端用户额度（清零）",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "额度记录ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "reason"
+                ],
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "重置原因",
+                    "example": "用户违规，重置额度"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "重置成功",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/batch/adjust": {
+      "patch": {
+        "summary": "批量调整额度 [管理员]",
+        "deprecated": false,
+        "description": "批量调整多个终端用户的额度",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "quotaId",
+                        "amount"
+                      ],
+                      "properties": {
+                        "quotaId": {
+                          "type": "string",
+                          "description": "额度记录ID",
+                          "example": "clx123"
+                        },
+                        "amount": {
+                          "type": "number",
+                          "format": "decimal",
+                          "description": "调整金额（正数为增加，负数为减少）",
+                          "example": 100
+                        },
+                        "reason": {
+                          "type": "string",
+                          "maxLength": 500,
+                          "description": "调整原因",
+                          "example": "批量充值"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "批量调整完成",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Batch quota adjustment completed"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "success": {
+                          "type": "array",
+                          "description": "成功列表",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "failed": {
+                          "type": "array",
+                          "description": "失败列表",
+                          "items": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/batch/freeze": {
+      "patch": {
+        "summary": "批量冻结额度 [管理员]",
+        "deprecated": false,
+        "description": "批量冻结多个终端用户的额度",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "quotaId",
+                        "amount"
+                      ],
+                      "properties": {
+                        "quotaId": {
+                          "type": "string",
+                          "description": "额度记录ID"
+                        },
+                        "amount": {
+                          "type": "number",
+                          "format": "decimal",
+                          "description": "冻结金额（必须大于0）"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "maxLength": 500,
+                          "description": "冻结原因"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "批量冻结完成",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/batch/unfreeze": {
+      "patch": {
+        "summary": "批量解冻额度 [管理员]",
+        "deprecated": false,
+        "description": "批量解冻多个终端用户的额度",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "items"
+                ],
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "quotaId",
+                        "amount"
+                      ],
+                      "properties": {
+                        "quotaId": {
+                          "type": "string",
+                          "description": "额度记录ID"
+                        },
+                        "amount": {
+                          "type": "number",
+                          "format": "decimal",
+                          "description": "解冻金额（必须大于0）"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "maxLength": 500,
+                          "description": "解冻原因"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "批量解冻完成",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/quotas/export": {
+      "post": {
+        "summary": "导出额度数据 [管理员]",
+        "deprecated": false,
+        "description": "管理员导出终端用户额度数据",
+        "tags": [
+          "额度管理（管理员）"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "description": "终端用户ID（可选）"
+                  },
+                  "packageId": {
+                    "type": "string",
+                    "description": "套餐ID（可选）"
+                  },
+                  "format": {
+                    "type": "string",
+                    "enum": [
+                      "excel",
+                      "csv"
+                    ],
+                    "default": "excel",
+                    "description": "导出格式"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "导出成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Quota data exported successfully"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "description": "额度数据列表",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "总记录数"
+                        },
+                        "format": {
+                          "type": "string",
+                          "description": "导出格式"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {},
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}
