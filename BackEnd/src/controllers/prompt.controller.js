@@ -15,6 +15,7 @@ class PromptController {
         categoryId: req.query.categoryId,
         type: req.query.type,
         userId: req.query.userId,
+        systemId: req.query.systemId,
         isActive: req.query.isActive,
         tags: req.query.tags,
         createdAt: {
@@ -33,7 +34,10 @@ class PromptController {
         title: req.query.orderBy === 'title' ? (req.query.order === 'asc' ? 'asc' : 'desc') : undefined
       };
 
-      const result = await promptService.getPrompts(filters, pagination, sort);
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+
+      const result = await promptService.getPrompts(filters, pagination, sort, userRole, userId);
 
       return ResponseHandler.paginated(res, result.data, {
         page: result.page,
@@ -51,7 +55,9 @@ class PromptController {
   async getPromptDetail(req, res, next) {
     try {
       const { id } = req.params;
-      const prompt = await promptService.getPromptDetail(id);
+      const userRole = req.user?.role;
+      const userId = req.user?.id;
+      const prompt = await promptService.getPromptDetail(id, userRole, userId);
       return ResponseHandler.success(res, prompt, 'Prompt detail retrieved successfully');
     } catch (error) {
       next(error);
@@ -64,9 +70,10 @@ class PromptController {
   async createPrompt(req, res, next) {
     try {
       const data = req.body;
-      const userId = req.user?.id; // 从 token 中获取用户ID（如果是用户提示词）
-      const adminId = req.user?.id; // 管理员ID
-      const prompt = await promptService.createPrompt(data, userId, adminId, req.ip);
+      const userId = req.user?.id;
+      const adminId = req.user?.id;
+      const userRole = req.user?.role;
+      const prompt = await promptService.createPrompt(data, userId, adminId, req.ip, userRole);
       return ResponseHandler.success(res, prompt, 'Prompt created successfully', 201);
     } catch (error) {
       next(error);
@@ -82,7 +89,8 @@ class PromptController {
       const data = req.body;
       const userId = req.user?.id;
       const adminId = req.user?.id;
-      const prompt = await promptService.updatePrompt(id, data, userId, adminId, req.ip);
+      const userRole = req.user?.role;
+      const prompt = await promptService.updatePrompt(id, data, userId, adminId, req.ip, userRole);
       return ResponseHandler.success(res, prompt, 'Prompt updated successfully');
     } catch (error) {
       next(error);
@@ -97,7 +105,8 @@ class PromptController {
       const { id } = req.params;
       const userId = req.user?.id;
       const adminId = req.user?.id;
-      await promptService.deletePrompt(id, userId, adminId, req.ip);
+      const userRole = req.user?.role;
+      await promptService.deletePrompt(id, userId, adminId, req.ip, userRole);
       return ResponseHandler.success(res, null, 'Prompt deleted successfully');
     } catch (error) {
       next(error);
@@ -124,7 +133,10 @@ class PromptController {
     try {
       const { id } = req.params;
       const { version } = req.body;
-      const prompt = await promptService.rollbackPrompt(id, version, req.user?.id, req.ip);
+      const adminId = req.user?.id;
+      const userId = req.user?.id;
+      const userRole = req.user?.role;
+      const prompt = await promptService.rollbackPrompt(id, version, adminId, req.ip, userRole, userId);
       return ResponseHandler.success(res, prompt, 'Prompt rolled back successfully');
     } catch (error) {
       next(error);

@@ -200,14 +200,25 @@ class UserAuthService {
         }
       }
 
+      // 如果设备没有名称，生成默认名称
+      const updateData = {
+        lastUsedAt: new Date(),
+        ipAddress: ipAddress || existingDevice.ipAddress,
+        status: 'active' // 恢复为 active 状态
+      };
+
+      // 如果设备没有名称，自动生成默认名称
+      if (!existingDevice.name) {
+        const defaultName = deviceFingerprint && deviceFingerprint.length >= 8
+          ? `设备-${deviceFingerprint.substring(0, 8)}`
+          : `设备-${deviceFingerprint || 'unknown'}`;
+        updateData.name = defaultName;
+      }
+
       // 更新设备最后使用时间和状态（如果是 revoked，恢复为 active）
       const device = await prisma.device.update({
         where: { id: existingDevice.id },
-        data: {
-          lastUsedAt: new Date(),
-          ipAddress: ipAddress || existingDevice.ipAddress,
-          status: 'active' // 恢复为 active 状态
-        }
+        data: updateData
       });
       return device;
     }
@@ -218,11 +229,17 @@ class UserAuthService {
       throw new BadRequestError(limitCheck.message);
     }
 
+    // 基于设备指纹生成默认名称（取前8位）
+    const defaultName = deviceFingerprint && deviceFingerprint.length >= 8
+      ? `设备-${deviceFingerprint.substring(0, 8)}`
+      : `设备-${deviceFingerprint || 'unknown'}`;
+
     // 创建新设备
     const device = await prisma.device.create({
       data: {
         userId,
         deviceFingerprint,
+        name: defaultName,
         ipAddress,
         status: 'active',
         lastUsedAt: new Date()

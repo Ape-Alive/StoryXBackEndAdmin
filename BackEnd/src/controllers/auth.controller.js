@@ -29,8 +29,8 @@ class AuthController {
   async registerUser(req, res, next) {
     try {
       const data = req.body;
-      // 从请求头获取 IP 地址
-      data.ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      // 使用统一的 IP 提取方法
+      data.ipAddress = req.realIp || req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
       const result = await userAuthService.register(data);
       return ResponseHandler.success(res, result, 'User registration successful', 201);
     } catch (error) {
@@ -45,8 +45,8 @@ class AuthController {
   async loginUser(req, res, next) {
     try {
       const { email, password, deviceFingerprint } = req.body;
-      // 从请求头获取 IP 地址
-      const ipAddress = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      // 使用统一的 IP 提取方法
+      const ipAddress = req.realIp || req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
       const result = await userAuthService.login(email, password, deviceFingerprint, ipAddress);
       return ResponseHandler.success(res, result, 'Login successful');
     } catch (error) {

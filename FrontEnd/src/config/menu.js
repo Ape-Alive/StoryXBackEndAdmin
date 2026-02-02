@@ -9,7 +9,12 @@ export const MENU_STRUCTURE = [
         icon: 'Odometer',
         children: [
             { id: 'dashboard', label: '运行总览大屏', path: '/dashboard', icon: 'Odometer' },
-            { id: 'statistics', label: '调用数据分析', path: '/dashboard/statistics', icon: 'DataAnalysis' }
+            {
+                id: 'statistics',
+                label: '调用数据分析',
+                path: '/dashboard/statistics',
+                icon: 'DataAnalysis'
+            }
         ]
     },
     {
@@ -17,15 +22,25 @@ export const MENU_STRUCTURE = [
         icon: 'User',
         children: [
             { id: 'system-user-list', label: '系统用户列表', path: '/system-user/list', icon: 'User' },
-            { id: 'system-user-status', label: '权限状态管控', path: '/system-user/status', icon: 'Lock' },
+            { id: 'system-user-status', label: '权限状态管控', path: '/system-user/status', icon: 'Lock' }
         ]
     },
     {
         title: '终端用户管理',
         icon: 'User',
         children: [
-            { id: 'terminal-user-list', label: '终端用户列表', path: '/terminal-user/list', icon: 'User' },
-            { id: 'device-manage', label: '安全设备管理', path: '/terminal-user/device', icon: 'Monitor' },
+            {
+                id: 'terminal-user-list',
+                label: '终端用户列表',
+                path: '/terminal-user/list',
+                icon: 'User'
+            },
+            {
+                id: 'device-manage',
+                label: '安全设备管理',
+                path: '/terminal-user/device',
+                icon: 'Monitor'
+            },
             { id: 'user-package', label: '用户套餐管理', path: '/terminal-user/package', icon: 'Box' },
             { id: 'user-quota', label: '用户额度管理', path: '/terminal-user/quota', icon: 'PieChart' }
         ]
@@ -45,7 +60,12 @@ export const MENU_STRUCTURE = [
         children: [
             { id: 'packages', label: '商业套餐定义', path: '/finance/package/list', icon: 'Box' },
             { id: 'quota', label: '订单结算管理', path: '/finance/quota/list', icon: 'PieChart' },
-            { id: 'billing-logs', label: '额度流水管理', path: '/finance/quota/billing', icon: 'Document' }
+            {
+                id: 'billing-logs',
+                label: '额度流水管理',
+                path: '/finance/quota/billing',
+                icon: 'Document'
+            }
         ]
     },
     {
@@ -58,10 +78,26 @@ export const MENU_STRUCTURE = [
     },
     {
         title: '提示词库',
-        icon: 'Document',
+        icon: 'Prompt',
         children: [
-            { id: 'prompt-category', label: '系统提示词库', path: '/system-prompt/category', icon: 'Folder' },
-            { id: 'prompt-list', label: '用户提示词库', path: '/user-prompt/list', icon: 'Document' }
+            {
+                id: 'system-prompt-list',
+                label: '系统提示词库',
+                path: '/prompt/system-prompt-list',
+                icon: 'Folder'
+            },
+            {
+                id: 'user-prompt-list',
+                label: '用户提示词库',
+                path: '/prompt/user-prompt-list',
+                icon: 'Document'
+            },
+            {
+                id: 'prompt-category',
+                label: '提示词分类管理',
+                path: '/prompt/prompt-category',
+                icon: 'Folder'
+            }
         ]
     },
     {
@@ -69,7 +105,12 @@ export const MENU_STRUCTURE = [
         icon: 'Key',
         children: [
             { id: 'authorization-list', label: '授权记录', path: '/authorization/list', icon: 'Key' },
-            { id: 'authorization-stats', label: '授权统计', path: '/authorization/stats', icon: 'DataAnalysis' }
+            {
+                id: 'authorization-stats',
+                label: '授权统计',
+                path: '/authorization/stats',
+                icon: 'DataAnalysis'
+            }
         ]
     },
     {
@@ -89,4 +130,3 @@ export const TOP_NAV_MENU = [
     { label: '路由', path: '/route' },
     { label: '审计', path: '/audit' }
 ]
-

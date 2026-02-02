@@ -29,8 +29,8 @@ const routes = [
     ]
   },
   {
-    path: "/model",
-    name: "Model",
+    path: '/model',
+    name: 'Model',
     component: () => import('@/layouts/MainLayout.vue'),
     meta: { title: '模型管理', requiresAuth: true },
     children: [
@@ -52,12 +52,11 @@ const routes = [
         component: () => import('@/views/model/Pricing.vue'),
         meta: { title: '模型计费策略', requiresAuth: true }
       }
-    ],
-
+    ]
   },
   {
-    path: "/system-user",
-    name: "SystemUser",
+    path: '/system-user',
+    name: 'SystemUser',
     component: () => import('@/layouts/MainLayout.vue'),
     meta: { title: '系统用户管理', requiresAuth: true },
     children: [
@@ -76,8 +75,8 @@ const routes = [
     ]
   },
   {
-    path: "/terminal-user",
-    name: "TerminalUser",
+    path: '/terminal-user',
+    name: 'TerminalUser',
     component: () => import('@/layouts/MainLayout.vue'),
     meta: { title: '终端用户管理', requiresAuth: true },
     children: [
@@ -108,8 +107,8 @@ const routes = [
     ]
   },
   {
-    path: "/finance",
-    name: "Finance",
+    path: '/finance',
+    name: 'Finance',
     component: () => import('@/layouts/MainLayout.vue'),
     meta: { title: '财务治理', requiresAuth: true },
     children: [
@@ -130,6 +129,32 @@ const routes = [
         name: 'FinanceQuotaBilling',
         component: () => import('@/views/finance/FinanceQuotaBilling.vue'),
         meta: { title: '额度流水管理', requiresAuth: true }
+      }
+    ]
+  },
+  {
+    path: '/prompt',
+    name: 'Prompt',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { title: '提示词管理', requiresAuth: true },
+    children: [
+      {
+        path: '/prompt/system-prompt-list',
+        name: 'SystemPromptList',
+        component: () => import('@/views/prompt/SystemPromptList.vue'),
+        meta: { title: '系统提示词列表', requiresAuth: true }
+      },
+      {
+        path: '/prompt/user-prompt-list',
+        name: 'UserPromptList',
+        component: () => import('@/views/prompt/UserPromptList.vue'),
+        meta: { title: '用户提示词列表', requiresAuth: true }
+      },
+      {
+        path: '/prompt/prompt-category',
+        name: 'PromptCategory',
+        component: () => import('@/views/prompt/PromptCategory.vue'),
+        meta: { title: '提示词分类管理', requiresAuth: true }
       }
     ]
   }
@@ -154,4 +179,3 @@ router.beforeEach((to, from, next) => {
 })
 
 export default router
-

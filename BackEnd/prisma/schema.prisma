@@ -362,26 +362,26 @@ model PromptCategory {
   name        String   @unique
   displayName String
   description String?
-  type        String   // system, user, shared
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   prompts     Prompt[]
 
-  @@index([type])
   @@map("prompt_categories")
 }
 
 // 提示词
 model Prompt {
   id          String   @id @default(cuid())
+  functionKey String   @unique // 功能键，唯一标识
   title       String
   content     String   @db.Text
   description String?
   categoryId  String
   tags        String?  // JSON数组
-  type        String   // system, user, shared
+  type        String   // system, system_user, user
   userId      String?  // 创建者ID（如果是用户提示词）
+  systemId    String?  // 关联的system类型提示词ID（system_user和user类型使用）
   version     Int      @default(1)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
@@ -389,12 +389,18 @@ model Prompt {
 
   category    PromptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   versions    PromptVersion[]
+  // 关联的system提示词（system_user和user类型）
+  system      Prompt?  @relation("SystemPrompts", fields: [systemId], references: [id], onDelete: SetNull)
+  // 关联到该system的所有子提示词（system_user和user类型）
+  children    Prompt[] @relation("SystemPrompts")
 
   @@index([categoryId])
   @@index([type])
   @@index([userId])
+  @@index([systemId])
   @@index([isActive])
   @@index([title])
+  @@index([functionKey])
   @@map("prompts")
 }
 

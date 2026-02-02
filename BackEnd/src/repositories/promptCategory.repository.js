@@ -10,10 +10,6 @@ class PromptCategoryRepository {
   async findCategories(filters = {}) {
     const where = {};
 
-    if (filters.type) {
-      where.type = filters.type;
-    }
-
     if (filters.name) {
       where.name = { contains: filters.name };
     }
@@ -66,8 +62,7 @@ class PromptCategoryRepository {
       data: {
         name: data.name,
         displayName: data.displayName,
-        description: data.description,
-        type: data.type
+        description: data.description
       }
     });
   }
@@ -80,7 +75,6 @@ class PromptCategoryRepository {
 
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
     if (data.description !== undefined) updateData.description = data.description;
-    if (data.type !== undefined) updateData.type = data.type;
 
     updateData.updatedAt = new Date();
 

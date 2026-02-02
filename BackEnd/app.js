@@ -8,6 +8,7 @@ const swaggerSpec = require('./src/config/swagger');
 
 // Import middleware
 const errorHandler = require('./src/middleware/errorHandler');
+const { ipExtractor } = require('./src/middleware/ipExtractor');
 const logger = require('./src/utils/logger');
 
 // Import routes
@@ -34,6 +35,12 @@ const paymentCallbackRoutes = require('./src/routes/paymentCallback.routes');
 
 const app = express();
 
+// Trust proxy settings (if behind proxy/load balancer)
+// 如果部署在 Nginx、负载均衡器等代理后面，需要设置此项
+// 设置为 true 表示信任第一个代理，设置为数字表示信任的代理层数
+// 设置为 IP 地址或 IP 段表示信任的代理 IP
+app.set('trust proxy', process.env.TRUST_PROXY === 'true' || process.env.TRUST_PROXY === '1' || false);
+
 // Security middleware
 app.use(helmet());
 
@@ -50,6 +57,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Compression middleware
 app.use(compression());
+
+// IP 提取中间件（在所有路由之前）
+app.use(ipExtractor);
 
 // Logging middleware
 if (process.env.NODE_ENV !== 'test') {

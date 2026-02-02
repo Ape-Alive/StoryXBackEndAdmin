@@ -13,20 +13,34 @@ class PromptRepository {
 
     const where = {};
 
+    // 处理OR条件（用于权限筛选）
+    if (filters.OR) {
+      where.OR = filters.OR;
+    }
+
     if (filters.title) {
       where.title = { contains: filters.title };
+    }
+
+    if (filters.functionKey) {
+      where.functionKey = filters.functionKey;
     }
 
     if (filters.categoryId) {
       where.categoryId = filters.categoryId;
     }
 
-    if (filters.type) {
+    // 只有在没有OR条件时才使用单独的type筛选
+    if (filters.type && !filters.OR) {
       where.type = filters.type;
     }
 
-    if (filters.userId) {
+    if (filters.userId && !filters.OR) {
       where.userId = filters.userId;
+    }
+
+    if (filters.systemId !== undefined) {
+      where.systemId = filters.systemId;
     }
 
     if (filters.isActive !== undefined) {
@@ -65,9 +79,17 @@ class PromptRepository {
         orderBy,
         include: {
           category: true,
+          system: {
+            select: {
+              id: true,
+              title: true,
+              type: true
+            }
+          },
           _count: {
             select: {
-              versions: true
+              versions: true,
+              children: true
             }
           }
         }
@@ -96,6 +118,21 @@ class PromptRepository {
       where: { id },
       include: {
         category: true,
+        system: {
+          select: {
+            id: true,
+            title: true,
+            type: true
+          }
+        },
+        children: {
+          select: {
+            id: true,
+            title: true,
+            type: true,
+            userId: true
+          }
+        },
         versions: {
           orderBy: {
             version: 'desc'
@@ -107,11 +144,21 @@ class PromptRepository {
   }
 
   /**
+   * 根据 functionKey 获取提示词
+   */
+  async findByFunctionKey(functionKey) {
+    return await prisma.prompt.findUnique({
+      where: { functionKey }
+    });
+  }
+
+  /**
    * 创建提示词
    */
   async create(data) {
     return await prisma.prompt.create({
       data: {
+        functionKey: data.functionKey,
         title: data.title,
         content: data.content,
         description: data.description,
@@ -119,11 +166,19 @@ class PromptRepository {
         tags: data.tags ? JSON.stringify(data.tags) : null,
         type: data.type,
         userId: data.userId || null,
+        systemId: data.systemId || null,
         version: 1,
         isActive: data.isActive !== undefined ? data.isActive : true
       },
       include: {
-        category: true
+        category: true,
+        system: {
+          select: {
+            id: true,
+            title: true,
+            type: true
+          }
+        }
       }
     });
   }
@@ -147,25 +202,39 @@ class PromptRepository {
       throw new Error('Prompt not found');
     }
 
-    // 保存当前版本到版本表
-    const currentVersion = prompt.versions[0] || prompt;
-    await prisma.promptVersion.create({
-      data: {
-        promptId: id,
-        version: prompt.version,
-        content: prompt.content,
-        updatedBy: updatedBy || null
+    // 保存当前版本到版本表（如果该版本不存在）
+    // 检查当前版本是否已经在版本表中
+    const existingVersion = await prisma.promptVersion.findUnique({
+      where: {
+        promptId_version: {
+          promptId: id,
+          version: prompt.version
+        }
       }
     });
+
+    // 如果版本不存在，才创建新版本记录
+    if (!existingVersion) {
+      await prisma.promptVersion.create({
+        data: {
+          promptId: id,
+          version: prompt.version,
+          content: prompt.content,
+          updatedBy: updatedBy || null
+        }
+      });
+    }
 
     // 更新提示词
     const updateData = {};
 
+    if (data.functionKey !== undefined) updateData.functionKey = data.functionKey;
     if (data.title !== undefined) updateData.title = data.title;
     if (data.content !== undefined) updateData.content = data.content;
     if (data.description !== undefined) updateData.description = data.description;
     if (data.categoryId !== undefined) updateData.categoryId = data.categoryId;
     if (data.tags !== undefined) updateData.tags = data.tags ? JSON.stringify(data.tags) : null;
+    if (data.systemId !== undefined) updateData.systemId = data.systemId;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     updateData.version = prompt.version + 1;
@@ -175,7 +244,14 @@ class PromptRepository {
       where: { id },
       data: updateData,
       include: {
-        category: true
+        category: true,
+        system: {
+          select: {
+            id: true,
+            title: true,
+            type: true
+          }
+        }
       }
     });
   }
@@ -215,15 +291,27 @@ class PromptRepository {
       throw new Error('Version not found');
     }
 
-    // 保存当前版本
-    await prisma.promptVersion.create({
-      data: {
-        promptId: id,
-        version: prompt.version,
-        content: prompt.content,
-        updatedBy: updatedBy || null
+    // 保存当前版本到版本表（如果该版本不存在）
+    const existingCurrentVersion = await prisma.promptVersion.findUnique({
+      where: {
+        promptId_version: {
+          promptId: id,
+          version: prompt.version
+        }
       }
     });
+
+    // 如果当前版本不存在于版本表中，才创建版本记录
+    if (!existingCurrentVersion) {
+      await prisma.promptVersion.create({
+        data: {
+          promptId: id,
+          version: prompt.version,
+          content: prompt.content,
+          updatedBy: updatedBy || null
+        }
+      });
+    }
 
     // 回滚到指定版本
     return await prisma.prompt.update({
