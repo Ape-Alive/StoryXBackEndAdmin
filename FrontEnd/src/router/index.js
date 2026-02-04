@@ -169,13 +169,20 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
 
+  // 如果访问登录页且已认证，重定向到首页
+  if (to.name === 'Login' && authStore.isAuthenticated) {
+    next({ path: '/' })
+    return
+  }
+
+  // 如果访问需要认证的页面但未认证，重定向到登录页
   if (to.meta.requiresAuth && !authStore.isAuthenticated) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.name === 'Login' && authStore.isAuthenticated) {
-    next({ path: '/' })
-  } else {
-    next()
+    return
   }
+
+  // 其他情况正常导航
+  next()
 })
 
 export default router

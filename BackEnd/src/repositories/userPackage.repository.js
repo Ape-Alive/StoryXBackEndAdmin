@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { calculateExpiryDate } = require('../utils/packageDuration');
 
 /**
  * 用户套餐数据访问层

@@ -142,8 +142,8 @@ class UserPackageController {
    */
   async getAvailablePackages(req, res, next) {
     try {
-      const { type } = req.query;
-      const packages = await userPackageService.getAvailablePackages(type);
+      const { type, durationUnit } = req.query;
+      const packages = await userPackageService.getAvailablePackages(type, durationUnit);
       return ResponseHandler.success(res, packages, 'Available packages retrieved successfully');
     } catch (error) {
       next(error);

@@ -291,9 +291,14 @@ function handleSizeChange(size) {
 }
 
 onMounted(async () => {
-  // 确保管理员信息已加载
-  if (!authStore.admin && !authStore.user) {
-    await authStore.fetchCurrentAdmin()
+  // 确保管理员信息已加载（只在有 token 时尝试获取）
+  if (authStore.isAuthenticated && !authStore.admin && !authStore.user) {
+    try {
+      await authStore.fetchCurrentAdmin()
+    } catch (error) {
+      // 如果获取失败（如 token 无效），不阻止页面加载
+      console.warn('Failed to fetch admin info:', error)
+    }
   }
   fetchData()
 })

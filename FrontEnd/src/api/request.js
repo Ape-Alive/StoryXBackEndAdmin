@@ -50,14 +50,18 @@ service.interceptors.response.use(
 
       switch (status) {
         case 401: {
-          ElMessage.error('未授权，请重新登录')
           // 清除认证状态
           const authStore = useAuthStore()
           authStore.logout()
-          // 使用 replace 避免在历史记录中留下当前页面
-          router.replace('/login').catch(() => {
-            // 如果已经在登录页面，忽略错误
-          })
+
+          // 如果当前不在登录页，才显示错误消息并重定向
+          if (router.currentRoute.value.name !== 'Login') {
+            ElMessage.error('未授权，请重新登录')
+            // 使用 replace 避免在历史记录中留下当前页面
+            router.replace('/login').catch(() => {
+              // 如果已经在登录页面，忽略错误
+            })
+          }
           break
         }
         case 403:

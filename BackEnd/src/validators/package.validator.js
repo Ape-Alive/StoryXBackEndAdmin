@@ -62,6 +62,10 @@ const createPackageValidator = [
       return Number.isInteger(value) && value >= 1;
     })
     .withMessage('Duration must be a positive integer or null (永久)'),
+  body('durationUnit')
+    .optional({ nullable: true })
+    .isIn(['day', 'month', 'year'])
+    .withMessage('Duration unit must be one of: day, month, year'),
   body('quota')
     .optional({ nullable: true })
     .custom((value) => {
@@ -136,6 +140,10 @@ const updatePackageValidator = [
       return Number.isInteger(value) && value >= 1;
     })
     .withMessage('Duration must be a positive integer or null (永久)'),
+  body('durationUnit')
+    .optional({ nullable: true })
+    .isIn(['day', 'month', 'year'])
+    .withMessage('Duration unit must be one of: day, month, year'),
   body('quota')
     .optional({ nullable: true })
     .custom((value) => {

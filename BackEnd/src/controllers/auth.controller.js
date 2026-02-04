@@ -55,6 +55,58 @@ class AuthController {
   }
 
   /**
+   * 生成一次性token（用于桌面端登录）
+   * 注意：此接口只允许终端用户（user）调用，管理员（admin）不能调用
+   */
+  async generateOneTimeToken(req, res, next) {
+    try {
+      // 检查是否为用户token（不是管理员token）
+      if (!req.user || req.user.type !== 'user') {
+        return res.status(403).json({
+          success: false,
+          message: 'This endpoint is only available for terminal users'
+        });
+      }
+
+      const userId = req.user.id; // 从认证token中获取用户ID
+      const ipAddress = req.realIp || req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      const { expiresInMinutes } = req.body; // 可选，默认10分钟
+      const result = await userAuthService.generateOneTimeToken(userId, ipAddress, expiresInMinutes || 10);
+      return ResponseHandler.success(res, result, 'One-time token generated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 桌面端登录（使用一次性token和设备指纹）
+   */
+  async desktopLogin(req, res, next) {
+    try {
+      const { token, deviceId } = req.body;
+      const ipAddress = req.realIp || req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      const result = await userAuthService.desktopLogin(token, deviceId, ipAddress);
+      return ResponseHandler.success(res, result, 'Desktop login successful');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 刷新访问令牌
+   */
+  async refreshToken(req, res, next) {
+    try {
+      const { refreshToken, deviceId } = req.body;
+      const ipAddress = req.realIp || req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+      const result = await userAuthService.refreshAccessToken(refreshToken, deviceId, ipAddress);
+      return ResponseHandler.success(res, result, 'Token refreshed successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
    * 获取登录验证码
    */
   async getLoginCaptcha(req, res, next) {

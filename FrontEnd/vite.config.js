@@ -20,11 +20,11 @@ export default defineConfig(({ mode }) => {
         },
         server: {
             host: '0.0.0.0', // 允许外部访问，可通过局域网 IP 访问
-            port: 3001,
+            port: 3008,
             hmr: {
                 // 热更新配置
                 overlay: true, // 显示错误覆盖层
-                clientPort: 3001 // HMR 客户端端口
+                clientPort: 3008 // HMR 客户端端口
             },
             watch: {
                 // 监听文件变化
@@ -39,7 +39,7 @@ export default defineConfig(({ mode }) => {
                         target: apiBaseUrl,
                         changeOrigin: true,
                         secure: false,
-                        rewrite: (path) => path.replace(/^\/api/, '/api')
+                        rewrite: path => path.replace(/^\/api/, '/api')
                     }
                 }
                 : undefined
@@ -66,4 +66,3 @@ export default defineConfig(({ mode }) => {
         }
     }
 })
-

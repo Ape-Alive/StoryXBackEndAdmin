@@ -113,6 +113,7 @@ class PackageRepository {
         description: data.description,
         type: data.type,
         duration: data.duration,
+        durationUnit: data.durationUnit,
         quota: data.quota,
         price: data.price,
         priceUnit: data.priceUnit,
@@ -139,6 +140,7 @@ class PackageRepository {
     if (data.description !== undefined) updateData.description = data.description;
     if (data.type !== undefined) updateData.type = data.type;
     if (data.duration !== undefined) updateData.duration = data.duration;
+    if (data.durationUnit !== undefined) updateData.durationUnit = data.durationUnit;
     if (data.quota !== undefined) updateData.quota = data.quota;
     if (data.price !== undefined) updateData.price = data.price;
     if (data.priceUnit !== undefined) updateData.priceUnit = data.priceUnit;
@@ -200,6 +202,7 @@ class PackageRepository {
         description: original.description,
         type: original.type,
         duration: original.duration,
+        durationUnit: original.durationUnit,
         quota: original.quota,
         price: original.price,
         priceUnit: original.priceUnit,

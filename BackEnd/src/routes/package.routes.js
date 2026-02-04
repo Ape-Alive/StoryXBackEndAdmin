@@ -56,6 +56,82 @@ router.use(authenticate);
  *     responses:
  *       200:
  *         description: 获取成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           displayName:
+ *                             type: string
+ *                           description:
+ *                             type: string
+ *                           type:
+ *                             type: string
+ *                             enum: [free, paid, trial]
+ *                           duration:
+ *                             type: integer
+ *                             nullable: true
+ *                             description: 有效期数值，null表示永久
+ *                           durationUnit:
+ *                             type: string
+ *                             nullable: true
+ *                             enum: [day, month, year]
+ *                             description: 有效期单位：day（天）、month（月）、year（年），null表示永久
+ *                           quota:
+ *                             type: number
+ *                             nullable: true
+ *                           price:
+ *                             type: number
+ *                             nullable: true
+ *                           priceUnit:
+ *                             type: string
+ *                             nullable: true
+ *                           discount:
+ *                             type: number
+ *                             nullable: true
+ *                           maxDevices:
+ *                             type: integer
+ *                             nullable: true
+ *                           availableModels:
+ *                             type: array
+ *                             nullable: true
+ *                           isStackable:
+ *                             type: boolean
+ *                           priority:
+ *                             type: integer
+ *                           isActive:
+ *                             type: boolean
+ *                           userCount:
+ *                             type: integer
+ *                           quotaRecordCount:
+ *                             type: integer
+ *                           createdAt:
+ *                             type: string
+ *                             format: date-time
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     pageSize:
+ *                       type: integer
  */
 router.get(
     '/',
@@ -83,6 +159,67 @@ router.get(
  *     responses:
  *       200:
  *         description: 获取成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     displayName:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     type:
+ *                       type: string
+ *                       enum: [free, paid, trial]
+ *                     duration:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 有效期数值，null表示永久
+ *                     durationUnit:
+ *                       type: string
+ *                       nullable: true
+ *                       enum: [day, month, year]
+ *                       description: 有效期单位：day（天）、month（月）、year（年），null表示永久
+ *                     quota:
+ *                       type: number
+ *                       nullable: true
+ *                     price:
+ *                       type: number
+ *                       nullable: true
+ *                     priceUnit:
+ *                       type: string
+ *                       nullable: true
+ *                     discount:
+ *                       type: number
+ *                       nullable: true
+ *                     maxDevices:
+ *                       type: integer
+ *                       nullable: true
+ *                     availableModels:
+ *                       type: array
+ *                       nullable: true
+ *                     isStackable:
+ *                       type: boolean
+ *                     priority:
+ *                       type: integer
+ *                     isActive:
+ *                       type: boolean
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
  *       404:
  *         description: 套餐不存在
  */
@@ -131,8 +268,13 @@ router.get(
  *                 example: "paid"
  *               duration:
  *                 type: integer
- *                 description: 有效期（天），null表示永久
+ *                 description: 有效期数值，null表示永久
  *                 example: 30
+ *               durationUnit:
+ *                 type: string
+ *                 enum: [day, month, year]
+ *                 description: 有效期单位：day（天）、month（月）、year（年），null表示永久
+ *                 example: "month"
  *               quota:
  *                 type: number
  *                 format: decimal
@@ -181,6 +323,67 @@ router.get(
  *     responses:
  *       201:
  *         description: 创建成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     displayName:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     type:
+ *                       type: string
+ *                       enum: [free, paid, trial]
+ *                     duration:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 有效期数值，null表示永久
+ *                     durationUnit:
+ *                       type: string
+ *                       nullable: true
+ *                       enum: [day, month, year]
+ *                       description: 有效期单位：day（天）、month（月）、year（年），null表示永久
+ *                     quota:
+ *                       type: number
+ *                       nullable: true
+ *                     price:
+ *                       type: number
+ *                       nullable: true
+ *                     priceUnit:
+ *                       type: string
+ *                       nullable: true
+ *                     discount:
+ *                       type: number
+ *                       nullable: true
+ *                     maxDevices:
+ *                       type: integer
+ *                       nullable: true
+ *                     availableModels:
+ *                       type: array
+ *                       nullable: true
+ *                     isStackable:
+ *                       type: boolean
+ *                     priority:
+ *                       type: integer
+ *                     isActive:
+ *                       type: boolean
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
  *       400:
  *         description: 请求参数错误
  *       409:
@@ -228,7 +431,11 @@ router.post(
  *                 description: 套餐类型
  *               duration:
  *                 type: integer
- *                 description: 有效期（天），null表示永久
+ *                 description: 有效期数值，null表示永久
+ *               durationUnit:
+ *                 type: string
+ *                 enum: [day, month, year]
+ *                 description: 有效期单位：day（天）、month（月）、year（年），null表示永久
  *               quota:
  *                 type: number
  *                 format: decimal
@@ -265,6 +472,67 @@ router.post(
  *     responses:
  *       200:
  *         description: 更新成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     displayName:
+ *                       type: string
+ *                     description:
+ *                       type: string
+ *                     type:
+ *                       type: string
+ *                       enum: [free, paid, trial]
+ *                     duration:
+ *                       type: integer
+ *                       nullable: true
+ *                       description: 有效期数值，null表示永久
+ *                     durationUnit:
+ *                       type: string
+ *                       nullable: true
+ *                       enum: [day, month, year]
+ *                       description: 有效期单位：day（天）、month（月）、year（年），null表示永久
+ *                     quota:
+ *                       type: number
+ *                       nullable: true
+ *                     price:
+ *                       type: number
+ *                       nullable: true
+ *                     priceUnit:
+ *                       type: string
+ *                       nullable: true
+ *                     discount:
+ *                       type: number
+ *                       nullable: true
+ *                     maxDevices:
+ *                       type: integer
+ *                       nullable: true
+ *                     availableModels:
+ *                       type: array
+ *                       nullable: true
+ *                     isStackable:
+ *                       type: boolean
+ *                     priority:
+ *                       type: integer
+ *                     isActive:
+ *                       type: boolean
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
  *       400:
  *         description: 请求参数错误
  *       404:

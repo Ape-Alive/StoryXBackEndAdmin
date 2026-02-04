@@ -1,6 +1,7 @@
 const userPackageRepository = require('../repositories/userPackage.repository');
 const packageRepository = require('../repositories/package.repository');
 const { NotFoundError, ConflictError, BadRequestError } = require('../utils/errors');
+const { calculateDays, calculateExpiryDate } = require('../utils/packageDuration');
 const prisma = require('../config/database');
 
 /**
@@ -58,8 +59,12 @@ class UserPackageService {
     }
 
     // 使用套餐的默认时长
-    if (pkg.duration && !data.expiresAt && !data.packageDuration) {
-      data.packageDuration = pkg.duration;
+    if (pkg.duration && pkg.durationUnit && !data.expiresAt && !data.packageDuration) {
+      // 根据套餐的 duration 和 durationUnit 计算天数
+      const days = calculateDays(pkg.duration, pkg.durationUnit);
+      if (days !== null) {
+        data.packageDuration = days;
+      }
     }
 
     const userPackage = await userPackageRepository.create(data);
@@ -225,13 +230,25 @@ class UserPackageService {
   /**
    * 获取可订阅的套餐列表（终端用户）
    */
-  async getAvailablePackages(type = null) {
+  async getAvailablePackages(type = null, durationUnit = null) {
     const where = {
       isActive: true
     };
 
     if (type) {
       where.type = type;
+    }
+
+    // 按有效期单位筛选
+    if (durationUnit) {
+      if (durationUnit === 'permanent') {
+        // 永久套餐：duration 和 durationUnit 都为 null
+        where.duration = null;
+        where.durationUnit = null;
+      } else if (['day', 'month', 'year'].includes(durationUnit)) {
+        // 指定单位的套餐
+        where.durationUnit = durationUnit;
+      }
     }
 
     const packages = await prisma.package.findMany({
@@ -296,9 +313,8 @@ class UserPackageService {
 
     // 计算有效期
     let expiresAt = null;
-    if (pkg.duration) {
-      expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + pkg.duration);
+    if (pkg.duration && pkg.durationUnit) {
+      expiresAt = calculateExpiryDate(pkg.duration, pkg.durationUnit);
     }
 
     // 创建用户套餐关系
@@ -357,7 +373,10 @@ class UserPackageService {
     }
 
     // 计算续费天数
-    const renewalDays = days || pkg.duration;
+    let renewalDays = days;
+    if (!renewalDays && pkg.duration && pkg.durationUnit) {
+      renewalDays = calculateDays(pkg.duration, pkg.durationUnit);
+    }
     if (!renewalDays) {
       throw new BadRequestError('Package has no duration, cannot renew');
     }

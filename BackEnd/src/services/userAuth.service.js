@@ -265,11 +265,6 @@ class UserAuthService {
     // 验证验证码
     await this.verifyRegisterCode(data.email, data.verificationCode);
 
-    // 验证设备指纹
-    if (!data.deviceFingerprint) {
-      throw new BadRequestError('Device fingerprint is required');
-    }
-
     // 加密密码
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
@@ -283,12 +278,14 @@ class UserAuthService {
       }
     });
 
-    // 创建设备记录
-    await this.addOrUpdateDevice(
-      user.id,
-      data.deviceFingerprint,
-      data.ipAddress || null
-    );
+    // 如果提供了设备指纹，创建设备记录（可选）
+    if (data.deviceFingerprint) {
+      await this.addOrUpdateDevice(
+        user.id,
+        data.deviceFingerprint,
+        data.ipAddress || null
+      );
+    }
 
     // 注册成功后自动登录并返回 JWT Token
     const token = jwt.sign(
@@ -319,12 +316,7 @@ class UserAuthService {
    * 终端用户登录（使用邮箱 + 密码 + 设备指纹）
    * 不需要图形验证码
    */
-  async login(email, password, deviceFingerprint, ipAddress = null) {
-    // 验证设备指纹
-    if (!deviceFingerprint) {
-      throw new BadRequestError('Device fingerprint is required');
-    }
-
+  async login(email, password, deviceFingerprint = null, ipAddress = null) {
     // 查找用户（通过邮箱）
     const user = await prisma.user.findUnique({
       where: { email }
@@ -349,8 +341,10 @@ class UserAuthService {
       throw new UnauthorizedError('Invalid credentials');
     }
 
-    // 添加或更新设备（会检查设备数量限制）
-    await this.addOrUpdateDevice(user.id, deviceFingerprint, ipAddress);
+    // 如果提供了设备指纹，添加或更新设备（会检查设备数量限制）
+    if (deviceFingerprint) {
+      await this.addOrUpdateDevice(user.id, deviceFingerprint, ipAddress);
+    }
 
     // 更新最后登录时间
     await prisma.user.update({
@@ -381,6 +375,253 @@ class UserAuthService {
         role: user.role,
         status: user.status
       }
+    };
+  }
+
+  /**
+   * 生成访问令牌和刷新令牌
+   */
+  async generateTokens(user, deviceId = null, ipAddress = null) {
+    // 生成访问令牌（10分钟）
+    const accessToken = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        type: 'user'
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '10m' // 10分钟
+      }
+    );
+
+    // 生成刷新令牌（30天）
+    const refreshToken = jwt.sign(
+      {
+        id: user.id,
+        type: 'refresh',
+        deviceId: deviceId || null
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: '30d' // 30天
+      }
+    );
+
+    // 保存刷新令牌到数据库
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30); // 30天后过期
+
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        deviceId: deviceId || null,
+        token: refreshToken,
+        accessToken: accessToken,
+        expiresAt,
+        ipAddress: ipAddress || null
+      }
+    });
+
+    return {
+      accessToken,
+      refreshToken
+    };
+  }
+
+  /**
+   * 生成一次性token（用于桌面端登录）
+   * @param {string} userId - 用户ID
+   * @param {string} ipAddress - IP地址（可选）
+   * @param {number} expiresInMinutes - 过期时间（分钟），默认10分钟
+   */
+  async generateOneTimeToken(userId, ipAddress = null, expiresInMinutes = 10) {
+    // 查找用户
+    const user = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
+    // 检查账号状态
+    if (user.status !== 'normal') {
+      throw new BadRequestError(`Account is ${user.status}`);
+    }
+
+    // 生成一次性token（JWT格式）
+    const expiresAt = new Date();
+    expiresAt.setMinutes(expiresAt.getMinutes() + expiresInMinutes);
+
+    const token = jwt.sign(
+      {
+        id: user.id,
+        email: user.email,
+        type: 'one_time',
+        expiresAt: expiresAt.getTime()
+      },
+      process.env.JWT_SECRET,
+      {
+        expiresIn: `${expiresInMinutes}m`
+      }
+    );
+
+    // 保存到数据库
+    const oneTimeToken = await prisma.oneTimeToken.create({
+      data: {
+        userId: user.id,
+        token,
+        expiresAt,
+        ipAddress: ipAddress || null
+      }
+    });
+
+    return {
+      token,
+      expiresAt,
+      expiresIn: expiresInMinutes * 60 // 秒
+    };
+  }
+
+  /**
+   * 桌面端登录（使用一次性token和设备指纹）
+   * @param {string} token - 一次性token
+   * @param {string} deviceId - 设备指纹（必填）
+   * @param {string} ipAddress - IP地址（可选）
+   */
+  async desktopLogin(token, deviceId, ipAddress = null) {
+    // 验证设备指纹
+    if (!deviceId) {
+      throw new BadRequestError('Device ID is required');
+    }
+
+    // 查找一次性token记录
+    const oneTimeTokenRecord = await prisma.oneTimeToken.findUnique({
+      where: { token },
+      include: { user: true }
+    });
+
+    if (!oneTimeTokenRecord) {
+      throw new UnauthorizedError('Invalid token');
+    }
+
+    // 检查是否已使用
+    if (oneTimeTokenRecord.used) {
+      throw new UnauthorizedError('Token has already been used');
+    }
+
+    // 检查是否过期
+    if (oneTimeTokenRecord.expiresAt < new Date()) {
+      throw new UnauthorizedError('Token has expired');
+    }
+
+    // 检查用户状态
+    if (oneTimeTokenRecord.user.status !== 'normal') {
+      throw new UnauthorizedError(`Account is ${oneTimeTokenRecord.user.status}`);
+    }
+
+    // 标记token为已使用
+    await prisma.oneTimeToken.update({
+      where: { id: oneTimeTokenRecord.id },
+      data: {
+        used: true,
+        usedAt: new Date()
+      }
+    });
+
+    // 添加或更新设备（设备指纹必填）
+    await this.addOrUpdateDevice(oneTimeTokenRecord.user.id, deviceId, ipAddress);
+
+    // 生成访问令牌和刷新令牌
+    const tokens = await this.generateTokens(oneTimeTokenRecord.user, deviceId, ipAddress);
+
+    // 更新最后登录时间
+    await prisma.user.update({
+      where: { id: oneTimeTokenRecord.user.id },
+      data: { lastLoginAt: new Date() }
+    });
+
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      user: {
+        id: oneTimeTokenRecord.user.id,
+        email: oneTimeTokenRecord.user.email,
+        phone: oneTimeTokenRecord.user.phone,
+        role: oneTimeTokenRecord.user.role,
+        status: oneTimeTokenRecord.user.status
+      }
+    };
+  }
+
+  /**
+   * 刷新访问令牌
+   */
+  async refreshAccessToken(refreshToken, deviceId = null, ipAddress = null) {
+    // 验证刷新令牌
+    let decoded;
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_SECRET);
+    } catch (error) {
+      throw new UnauthorizedError('Invalid refresh token');
+    }
+
+    if (decoded.type !== 'refresh') {
+      throw new UnauthorizedError('Invalid token type');
+    }
+
+    // 查找刷新令牌记录
+    const refreshTokenRecord = await prisma.refreshToken.findUnique({
+      where: { token: refreshToken },
+      include: { user: true }
+    });
+
+    if (!refreshTokenRecord) {
+      throw new UnauthorizedError('Refresh token not found');
+    }
+
+    // 检查是否已撤销
+    if (refreshTokenRecord.revoked) {
+      throw new UnauthorizedError('Refresh token has been revoked');
+    }
+
+    // 检查是否过期
+    if (refreshTokenRecord.expiresAt < new Date()) {
+      throw new UnauthorizedError('Refresh token has expired');
+    }
+
+    // 检查用户状态
+    if (refreshTokenRecord.user.status !== 'normal') {
+      throw new UnauthorizedError(`Account is ${refreshTokenRecord.user.status}`);
+    }
+
+    // 如果提供了设备ID，验证设备ID是否匹配
+    if (deviceId && refreshTokenRecord.deviceId && refreshTokenRecord.deviceId !== deviceId) {
+      throw new UnauthorizedError('Device ID mismatch');
+    }
+
+    // 生成新的访问令牌和刷新令牌
+    const newTokens = await this.generateTokens(
+      refreshTokenRecord.user,
+      deviceId || refreshTokenRecord.deviceId,
+      ipAddress
+    );
+
+    // 撤销旧的刷新令牌并更新最后使用时间
+    await prisma.refreshToken.update({
+      where: { id: refreshTokenRecord.id },
+      data: {
+        revoked: true,
+        revokedAt: new Date(),
+        lastUsedAt: new Date()
+      }
+    });
+
+    return {
+      accessToken: newTokens.accessToken,
+      refreshToken: newTokens.refreshToken
     };
   }
 

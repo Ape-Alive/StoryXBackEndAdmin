@@ -8,9 +8,7 @@
           配置面向终端用户售卖的商业套餐，包括额度、有效期、价格、最大设备数等关键参数。
         </p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="handleAdd">
-        新增套餐
-      </el-button>
+      <el-button type="primary" :icon="Plus" @click="handleAdd"> 新增套餐 </el-button>
     </div>
 
     <!-- 搜索和统计 -->
@@ -76,12 +74,8 @@
             </el-button>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item @click="handleBatchStatus(true)">
-                  批量启用
-                </el-dropdown-item>
-                <el-dropdown-item @click="handleBatchStatus(false)">
-                  批量停用
-                </el-dropdown-item>
+                <el-dropdown-item @click="handleBatchStatus(true)"> 批量启用 </el-dropdown-item>
+                <el-dropdown-item @click="handleBatchStatus(false)"> 批量停用 </el-dropdown-item>
                 <el-dropdown-item divided @click="handleBatchDelete">
                   <span style="color: #ef4444">批量删除</span>
                 </el-dropdown-item>
@@ -146,6 +140,15 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="有效期" width="120" align="center">
+          <template #default="{ row }">
+            <span v-if="row.duration && row.durationUnit">
+              {{ formatDuration(row.duration, row.durationUnit) }}
+            </span>
+            <span v-else class="text-muted">永久</span>
+          </template>
+        </el-table-column>
+
         <el-table-column label="折扣" width="100" align="center">
           <template #default="{ row }">
             <span v-if="row.discount !== null && row.discount !== undefined">
@@ -171,7 +174,8 @@
           <template #default="{ row }">
             <div :class="['status-badge', row.isActive ? 'status-enabled' : 'status-disabled']">
               <el-icon class="status-icon">
-                <component :is="row.isActive ? 'CircleCheck' : 'CircleClose'" />
+                <CircleCheck v-if="row.isActive" />
+                <CircleClose v-else />
               </el-icon>
               <span class="status-text">{{ row.isActive ? '已启用' : '已停用' }}</span>
             </div>
@@ -187,36 +191,16 @@
         <el-table-column label="操作" width="250" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
-              <el-button
-                type="primary"
-                text
-                size="small"
-                @click="handleEdit(row)"
-              >
+              <el-button type="primary" text size="small" @click="handleEdit(row)">
                 编辑
               </el-button>
-              <el-button
-                type="primary"
-                text
-                size="small"
-                @click="handleDuplicate(row)"
-              >
+              <el-button type="primary" text size="small" @click="handleDuplicate(row)">
                 复制
               </el-button>
-              <el-button
-                type="primary"
-                text
-                size="small"
-                @click="toggleStatus(row)"
-              >
+              <el-button type="primary" text size="small" @click="toggleStatus(row)">
                 {{ row.isActive ? '停用' : '启用' }}
               </el-button>
-              <el-button
-                type="danger"
-                text
-                size="small"
-                @click="handleDelete(row)"
-              >
+              <el-button type="danger" text size="small" @click="handleDelete(row)">
                 删除
               </el-button>
             </div>
@@ -228,7 +212,9 @@
     <!-- 分页器 -->
     <div class="pagination-wrapper">
       <div class="pagination-info">
-        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{ paginationRange.end }}
+        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{
+          paginationRange.end
+        }}
       </div>
       <el-pagination
         :current-page="pagination.page"
@@ -265,18 +251,12 @@
         label-position="left"
       >
         <el-form-item label="内部标识" prop="name" v-if="!currentPackage?.id">
-          <el-input
-            v-model="formData.name"
-            placeholder="例如：premium_monthly"
-          />
+          <el-input v-model="formData.name" placeholder="例如：premium_monthly" />
           <div class="form-tip">创建后不可修改，仅在系统内部使用，需唯一。</div>
         </el-form-item>
 
         <el-form-item label="显示名称" prop="displayName">
-          <el-input
-            v-model="formData.displayName"
-            placeholder="例如：高级套餐（月付）"
-          />
+          <el-input v-model="formData.displayName" placeholder="例如：高级套餐（月付）" />
         </el-form-item>
 
         <el-form-item label="套餐类型" prop="type">
@@ -287,13 +267,27 @@
           </el-select>
         </el-form-item>
 
-        <el-form-item label="有效期（天）">
-          <el-input-number
-            v-model="formData.duration"
-            :min="1"
-            :max="3650"
-            placeholder="为空表示永久"
-          />
+        <el-form-item label="有效期">
+          <div class="duration-row">
+            <el-input-number
+              v-model="formData.duration"
+              :min="1"
+              :max="3650"
+              placeholder="为空表示永久"
+              style="flex: 1"
+            />
+            <el-select
+              v-model="formData.durationUnit"
+              placeholder="单位"
+              clearable
+              style="width: 100px; margin-left: 8px"
+            >
+              <el-option label="天" value="day" />
+              <el-option label="月" value="month" />
+              <el-option label="年" value="year" />
+            </el-select>
+          </div>
+          <div class="form-tip">为空或单位为空表示永久</div>
         </el-form-item>
 
         <el-form-item label="额度（积分）">
@@ -316,11 +310,7 @@
               :precision="2"
               placeholder="套餐金额"
             />
-            <el-select
-              v-model="formData.priceUnit"
-              placeholder="货币单位"
-              style="width: 120px"
-            >
+            <el-select v-model="formData.priceUnit" placeholder="货币单位" style="width: 120px">
               <el-option label="CNY" value="CNY" />
               <el-option label="USD" value="USD" />
             </el-select>
@@ -352,11 +342,7 @@
         </el-form-item>
 
         <el-form-item label="优先级">
-          <el-input-number
-            v-model="formData.priority"
-            :min="0"
-            :max="1000"
-          />
+          <el-input-number v-model="formData.priority" :min="0" :max="1000" />
           <div class="form-tip">数字越大优先级越高，用于计算额度和设备限制时的生效顺序。</div>
         </el-form-item>
 
@@ -376,9 +362,7 @@
 
       <template #footer>
         <el-button @click="formVisible = false">取消</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSubmit">
-          确定
-        </el-button>
+        <el-button type="primary" :loading="saving" @click="handleSubmit"> 确定 </el-button>
       </template>
     </el-dialog>
   </div>
@@ -445,6 +429,7 @@ const formData = reactive({
   description: '',
   type: 'paid',
   duration: null,
+  durationUnit: null,
   quota: null,
   price: null,
   priceUnit: 'CNY',
@@ -461,12 +446,8 @@ const rules = {
     { required: true, message: '请输入内部标识', trigger: 'blur' },
     { min: 3, max: 50, message: '长度在 3 到 50 个字符', trigger: 'blur' }
   ],
-  displayName: [
-    { required: true, message: '请输入显示名称', trigger: 'blur' }
-  ],
-  type: [
-    { required: true, message: '请选择套餐类型', trigger: 'change' }
-  ]
+  displayName: [{ required: true, message: '请输入显示名称', trigger: 'blur' }],
+  type: [{ required: true, message: '请选择套餐类型', trigger: 'change' }]
 }
 
 // 获取列表
@@ -532,6 +513,7 @@ function handleAdd() {
     description: '',
     type: 'paid',
     duration: null,
+    durationUnit: null,
     quota: null,
     price: null,
     priceUnit: 'CNY',
@@ -555,6 +537,7 @@ function handleEdit(row) {
     description: row.description,
     type: row.type,
     duration: row.duration,
+    durationUnit: row.durationUnit,
     quota: row.quota,
     price: row.price,
     priceUnit: row.priceUnit || 'CNY',
@@ -598,15 +581,11 @@ async function toggleStatus(row) {
 // 删除
 async function handleDelete(row) {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除套餐「${row.displayName || row.name}」吗？`,
-      '删除确认',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消'
-      }
-    )
+    await ElMessageBox.confirm(`确定要删除套餐「${row.displayName || row.name}」吗？`, '删除确认', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消'
+    })
   } catch {
     return
   }
@@ -670,16 +649,17 @@ async function handleBatchDelete() {
 
 // 提交表单
 function handleSubmit() {
-  formRef.value?.validate(async (valid) => {
+  formRef.value?.validate(async valid => {
     if (!valid) return
     saving.value = true
     try {
       const payload = { ...formData }
 
       // 清理数据格式，确保符合后端验证规则
-      // duration: null/undefined/0 表示永久，传 null
-      if (!payload.duration || payload.duration === 0) {
+      // duration: null/undefined/0 或 durationUnit 为空表示永久，传 null
+      if (!payload.duration || payload.duration === 0 || !payload.durationUnit) {
         payload.duration = null
+        payload.durationUnit = null
       } else {
         payload.duration = parseInt(payload.duration)
       }
@@ -722,7 +702,10 @@ function handleSubmit() {
       }
 
       // availableModels: 如果是空数组或 null，传 null
-      if (!payload.availableModels || (Array.isArray(payload.availableModels) && payload.availableModels.length === 0)) {
+      if (
+        !payload.availableModels ||
+        (Array.isArray(payload.availableModels) && payload.availableModels.length === 0)
+      ) {
         payload.availableModels = null
       }
 
@@ -802,6 +785,16 @@ function formatDate(date) {
   const m = String(d.getMonth() + 1).padStart(2, '0')
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
+}
+
+function formatDuration(duration, durationUnit) {
+  if (!duration || !durationUnit) return '永久'
+  const unitMap = {
+    day: '天',
+    month: '月',
+    year: '年'
+  }
+  return `${duration}${unitMap[durationUnit] || durationUnit}`
 }
 
 onMounted(() => {
@@ -999,6 +992,12 @@ onMounted(() => {
   line-height: 1;
 }
 
+.duration-row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
 .price-row {
   display: flex;
   gap: 12px;
@@ -1017,5 +1016,3 @@ onMounted(() => {
   margin-bottom: 12px;
 }
 </style>
-
-

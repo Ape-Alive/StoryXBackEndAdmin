@@ -40,8 +40,7 @@ const registerUserValidator = [
         .isNumeric()
         .withMessage('Verification code must be numeric'),
     body('deviceFingerprint')
-        .notEmpty()
-        .withMessage('Device fingerprint is required')
+        .optional()
         .isLength({ min: 1, max: 255 })
         .withMessage('Device fingerprint must be between 1 and 255 characters')
 ];
@@ -61,12 +60,51 @@ const loginUserValidator = [
         .isLength({ min: 6 })
         .withMessage('Password must be at least 6 characters'),
     body('deviceFingerprint')
-        .notEmpty()
-        .withMessage('Device fingerprint is required')
+        .optional()
         .isLength({ min: 1, max: 255 })
         .withMessage('Device fingerprint must be between 1 and 255 characters')
 ];
 
+/**
+ * 桌面端登录验证
+ */
+const desktopLoginValidator = [
+    body('token')
+        .notEmpty()
+        .withMessage('Token is required')
+        .isString()
+        .withMessage('Token must be a string'),
+    body('deviceId')
+        .notEmpty()
+        .withMessage('Device ID is required')
+        .isLength({ min: 1, max: 255 })
+        .withMessage('Device ID must be between 1 and 255 characters')
+];
+
+/**
+ * 刷新令牌验证
+ */
+const refreshTokenValidator = [
+    body('refreshToken')
+        .notEmpty()
+        .withMessage('Refresh token is required')
+        .isString()
+        .withMessage('Refresh token must be a string'),
+    body('deviceId')
+        .optional()
+        .isLength({ min: 1, max: 255 })
+        .withMessage('Device ID must be between 1 and 255 characters')
+];
+
+/**
+ * 生成一次性token验证
+ */
+const generateOneTimeTokenValidator = [
+    body('expiresInMinutes')
+        .optional()
+        .isInt({ min: 1, max: 60 })
+        .withMessage('Expires in minutes must be between 1 and 60')
+];
 
 /**
  * 登录验证（使用邮箱 + 密码 + 图片验证码）
@@ -205,9 +243,10 @@ router.post(
  *       - 有效期：10分钟
  *       - 使用后自动失效
  *
- *       **设备指纹**：桌面端程序需要获取设备指纹并传入
+ *       **设备指纹**：可选参数，桌面端程序可以获取设备指纹并传入
  *       - 用于设备管理和数量限制控制
- *       - 注册时会自动创建设备记录
+ *       - 如果提供，注册时会自动创建设备记录
+ *       - 如果不提供，注册成功但不会创建设备记录（后续登录时也可以不提供设备指纹）
  *     tags: [认证]
  *     requestBody:
  *       required: true
@@ -219,7 +258,6 @@ router.post(
  *               - email
  *               - password
  *               - verificationCode
- *               - deviceFingerprint
  *             properties:
  *               email:
  *                 type: string
@@ -242,7 +280,7 @@ router.post(
  *                 minLength: 1
  *                 maxLength: 255
  *                 example: 'device_fingerprint_hash_12345'
- *                 description: 设备指纹（桌面端程序生成，用于设备管理和数量限制）
+ *                 description: 设备指纹（可选，桌面端程序生成，用于设备管理和数量限制。如果提供，注册时会自动创建设备记录）
  *     responses:
  *       201:
  *         description: 注册成功
@@ -287,11 +325,13 @@ router.post(
  *
  *       **注意**：终端用户登录不需要图形验证码，使用设备指纹进行安全验证。
  *
- *       **设备指纹**：桌面端程序需要获取设备指纹并传入
+ *       **设备指纹**：可选参数，桌面端程序可以获取设备指纹并传入
  *       - 用于设备管理和数量限制控制
- *       - 如果设备已存在，会更新最后使用时间
- *       - 如果设备不存在，会检查用户套餐的设备数量限制
- *       - 超过设备数量限制时会返回错误
+ *       - 如果提供设备指纹：
+ *         - 如果设备已存在，会更新最后使用时间
+ *         - 如果设备不存在，会检查用户套餐的设备数量限制
+ *         - 超过设备数量限制时会返回错误
+ *       - 如果不提供设备指纹，登录成功但不会创建设备记录
  *     tags: [认证]
  *     requestBody:
  *       required: true
@@ -302,7 +342,6 @@ router.post(
  *             required:
  *               - email
  *               - password
- *               - deviceFingerprint
  *             properties:
  *               email:
  *                 type: string
@@ -319,7 +358,7 @@ router.post(
  *                 minLength: 1
  *                 maxLength: 255
  *                 example: 'device_fingerprint_hash_12345'
- *                 description: 设备指纹（桌面端程序生成，用于设备管理和数量限制）
+ *                 description: 设备指纹（可选，桌面端程序生成，用于设备管理和数量限制。如果提供，登录时会自动创建设备记录）
  *     responses:
  *       200:
  *         description: 登录成功
@@ -353,12 +392,221 @@ router.post(
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-// 终端用户登录（无需认证，需要设备指纹，不需要图形验证码）
+// 终端用户登录（无需认证，设备指纹可选，不需要图形验证码）
 router.post(
     '/user/login',
     loginUserValidator,
     validate,
     authController.loginUser.bind(authController)
+);
+
+/**
+ * @swagger
+ * /api/auth/one-time-token:
+ *   post:
+ *     summary: 生成一次性token（用于桌面端登录）
+ *     description: |
+ *       生成一次性token，用于桌面端登录。用户需要先通过正常登录获取accessToken，然后调用此接口生成一次性token。
+ *
+ *       **使用场景：**
+ *       - 用户已登录Web端，需要生成token供桌面端扫码登录
+ *       - 管理员为用户生成一次性token
+ *
+ *       **Token说明：**
+ *       - 一次性token有效期：默认10分钟（可配置，最长60分钟）
+ *       - 使用后自动失效，不能重复使用
+ *       - 过期后自动失效
+ *
+ *       **流程：**
+ *       1. 用户通过Web端登录，获取accessToken
+ *       2. 使用accessToken调用此接口，生成一次性token
+ *       3. 将一次性token展示给用户（如二维码）
+ *       4. 桌面端扫描二维码获取token，调用 /api/auth/desktop-login 登录
+ *     tags: [认证]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               expiresInMinutes:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 60
+ *                 default: 10
+ *                 description: 过期时间（分钟），默认10分钟，最长60分钟
+ *                 example: 10
+ *     responses:
+ *       200:
+ *         description: 生成成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               success: true
+ *               message: One-time token generated successfully
+ *               data:
+ *                 token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 expiresAt: "2024-01-01T12:10:00.000Z"
+ *                 expiresIn: 600
+ *       401:
+ *         description: 未认证或token无效
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+    '/one-time-token',
+    authenticate, // 需要登录认证
+    generateOneTimeTokenValidator,
+    validate,
+    authController.generateOneTimeToken.bind(authController)
+);
+
+/**
+ * @swagger
+ * /api/auth/desktop-login:
+ *   post:
+ *     summary: 桌面端登录（使用一次性token和设备指纹）
+ *     description: |
+ *       桌面端登录接口，使用一次性token和设备指纹进行登录。
+ *
+ *       **登录流程：**
+ *       1. 用户通过Web端登录，调用 /api/auth/one-time-token 生成一次性token
+ *       2. 将一次性token展示给用户（如二维码）
+ *       3. 桌面端扫描二维码获取token，调用此接口，传入token和设备指纹
+ *       4. 服务端验证token有效性，标记token为已使用，返回accessToken和refreshToken
+ *
+ *       **Token说明：**
+ *       - accessToken：访问令牌，有效期10分钟，用于正常API请求
+ *       - refreshToken：刷新令牌，有效期30天，用于刷新accessToken
+ *
+ *       **设备指纹：**
+ *       - 必填参数，用于设备管理和数量限制
+ *       - 登录时会自动创建设备记录
+ *       - 如果设备已存在，会更新最后使用时间
+ *       - 如果设备不存在，会检查用户套餐的设备数量限制
+ *       - 超过设备数量限制时会返回错误
+ *     tags: [认证]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - token
+ *               - deviceId
+ *             properties:
+ *               token:
+ *                 type: string
+ *                 description: 一次性token（通过调用 /api/auth/one-time-token 生成，然后通过扫码等方式获取）
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *               deviceId:
+ *                 type: string
+ *                 minLength: 1
+ *                 maxLength: 255
+ *                 description: 设备指纹（必填，用于设备管理和数量限制）
+ *                 example: "device-xxx"
+ *     responses:
+ *       200:
+ *         description: 登录成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               success: true
+ *               message: Desktop login successful
+ *               data:
+ *                 accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 user:
+ *                   id: "clx123456789"
+ *                   email: "user@example.com"
+ *                   phone: null
+ *                   role: "basic_user"
+ *                   status: "normal"
+ *       401:
+ *         description: 登录失败（token无效、过期或用户状态异常）
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+    '/desktop-login',
+    desktopLoginValidator,
+    validate,
+    authController.desktopLogin.bind(authController)
+);
+
+/**
+ * @swagger
+ * /api/auth/refresh:
+ *   post:
+ *     summary: 刷新访问令牌
+ *     description: |
+ *       使用refreshToken刷新accessToken的接口。
+ *
+ *       **刷新流程：**
+ *       1. accessToken过期（返回401）
+ *       2. 客户端自动调用此接口，传入refreshToken和设备指纹
+ *       3. 服务端验证refreshToken有效性，返回新的accessToken和refreshToken
+ *       4. 客户端更新token，继续正常请求
+ *
+ *       **Token说明：**
+ *       - 旧的refreshToken会被撤销
+ *       - 返回新的accessToken（10分钟）和refreshToken（30天）
+ *       - 如果提供了deviceId，会验证是否与refreshToken关联的设备ID匹配
+ *     tags: [认证]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: 刷新令牌（30天有效期）
+ *                 example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *               deviceId:
+ *                 type: string
+ *                 description: 设备指纹（可选，如果refreshToken关联了设备ID，则必须匹配）
+ *                 example: "device-xxx"
+ *     responses:
+ *       200:
+ *         description: 刷新成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *             example:
+ *               success: true
+ *               message: Token refreshed successfully
+ *               data:
+ *                 accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *       401:
+ *         description: 刷新失败（refreshToken无效、过期、已撤销或设备ID不匹配）
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.post(
+    '/refresh',
+    refreshTokenValidator,
+    validate,
+    authController.refreshToken.bind(authController)
 );
 
 /**

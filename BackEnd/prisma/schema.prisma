@@ -76,6 +76,7 @@ model User {
   authorizations Authorization[]
   aiCallLogs     AICallLog[]
   orders         Order[]
+  refreshTokens  RefreshToken[]
 
   @@index([email])
   @@index([phone])
@@ -83,6 +84,52 @@ model User {
   @@index([status])
   @@index([createdAt])
   @@map("users")
+}
+
+// 刷新令牌（用于桌面端登录和Token刷新）
+model RefreshToken {
+  id            String   @id @default(cuid())
+  userId        String
+  deviceId      String?  // 设备ID（可选）
+  token         String   @unique // 刷新令牌
+  accessToken   String?  // 当前关联的访问令牌（可选，用于追踪）
+  expiresAt     DateTime // 过期时间
+  revoked       Boolean  @default(false) // 是否已撤销
+  revokedAt     DateTime? // 撤销时间
+  lastUsedAt    DateTime? // 最后使用时间
+  ipAddress     String?  // 创建时的IP地址
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([deviceId])
+  @@index([expiresAt])
+  @@index([revoked])
+  @@map("refresh_tokens")
+}
+
+// 一次性令牌（用于桌面端登录）
+model OneTimeToken {
+  id            String   @id @default(cuid())
+  userId        String
+  token         String   @unique // 一次性token
+  used          Boolean  @default(false) // 是否已使用
+  usedAt        DateTime? // 使用时间
+  expiresAt     DateTime // 过期时间（通常5-10分钟）
+  ipAddress     String?  // 创建时的IP地址
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([used])
+  @@index([expiresAt])
+  @@map("one_time_tokens")
 }
 
 // 用户设备
@@ -197,7 +244,8 @@ model Package {
   displayName    String
   description    String?
   type           String        // free, paid, trial
-  duration       Int?          // 有效期（天），null表示永久
+  duration       Int?          // 有效期数值，null表示永久
+  durationUnit   String?       // 有效期单位：day, month, year，null表示永久
   quota          Decimal?      @map("totalQuota") @db.Decimal(20, 2) // 额度（积分），null表示无限
   price          Decimal?      @db.Decimal(20, 2) // 套餐金额
   priceUnit      String?       // 套餐金额单位：CNY, USD
