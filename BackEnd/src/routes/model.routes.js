@@ -22,7 +22,32 @@ router.use(authenticate);
  * @swagger
  * /api/models:
  *   get:
- *     summary: 获取模型列表
+ *     summary: 获取模型列表 [管理员/终端用户]
+ *     description: |
+ *       获取AI模型列表，支持多条件筛选、分页和排序。
+ *       
+ *       **权限说明**：
+ *       - **管理员角色**：super_admin、platform_admin、read_only 可访问（可查看所有模型）
+ *       - **终端用户角色**：user、basic_user 可访问（仅查看，不能进行增删改操作）
+ *       
+ *       **筛选说明**：
+ *       - 所有筛选参数都是可选的，可以组合使用
+ *       - **如果不传 type 参数，将返回所有类型的模型**（llm、video、image、tts）
+ *       - 支持模糊搜索的字段：name、displayName、baseUrl
+ *       - 支持精确匹配的字段：type、category、providerId、isActive、requiresKey
+ *       
+ *       **分页说明**：
+ *       - page：页码，从1开始，默认1
+ *       - pageSize：每页数量，默认20，建议不超过100
+ *       
+ *       **排序说明**：
+ *       - 默认按创建时间降序排列（最新的在前）
+ *       
+ *       **使用示例**：
+ *       - 获取所有模型：`GET /api/models`
+ *       - 仅获取 llm 类型：`GET /api/models?type=llm`
+ *       - 搜索模型：`GET /api/models?name=deepseek`
+ *       - 组合筛选：`GET /api/models?type=llm&isActive=true&page=1&pageSize=20`
  *     tags: [模型管理]
  *     security:
  *       - bearerAuth: []
@@ -32,71 +57,194 @@ router.use(authenticate);
  *         schema:
  *           type: integer
  *           default: 1
- *         description: 页码
+ *           minimum: 1
+ *         description: 页码（从1开始）
+ *         example: 1
  *       - in: query
  *         name: pageSize
  *         schema:
  *           type: integer
  *           default: 20
- *         description: 每页数量
+ *           minimum: 1
+ *           maximum: 100
+ *         description: 每页数量（建议不超过100）
+ *         example: 20
  *       - in: query
  *         name: name
  *         schema:
  *           type: string
- *         description: 模型名称搜索
+ *         description: 模型内部标识（模糊搜索，如：deepseek-chat）
+ *         example: "deepseek"
  *       - in: query
  *         name: displayName
  *         schema:
  *           type: string
- *         description: 显示名称搜索
+ *         description: 模型显示名称（模糊搜索）
+ *         example: "DeepSeek"
  *       - in: query
  *         name: baseUrl
  *         schema:
  *           type: string
- *         description: 接口路径搜索
+ *         description: 接口路径（模糊搜索，如：/v1/chat/completions）
+ *         example: "/v1/chat"
  *       - in: query
  *         name: type
  *         schema:
  *           type: string
  *           enum: [llm, video, image, tts]
- *         description: 模型类型
+ *         description: |
+ *           模型类型筛选（可选）
+ *           - llm：大语言模型
+ *           - video：视频生成模型
+ *           - image：图像生成模型
+ *           - tts：文本转语音模型
+ *           如果不传此参数，将返回所有类型的模型
+ *         example: "llm"
  *       - in: query
  *         name: category
  *         schema:
  *           type: string
- *         description: 模型分类
+ *         description: 模型分类（精确匹配，如：chat、completion、generation）
+ *         example: "chat"
  *       - in: query
  *         name: providerId
  *         schema:
  *           type: string
- *         description: 提供商ID
+ *         description: 提供商ID（精确匹配）
+ *         example: "clx123456789"
  *       - in: query
  *         name: isActive
  *         schema:
  *           type: boolean
- *         description: 是否启用
+ *         description: 是否启用（true=仅启用，false=仅禁用，不传=全部）
+ *         example: true
  *       - in: query
  *         name: requiresKey
  *         schema:
  *           type: boolean
- *         description: 是否需要API密钥
+ *         description: 是否需要API密钥（true=需要，false=不需要，不传=全部）
+ *         example: false
+ *       - in: query
+ *         name: startDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: 创建开始时间（ISO 8601格式，用于时间范围筛选）
+ *         example: "2024-01-01T00:00:00Z"
+ *       - in: query
+ *         name: endDate
+ *         schema:
+ *           type: string
+ *           format: date-time
+ *         description: 创建结束时间（ISO 8601格式，用于时间范围筛选）
+ *         example: "2024-12-31T23:59:59Z"
  *     responses:
  *       200:
  *         description: 获取成功
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/Success'
- *                 - type: object
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Success"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                         description: 模型ID
+ *                         example: "clx123456789"
+ *                       name:
+ *                         type: string
+ *                         description: 模型内部标识
+ *                         example: "deepseek-chat"
+ *                       displayName:
+ *                         type: string
+ *                         description: 模型显示名称
+ *                         example: "DeepSeek Chat"
+ *                       type:
+ *                         type: string
+ *                         enum: [llm, video, image, tts]
+ *                         description: 模型类型
+ *                         example: "llm"
+ *                       category:
+ *                         type: string
+ *                         nullable: true
+ *                         description: 模型分类
+ *                         example: "chat"
+ *                       providerId:
+ *                         type: string
+ *                         description: 提供商ID
+ *                       provider:
+ *                         type: object
+ *                         description: 提供商信息
+ *                         properties:
+ *                           id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           displayName:
+ *                             type: string
+ *                       baseUrl:
+ *                         type: string
+ *                         description: 接口路径
+ *                         example: "/v1/chat/completions"
+ *                       description:
+ *                         type: string
+ *                         nullable: true
+ *                         description: 描述信息
+ *                       isActive:
+ *                         type: boolean
+ *                         description: 是否启用
+ *                         example: true
+ *                       requiresKey:
+ *                         type: boolean
+ *                         description: 是否需要API密钥
+ *                         example: false
+ *                       apiConfig:
+ *                         type: string
+ *                         nullable: true
+ *                         description: API配置参数（JSON字符串）
+ *                         example: '{"temperature": 0.7, "max_tokens": 2000}'
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 创建时间
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         description: 更新时间
+ *                 pagination:
+ *                   type: object
  *                   properties:
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     pageSize:
+ *                       type: integer
+ *                       example: 20
+ *                     total:
+ *                       type: integer
+ *                       example: 100
+ *                     totalPages:
+ *                       type: integer
+ *                       example: 5
+ *       401:
+ *         description: 未认证或token无效
+ *       403:
+ *         description: 权限不足（非管理员角色）
  */
-// 获取模型列表
+// 获取模型列表（管理员和终端用户都可以访问）
 router.get(
     '/',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
     getModelsValidator,
     validate,
     modelController.getModels.bind(modelController)
@@ -106,7 +254,13 @@ router.get(
  * @swagger
  * /api/models/{id}:
  *   get:
- *     summary: 获取模型详情
+ *     summary: 获取模型详情 [管理员/终端用户]
+ *     description: |
+ *       获取指定模型的详细信息，包括提供商信息、价格信息等。
+ *       
+ *       **权限说明**：
+ *       - **管理员角色**：super_admin、platform_admin、read_only 可访问
+ *       - **终端用户角色**：user、basic_user 可访问（仅查看）
  *     tags: [模型管理]
  *     security:
  *       - bearerAuth: []
@@ -117,20 +271,83 @@ router.get(
  *         schema:
  *           type: string
  *         description: 模型ID
+ *         example: "clx123456789"
  *     responses:
  *       200:
  *         description: 获取成功
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Success'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Model detail retrieved successfully"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                       description: 模型ID
+ *                     name:
+ *                       type: string
+ *                       description: 模型内部标识
+ *                     displayName:
+ *                       type: string
+ *                       description: 模型显示名称
+ *                     type:
+ *                       type: string
+ *                       enum: [llm, video, image, tts]
+ *                       description: 模型类型
+ *                     category:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 模型分类
+ *                     providerId:
+ *                       type: string
+ *                       description: 提供商ID
+ *                     provider:
+ *                       type: object
+ *                       description: 提供商信息
+ *                     baseUrl:
+ *                       type: string
+ *                       description: 接口路径
+ *                     description:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 描述信息
+ *                     isActive:
+ *                       type: boolean
+ *                       description: 是否启用
+ *                     requiresKey:
+ *                       type: boolean
+ *                       description: 是否需要API密钥
+ *                     apiConfig:
+ *                       type: string
+ *                       nullable: true
+ *                       description: API配置参数（JSON字符串）
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                       description: 创建时间
+ *                     updatedAt:
+ *                       type: string
+ *                       format: date-time
+ *                       description: 更新时间
+ *       401:
+ *         description: 未认证或token无效
+ *       403:
+ *         description: 权限不足
  *       404:
  *         description: 模型不存在
  */
-// 获取模型详情
+// 获取模型详情（管理员和终端用户都可以访问）
 router.get(
     '/:id',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
     validate,
     modelController.getModelDetail.bind(modelController)
 );

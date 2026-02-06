@@ -49,16 +49,41 @@ class PromptService {
     // 2. system_user 类型的提示词（可查看）
     // 3. 自己的终端用户提示词（type='user' 且 userId=自己的ID）
     if (userRole && isTerminalUserRole(userRole)) {
-      const typeFilter = {
-        OR: [
-          { type: 'system' },
-          { type: 'system_user' },
-          { type: 'user', userId: userId }
-        ]
-      };
-      filters = { ...filters, ...typeFilter };
+      // 如果传了 type 参数且不为空，根据类型进行筛选
+      if (filters.type && filters.type.trim() !== '') {
+        const type = filters.type.trim();
+        if (type === 'system' || type === 'system_user') {
+          // system 和 system_user 类型，终端用户都可以查看
+          filters.type = type;
+          // 清除可能存在的 OR 条件，因为已经指定了类型
+          delete filters.OR;
+        } else if (type === 'user') {
+          // user 类型，只能查看自己的
+          filters.userId = userId;
+          filters.type = 'user';
+          // 清除可能存在的 OR 条件，因为已经指定了类型
+          delete filters.OR;
+        } else {
+          // 无效的类型，返回空结果
+          filters.type = '__invalid__';
+          delete filters.OR;
+        }
+      } else {
+        // 如果不传 type 或 type 为空，返回所有允许的类型
+        // 清除单独的 type 筛选，使用 OR 条件
+        delete filters.type;
+        const typeFilter = {
+          OR: [
+            { type: 'system' },
+            { type: 'system_user' },
+            { type: 'user', userId: userId }
+          ]
+        };
+        filters = { ...filters, ...typeFilter };
+      }
     }
     // 管理员可以看到所有类型的提示词
+    // 如果不传 type，返回所有类型；如果传了 type，返回指定类型
 
     return await promptRepository.findPrompts(filters, pagination, sort);
   }

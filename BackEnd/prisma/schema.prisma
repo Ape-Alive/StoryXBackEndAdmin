@@ -77,6 +77,7 @@ model User {
   aiCallLogs     AICallLog[]
   orders         Order[]
   refreshTokens  RefreshToken[]
+  oneTimeTokens  OneTimeToken[]
 
   @@index([email])
   @@index([phone])
@@ -91,8 +92,8 @@ model RefreshToken {
   id            String   @id @default(cuid())
   userId        String
   deviceId      String?  // 设备ID（可选）
-  token         String   @unique // 刷新令牌
-  accessToken   String?  // 当前关联的访问令牌（可选，用于追踪）
+  token         String   @unique @db.VarChar(767) // 刷新令牌（JWT格式，767字符足够，且满足MySQL唯一索引限制）
+  accessToken   String?  @db.VarChar(767) // 当前关联的访问令牌（可选，用于追踪，JWT格式）
   expiresAt     DateTime // 过期时间
   revoked       Boolean  @default(false) // 是否已撤销
   revokedAt     DateTime? // 撤销时间
@@ -115,7 +116,7 @@ model RefreshToken {
 model OneTimeToken {
   id            String   @id @default(cuid())
   userId        String
-  token         String   @unique // 一次性token
+  token         String   @unique @db.VarChar(767) // 一次性token（JWT格式，767字符足够，且满足MySQL唯一索引限制）
   used          Boolean  @default(false) // 是否已使用
   usedAt        DateTime? // 使用时间
   expiresAt     DateTime // 过期时间（通常5-10分钟）

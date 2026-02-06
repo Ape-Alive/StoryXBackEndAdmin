@@ -45,10 +45,32 @@ app.set('trust proxy', process.env.TRUST_PROXY === 'true' || process.env.TRUST_P
 app.use(helmet());
 
 // CORS configuration
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3001',
+const corsOptions = {
+  origin: function (origin, callback) {
+    // 允许的源列表
+    const allowedOrigins = process.env.CORS_ORIGIN 
+      ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+      : ['http://localhost:3001', 'http://localhost:3020'];
+    
+    // 开发环境允许所有本地端口，生产环境需要明确配置
+    if (process.env.NODE_ENV === 'development') {
+      // 允许所有 localhost 端口
+      if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('http://127.0.0.1:')) {
+        callback(null, true);
+        return;
+      }
+    }
+    
+    // 检查是否在允许列表中
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true
-}));
+};
+app.use(cors(corsOptions));
 
 // Body parsing middleware
 // 注意：支付回调可能使用 form-urlencoded 格式，需要支持

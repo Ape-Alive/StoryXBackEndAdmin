@@ -40,7 +40,7 @@ const registerUserValidator = [
         .isNumeric()
         .withMessage('Verification code must be numeric'),
     body('deviceFingerprint')
-        .optional()
+        .optional({ checkFalsy: true })
         .isLength({ min: 1, max: 255 })
         .withMessage('Device fingerprint must be between 1 and 255 characters')
 ];
@@ -60,7 +60,7 @@ const loginUserValidator = [
         .isLength({ min: 6 })
         .withMessage('Password must be at least 6 characters'),
     body('deviceFingerprint')
-        .optional()
+        .optional({ checkFalsy: true })
         .isLength({ min: 1, max: 255 })
         .withMessage('Device fingerprint must be between 1 and 255 characters')
 ];

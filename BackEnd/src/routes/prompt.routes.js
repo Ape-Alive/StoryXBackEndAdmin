@@ -22,10 +22,53 @@ router.use(authenticate);
  *   get:
  *     summary: 获取提示词列表 [管理员/终端用户]
  *     description: |
- *       获取提示词列表，支持多条件筛选和分页。
- *       权限说明：
- *       - 管理员：可以查看所有类型的提示词
- *       - 终端用户：可以查看system和system_user类型提示词，以及自己的user类型提示词
+ *       获取提示词列表，支持多条件筛选、分页和排序。
+ *       
+ *       **权限说明**：
+ *       - **管理员**：可以查看所有类型的提示词（system、system_user、user）
+ *       - **终端用户**：可以查看 system 和 system_user 类型提示词，以及自己的 user 类型提示词
+ *       
+ *       **类型筛选说明**：
+ *       - **type 参数是可选的**，如果不传 type 参数（或传空字符串），将返回所有符合条件的提示词（根据权限自动筛选）
+ *       
+ *       **管理员行为**：
+ *       - 不传 type：返回所有类型的提示词（system、system_user、user）
+ *       - 传 type=system：仅返回 system 类型
+ *       - 传 type=system_user：仅返回 system_user 类型
+ *       - 传 type=user：返回所有用户的 user 类型提示词
+ *       
+ *       **终端用户行为**：
+ *       - **不传 type**：返回所有有权限查看的提示词（system、system_user、自己的user）
+ *       - 传 type=system：仅返回 system 类型（所有）
+ *       - 传 type=system_user：仅返回 system_user 类型（所有）
+ *       - 传 type=user：仅返回自己的 user 类型提示词
+ *       
+ *       **提示词类型说明**：
+ *       - **system**：系统提示词，仅管理员可管理，所有用户可查看
+ *       - **system_user**：系统用户提示词，仅管理员可管理，所有用户可查看，可关联 system 类型
+ *       - **user**：终端用户提示词，终端用户可管理自己的，管理员可管理所有，可关联 system 类型
+ *       
+ *       **筛选说明**：
+ *       - 所有筛选参数都是可选的，可以组合使用
+ *       - 支持模糊搜索的字段：title、tags
+ *       - 支持精确匹配的字段：categoryId、type、userId、isActive
+ *       - 支持时间范围筛选：startDate、endDate
+ *       
+ *       **分页说明**：
+ *       - page：页码，从1开始，默认1
+ *       - pageSize：每页数量，默认20，最大100
+ *       
+ *       **排序说明**：
+ *       - order：排序顺序，asc=升序，desc=降序，默认desc
+ *       - orderBy：排序字段，createdAt=创建时间，title=标题，默认createdAt
+ *       
+ *       **使用示例**：
+ *       - 获取所有提示词（管理员）：`GET /api/prompts`
+ *       - 获取所有提示词（终端用户）：`GET /api/prompts` - 自动返回有权限查看的类型
+ *       - 仅获取 system 类型：`GET /api/prompts?type=system`
+ *       - 按标题搜索：`GET /api/prompts?title=Python`
+ *       - 组合筛选：`GET /api/prompts?type=system&categoryId=xxx&isActive=true`
+ *       - 分页查询：`GET /api/prompts?page=1&pageSize=20`
  *     tags: [提示词库]
  *     security:
  *       - bearerAuth: []
@@ -34,52 +77,83 @@ router.use(authenticate);
  *         name: title
  *         schema:
  *           type: string
- *         description: 标题关键词（模糊搜索）
+ *         description: 标题关键词（模糊搜索，匹配标题中包含该关键词的提示词）
+ *         example: "Python代码"
  *       - in: query
  *         name: categoryId
  *         schema:
  *           type: string
- *         description: 分类ID筛选
+ *         description: 分类ID筛选（精确匹配）
+ *         example: "clx111222333"
  *       - in: query
  *         name: type
  *         schema:
  *           type: string
  *           enum: [system, system_user, user]
- *         description: 提示词类型筛选
+ *         description: |
+ *           提示词类型筛选（可选，不传或传空字符串将返回所有类型）
+ *           
+ *           **类型说明**：
+ *           - system：系统提示词（仅管理员可管理，所有用户可查看）
+ *           - system_user：系统用户提示词（仅管理员可管理，所有用户可查看）
+ *           - user：终端用户提示词（终端用户可管理自己的，管理员可管理所有）
+ *           
+ *           **行为说明**：
+ *           - **管理员不传 type**：返回所有类型的提示词（system、system_user、user）
+ *           - **管理员传 type**：返回指定类型的提示词
+ *           - **终端用户不传 type**：返回所有有权限查看的提示词（system、system_user、自己的user）
+ *           - **终端用户传 type**：返回指定类型中有权限查看的提示词
+ *           
+ *           **示例**：
+ *           - 不传 type：`GET /api/prompts` - 返回所有类型（根据权限）
+ *           - 传 type：`GET /api/prompts?type=system` - 仅返回 system 类型
+ *         example: "system"
  *       - in: query
  *         name: userId
  *         schema:
  *           type: string
- *         description: 用户ID筛选（管理员可用）
+ *         description: 用户ID筛选（仅管理员可用，用于筛选特定用户的user类型提示词）
+ *         example: "clx123456789"
+ *       - in: query
+ *         name: systemId
+ *         schema:
+ *           type: string
+ *         description: 关联的system提示词ID筛选（用于查找关联了指定system提示词的system_user和user类型提示词）
+ *         example: "clx111222333"
  *       - in: query
  *         name: isActive
  *         schema:
  *           type: boolean
- *         description: 是否启用筛选
+ *         description: 是否启用筛选（true=仅启用，false=仅禁用，不传=全部）
+ *         example: true
  *       - in: query
  *         name: tags
  *         schema:
  *           type: string
- *         description: 标签关键词搜索
+ *         description: 标签关键词搜索（模糊搜索，匹配标签中包含该关键词的提示词）
+ *         example: "python"
  *       - in: query
  *         name: startDate
  *         schema:
  *           type: string
  *           format: date-time
- *         description: 创建开始时间
+ *         description: 创建开始时间（ISO 8601格式，用于时间范围筛选）
+ *         example: "2024-01-01T00:00:00Z"
  *       - in: query
  *         name: endDate
  *         schema:
  *           type: string
  *           format: date-time
- *         description: 创建结束时间
+ *         description: 创建结束时间（ISO 8601格式，用于时间范围筛选）
+ *         example: "2024-12-31T23:59:59Z"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           default: 1
  *           minimum: 1
- *         description: 页码
+ *         description: 页码（从1开始）
+ *         example: 1
  *       - in: query
  *         name: pageSize
  *         schema:
@@ -87,21 +161,24 @@ router.use(authenticate);
  *           default: 20
  *           minimum: 1
  *           maximum: 100
- *         description: 每页数量
+ *         description: 每页数量（最大100）
+ *         example: 20
  *       - in: query
  *         name: order
  *         schema:
  *           type: string
  *           enum: [asc, desc]
  *           default: desc
- *         description: 排序顺序
+ *         description: 排序顺序（asc=升序，desc=降序）
+ *         example: "desc"
  *       - in: query
  *         name: orderBy
  *         schema:
  *           type: string
  *           enum: [createdAt, title]
  *           default: createdAt
- *         description: 排序字段
+ *         description: 排序字段（createdAt=创建时间，title=标题）
+ *         example: "createdAt"
  *     responses:
  *       200:
  *         description: 获取成功
