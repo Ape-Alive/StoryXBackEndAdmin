@@ -75,10 +75,27 @@ const createProviderValidator = [
     .optional()
     .isIn(['points'])
     .withMessage('Quota unit must be points (积分)'),
-  body('mainAccountToken')
+  body('supportsApiKeyCreation')
     .optional()
-    .isString()
-    .withMessage('Main account token must be a string')
+    .isBoolean()
+    .withMessage('supportsApiKeyCreation must be a boolean'),
+  body('mainAccountToken')
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value, { req }) => {
+      // 如果支持API Key创建，则mainAccountToken必填
+      if (req.body.supportsApiKeyCreation === true) {
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
+          throw new Error('Main account token is required when supportsApiKeyCreation is enabled');
+        }
+      }
+      // 如果值存在，验证是否为字符串
+      if (value !== null && value !== undefined && value !== '') {
+        if (typeof value !== 'string') {
+          throw new Error('Main account token must be a string');
+        }
+      }
+      return true;
+    })
 ];
 
 /**
@@ -120,10 +137,27 @@ const updateProviderValidator = [
     .optional()
     .isIn(['points'])
     .withMessage('Quota unit must be points (积分)'),
-  body('mainAccountToken')
+  body('supportsApiKeyCreation')
     .optional()
-    .isString()
-    .withMessage('Main account token must be a string')
+    .isBoolean()
+    .withMessage('supportsApiKeyCreation must be a boolean'),
+  body('mainAccountToken')
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value, { req }) => {
+      // 如果支持API Key创建，则mainAccountToken必填
+      if (req.body.supportsApiKeyCreation === true) {
+        if (!value || (typeof value === 'string' && value.trim() === '')) {
+          throw new Error('Main account token is required when supportsApiKeyCreation is enabled');
+        }
+      }
+      // 如果值存在，验证是否为字符串
+      if (value !== null && value !== undefined && value !== '') {
+        if (typeof value !== 'string') {
+          throw new Error('Main account token must be a string');
+        }
+      }
+      return true;
+    })
 ];
 
 /**

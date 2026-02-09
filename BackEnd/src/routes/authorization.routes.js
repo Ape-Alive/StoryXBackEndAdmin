@@ -49,16 +49,16 @@ router.delete(
 
 /**
  * @swagger
- * /api/authorization/session/{sessionToken}:
+ * /api/authorization/call-token/{callToken}:
  *   get:
- *     summary: 根据 sessionToken 获取授权记录
+ *     summary: 根据 callToken 获取授权记录
  *     tags: [授权管理]
  */
 router.get(
-    '/session/:sessionToken',
+    '/call-token/:callToken',
     authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
     validate,
-    authorizationController.getBySessionToken.bind(authorizationController)
+    authorizationController.getByCallToken.bind(authorizationController)
 );
 
 /**

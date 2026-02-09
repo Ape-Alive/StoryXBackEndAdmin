@@ -40,6 +40,12 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="最大Token数" width="120" align="center" v-if="showTokenPrices">
+        <template #default="{ row }">
+          <span class="token-value">{{ row.maxToken || '-' }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="调用次数单价" width="140" align="center" v-if="showCallPrice">
         <template #default="{ row }">
           <span class="price-value">{{ formatPrice(row.callPrice) }}</span>

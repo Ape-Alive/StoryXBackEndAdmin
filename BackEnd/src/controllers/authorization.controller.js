@@ -13,7 +13,7 @@ class AuthorizationController {
       const filters = {
         userId: req.query.userId,
         modelId: req.query.modelId,
-        sessionToken: req.query.sessionToken,
+        callToken: req.query.callToken,
         status: req.query.status,
         requestId: req.query.requestId,
         activeOnly: req.query.activeOnly === 'true',
@@ -54,12 +54,12 @@ class AuthorizationController {
   }
 
   /**
-   * 根据 sessionToken 获取授权记录
+   * 根据 callToken 获取授权记录
    */
-  async getBySessionToken(req, res, next) {
+  async getByCallToken(req, res, next) {
     try {
-      const { sessionToken } = req.params;
-      const authorization = await authorizationService.getBySessionToken(sessionToken);
+      const { callToken } = req.params;
+      const authorization = await authorizationService.getByCallToken(callToken);
       return ResponseHandler.success(res, authorization, 'Authorization retrieved successfully');
     } catch (error) {
       next(error);

@@ -21,8 +21,8 @@ class AuthorizationRepository {
       where.modelId = filters.modelId;
     }
 
-    if (filters.sessionToken) {
-      where.sessionToken = filters.sessionToken;
+    if (filters.callToken) {
+      where.callToken = filters.callToken;
     }
 
     if (filters.status) {
@@ -103,14 +103,19 @@ class AuthorizationRepository {
   }
 
   /**
-   * 根据 sessionToken 获取授权记录
+   * 根据 callToken 获取授权记录
    */
-  async findBySessionToken(sessionToken) {
+  async findByCallToken(callToken) {
     return await prisma.authorization.findUnique({
-      where: { sessionToken },
+      where: { callToken },
       include: {
         user: true,
-        model: true
+        model: {
+          include: {
+            provider: true,
+            prices: true
+          }
+        }
       }
     });
   }
@@ -139,6 +144,45 @@ class AuthorizationRepository {
       },
       data: {
         status: 'revoked',
+        updatedAt: new Date()
+      }
+    });
+  }
+
+  /**
+   * 创建授权记录
+   */
+  async create(data) {
+    return await prisma.authorization.create({
+      data: {
+        userId: data.userId,
+        modelId: data.modelId,
+        deviceFingerprint: data.deviceFingerprint,
+        ipAddress: data.ipAddress,
+        frozenQuota: data.frozenQuota,
+        callToken: data.callToken,
+        status: data.status || 'active',
+        expiresAt: data.expiresAt
+      },
+      include: {
+        user: true,
+        model: {
+          include: {
+            provider: true
+          }
+        }
+      }
+    });
+  }
+
+  /**
+   * 更新授权状态
+   */
+  async updateStatus(id, status) {
+    return await prisma.authorization.update({
+      where: { id },
+      data: {
+        status,
         updatedAt: new Date()
       }
     });

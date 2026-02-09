@@ -6,11 +6,22 @@ class ResponseHandler {
    * 成功响应
    */
   static success(res, data = null, message = 'Success', statusCode = 200) {
-    return res.status(statusCode).json({
+    // 处理 BigInt 和 Date 序列化问题
+    const jsonString = JSON.stringify({
       success: true,
       message,
       data
+    }, (key, value) => {
+      if (typeof value === 'bigint') {
+        return value.toString();
+      }
+      // 处理 Date 对象
+      if (value instanceof Date) {
+        return value.toISOString();
+      }
+      return value;
     });
+    return res.status(statusCode).send(jsonString);
   }
 
   /**

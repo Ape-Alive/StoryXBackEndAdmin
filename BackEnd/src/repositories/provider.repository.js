@@ -111,6 +111,9 @@ class ProviderRepository {
         quota: data.quota !== undefined ? data.quota : null,
         quotaUnit: data.quotaUnit || null,
         mainAccountToken: data.mainAccountToken || null,
+        supportsApiKeyCreation: data.supportsApiKeyCreation !== undefined ? data.supportsApiKeyCreation : false,
+        apiKeyCreationConfig: data.apiKeyCreationConfig || null,
+        apiKeys: data.apiKeys || null,
         isActive: data.isActive !== undefined ? data.isActive : true
       }
     });
@@ -130,6 +133,9 @@ class ProviderRepository {
     if (data.quota !== undefined) updateData.quota = data.quota;
     if (data.quotaUnit !== undefined) updateData.quotaUnit = data.quotaUnit;
     if (data.mainAccountToken !== undefined) updateData.mainAccountToken = data.mainAccountToken;
+    if (data.supportsApiKeyCreation !== undefined) updateData.supportsApiKeyCreation = data.supportsApiKeyCreation;
+    if (data.apiKeyCreationConfig !== undefined) updateData.apiKeyCreationConfig = data.apiKeyCreationConfig;
+    if (data.apiKeys !== undefined) updateData.apiKeys = data.apiKeys;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     updateData.updatedAt = new Date();

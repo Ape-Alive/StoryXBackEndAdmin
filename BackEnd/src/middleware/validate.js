@@ -13,6 +13,9 @@ const validate = (req, res, next) => {
       message: err.msg,
       value: err.value
     }));
+    // 输出详细的验证错误信息，便于调试
+    console.log('Validation errors:', JSON.stringify(formattedErrors, null, 2));
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
     return next(new ValidationError('Validation failed', formattedErrors));
   }
 

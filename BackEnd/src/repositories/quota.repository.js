@@ -25,25 +25,75 @@ class QuotaRepository {
       updatedAt: 'desc'
     };
 
-    const [data, total] = await Promise.all([
-      prisma.userQuota.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy,
-        include: {
-          user: {
-            select: {
-              id: true,
-              email: true,
-              phone: true,
-              status: true
-            }
+    // 先获取所有有效的 UserPackage 组合（仍然存在的用户套餐）
+    const validUserPackages = await prisma.userPackage.findMany({
+      select: {
+        userId: true,
+        packageId: true
+      }
+    });
+
+    // 创建有效的套餐组合集合（userId + packageId）
+    // 格式：userId_packageId 或 userId_null（对于 packageId 为 null 的情况）
+    const validPackageSet = new Set();
+    validUserPackages.forEach(up => {
+      const key = `${up.userId}_${up.packageId || 'null'}`;
+      validPackageSet.add(key);
+    });
+
+    // 查询所有额度记录（应用筛选条件）
+    const allQuotas = await prisma.userQuota.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            phone: true,
+            status: true
           }
         }
-      }),
-      prisma.userQuota.count({ where })
-    ]);
+      }
+    });
+
+    // 过滤出有效的额度记录（只保留仍然存在的 UserPackage 对应的记录）
+    const validQuotas = allQuotas.filter(quota => {
+      const key = `${quota.userId}_${quota.packageId || 'null'}`;
+      return validPackageSet.has(key);
+    });
+
+    // 按更新时间排序
+    validQuotas.sort((a, b) => {
+      const timeA = new Date(a.updatedAt).getTime();
+      const timeB = new Date(b.updatedAt).getTime();
+      return timeB - timeA; // 降序
+    });
+
+    // 应用分页
+    const paginatedQuotas = validQuotas.slice(skip, skip + pageSize);
+
+    // 获取套餐信息
+    const packageIds = paginatedQuotas.map(q => q.packageId).filter(id => id);
+    const packages = packageIds.length > 0 
+      ? await prisma.package.findMany({
+          where: { id: { in: packageIds } },
+          select: {
+            id: true,
+            name: true,
+            displayName: true
+          }
+        })
+      : [];
+
+    const packageMap = new Map(packages.map(p => [p.id, p]));
+
+    // 添加套餐信息到额度记录
+    const data = paginatedQuotas.map(quota => ({
+      ...quota,
+      package: quota.packageId ? packageMap.get(quota.packageId) || null : null
+    }));
+
+    const total = validQuotas.length;
 
     return {
       data,

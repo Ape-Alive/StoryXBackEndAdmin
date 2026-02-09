@@ -302,6 +302,7 @@ class ModelRepository {
         inputPrice: data.inputPrice || 0,
         outputPrice: data.outputPrice || 0,
         callPrice: data.callPrice || 0,
+        maxToken: data.maxToken !== undefined ? (data.maxToken === null || data.maxToken === '' ? null : parseInt(data.maxToken)) : null,
         effectiveAt: data.effectiveAt ? new Date(data.effectiveAt) : new Date(),
         expiredAt: data.expiredAt ? new Date(data.expiredAt) : null
       }
@@ -318,6 +319,9 @@ class ModelRepository {
     if (data.inputPrice !== undefined) updateData.inputPrice = data.inputPrice;
     if (data.outputPrice !== undefined) updateData.outputPrice = data.outputPrice;
     if (data.callPrice !== undefined) updateData.callPrice = data.callPrice;
+    if (data.maxToken !== undefined) {
+      updateData.maxToken = data.maxToken === null || data.maxToken === '' ? null : parseInt(data.maxToken);
+    }
     if (data.effectiveAt !== undefined) updateData.effectiveAt = new Date(data.effectiveAt);
     if (data.expiredAt !== undefined) updateData.expiredAt = data.expiredAt ? new Date(data.expiredAt) : null;
 

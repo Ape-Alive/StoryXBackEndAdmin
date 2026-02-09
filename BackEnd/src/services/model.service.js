@@ -206,6 +206,10 @@ class ModelService {
 
     const price = await modelRepository.createPrice(data);
 
+    // 清除价格缓存
+    const priceCalculatorService = require('./priceCalculator.service');
+    priceCalculatorService.clearModelCache(data.modelId);
+
     // 记录操作日志
     if (adminId) {
       const logService = require('./log.service');
@@ -236,6 +240,10 @@ class ModelService {
 
     const updated = await modelRepository.updatePrice(id, data);
 
+    // 清除价格缓存
+    const priceCalculatorService = require('./priceCalculator.service');
+    priceCalculatorService.clearModelCache(price.modelId);
+
     // 记录操作日志
     if (adminId) {
       const logService = require('./log.service');
@@ -262,6 +270,10 @@ class ModelService {
     }
 
     const updated = await modelRepository.update(id, { isActive });
+
+    // 清除价格缓存（模型状态变化可能影响价格可用性）
+    const priceCalculatorService = require('./priceCalculator.service');
+    priceCalculatorService.clearModelCache(id);
 
     // 记录操作日志
     if (adminId) {

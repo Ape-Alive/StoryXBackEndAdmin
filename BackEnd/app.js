@@ -32,6 +32,8 @@ const docsRoutes = require('./src/routes/docs.routes');
 const orderRoutes = require('./src/routes/order.routes');
 const paymentRoutes = require('./src/routes/payment.routes');
 const paymentCallbackRoutes = require('./src/routes/paymentCallback.routes');
+const userApiRoutes = require('./src/routes/userApi.routes');
+const userApiKeyRoutes = require('./src/routes/userApiKey.routes');
 
 const app = express();
 
@@ -135,6 +137,8 @@ app.use('/api/user/orders', orderRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/user', paymentRoutes);
 app.use('/api/payment/callback', paymentCallbackRoutes);
+app.use('/api/user', userApiRoutes);
+app.use('/api/user/api-keys', userApiKeyRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

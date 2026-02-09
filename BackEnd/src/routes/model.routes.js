@@ -647,6 +647,42 @@ router.delete(
  * /api/models/prices:
  *   post:
  *     summary: 获取模型价格列表（分页查询）
+ *     description: |
+ *       获取模型价格配置列表，支持多条件筛选和分页查询。
+ *       
+ *       **筛选说明：**
+ *       - `modelId`：可选，不传则返回全部模型的价格列表
+ *       - `packageId`：可选，筛选特定套餐的价格
+ *       - `pricingType`：可选，筛选计价类型（token/call）
+ *       - 时间筛选：支持按生效时间和过期时间范围筛选
+ *       
+ *       **返回数据说明：**
+ *       - `maxToken`：仅在 `pricingType` 为 `token` 时有效
+ *       - `inputPrice/outputPrice`：仅在 `pricingType` 为 `token` 时有值
+ *       - `callPrice`：仅在 `pricingType` 为 `call` 时有值
+ *       
+ *       **使用示例：**
+ *       ```bash
+ *       # 获取所有价格
+ *       curl -X POST "http://localhost:5800/api/models/prices" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "page": 1,
+ *           "pageSize": 20
+ *         }'
+ *       
+ *       # 获取特定模型的价格
+ *       curl -X POST "http://localhost:5800/api/models/prices" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "modelId": "model_123",
+ *           "pricingType": "token",
+ *           "page": 1,
+ *           "pageSize": 20
+ *         }'
+ *       ```
  *     tags: [模型管理]
  *     security:
  *       - bearerAuth: []
@@ -746,6 +782,15 @@ router.delete(
  *                             type: number
  *                             format: decimal
  *                             description: 调用次数单价（积分）
+ *                           maxToken:
+ *                             type: integer
+ *                             nullable: true
+ *                             example: 8192
+ *                             description: |
+ *                               最大Token数（pricingType为token时使用），用于预估费用计算
+ *                               - null：表示不限制，使用用户提供的estimatedTokens
+ *                               - 正整数：表示该模型的最大token数，预估费用计算时会优先使用此值
+ *                               - 例如：gemini-2.5-flash-image模型如果设置了maxToken=8192，则预估费用按maxToken计算
  *                           effectiveAt:
  *                             type: string
  *                             format: date-time
@@ -772,6 +817,30 @@ router.delete(
  *                                 type: string
  *                               displayName:
  *                                 type: string
+ *       400:
+ *         description: 请求参数错误
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               invalidParams:
+ *                 summary: 参数验证失败
+ *                 value:
+ *                   success: false
+ *                   message: "Validation failed"
+ *                   errors: [
+ *                     {
+ *                       field: "page",
+ *                       message: "Page must be a positive integer"
+ *                     }
+ *                   ]
+ *       401:
+ *         description: 未认证
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 // 获取模型价格列表（POST分页查询）
 router.post(
@@ -787,6 +856,48 @@ router.post(
  * /api/models/{id}/prices/create:
  *   post:
  *     summary: 创建模型价格
+ *     description: |
+ *       为指定模型创建价格配置。
+ *       
+ *       **计价类型说明：**
+ *       - **token（按Token计价）**：需要设置 `inputPrice` 和 `outputPrice`，可选设置 `maxToken`
+ *       - **call（按调用次数计价）**：需要设置 `callPrice`，`maxToken` 字段无效
+ *       
+ *       **maxToken字段说明：**
+ *       - 仅在 `pricingType` 为 `token` 时有效
+ *       - `null` 或空：表示不限制，预估费用计算时使用用户提供的 `estimatedTokens`
+ *       - 正整数：表示该模型的最大token数，预估费用计算时会优先使用此值
+ *       - 例如：`gemini-2.5-flash-image` 模型如果设置了 `maxToken=8192`，则无论用户传入多少 `estimatedTokens`，预估费用都按 `maxToken=8192` 计算
+ *       
+ *       **套餐价格说明：**
+ *       - `packageId` 为 `null` 或空：表示默认价格，适用于所有套餐
+ *       - `packageId` 有值：表示该套餐的专属价格，优先级高于默认价格
+ *       
+ *       **使用示例：**
+ *       ```bash
+ *       # 创建默认价格（按Token计价，带maxToken）
+ *       curl -X POST "http://localhost:5800/api/models/{id}/prices/create" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "pricingType": "token",
+ *           "inputPrice": 0.001,
+ *           "outputPrice": 0.002,
+ *           "maxToken": 8192,
+ *           "effectiveAt": "2024-01-01T00:00:00Z"
+ *         }'
+ *       
+ *       # 创建套餐专属价格（按调用次数计价）
+ *       curl -X POST "http://localhost:5800/api/models/{id}/prices/create" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "packageId": "package_123",
+ *           "pricingType": "call",
+ *           "callPrice": 0.1,
+ *           "effectiveAt": "2024-01-01T00:00:00Z"
+ *         }'
+ *       ```
  *     tags: [模型管理]
  *     security:
  *       - bearerAuth: []
@@ -828,6 +939,35 @@ router.post(
  *                 format: decimal
  *                 example: 0.1
  *                 description: 调用次数单价（积分），pricingType为call时使用
+ *               maxToken:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 8192
+ *                 description: |
+ *                   最大Token数（pricingType为token时使用），用于预估费用计算
+ *                   
+ *                   **字段说明：**
+ *                   - `null` 或空：表示不限制，使用用户提供的estimatedTokens
+ *                   - 正整数：表示该模型的最大token数，预估费用计算时会优先使用此值
+ *                   
+ *                   **计费逻辑示例：**
+ *                   假设模型 `gemini-2.5-flash-image` 的价格配置：
+ *                   - `pricingType`: `token`
+ *                   - `maxToken`: `8192`
+ *                   - `inputPrice`: `0.001`
+ *                   - `outputPrice`: `0.002`
+ *                   
+ *                   用户申请授权时传入 `estimatedTokens=10000`：
+ *                   - 由于设置了 `maxToken=8192`，预估费用按 `maxToken` 计算（而不是10000）
+ *                   - 预估输入token：`8192 * 0.5 = 4096`
+ *                   - 预估输出token：`8192 * 0.5 = 4096`
+ *                   - 预估费用：`0.001 * 4096 + 0.002 * 4096 = 12.288` 积分
+ *                   
+ *                   如果 `maxToken` 为 `null`：
+ *                   - 使用用户提供的 `estimatedTokens=10000`
+ *                   - 预估输入token：`10000 * 0.5 = 5000`
+ *                   - 预估输出token：`10000 * 0.5 = 5000`
+ *                   - 预估费用：`0.001 * 5000 + 0.002 * 5000 = 15` 积分
  *               effectiveAt:
  *                 type: string
  *                 format: date-time
@@ -839,6 +979,88 @@ router.post(
  *     responses:
  *       201:
  *         description: 创建成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: "price_123456"
+ *                         modelId:
+ *                           type: string
+ *                           example: "model_123"
+ *                         packageId:
+ *                           type: string
+ *                           nullable: true
+ *                           example: "package_123"
+ *                         pricingType:
+ *                           type: string
+ *                           enum: [token, call]
+ *                           example: "token"
+ *                         inputPrice:
+ *                           type: number
+ *                           format: decimal
+ *                           example: 0.001
+ *                         outputPrice:
+ *                           type: number
+ *                           format: decimal
+ *                           example: 0.002
+ *                         callPrice:
+ *                           type: number
+ *                           format: decimal
+ *                           example: 0.1
+ *                         maxToken:
+ *                           type: integer
+ *                           nullable: true
+ *                           example: 8192
+ *                           description: 最大Token数（pricingType为token时使用）
+ *                         effectiveAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2024-01-01T00:00:00Z"
+ *                         expiredAt:
+ *                           type: string
+ *                           format: date-time
+ *                           nullable: true
+ *                           example: "2024-12-31T23:59:59Z"
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2024-01-01T00:00:00Z"
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2024-01-01T00:00:00Z"
+ *       400:
+ *         description: 请求参数错误
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               invalidParams:
+ *                 summary: 参数验证失败
+ *                 value:
+ *                   success: false
+ *                   message: "Validation failed"
+ *                   errors: [
+ *                     {
+ *                       field: "inputPrice",
+ *                       message: "Input price is required when pricing type is token"
+ *                     }
+ *                   ]
+ *       404:
+ *         description: 模型不存在
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
  */
 // 创建模型价格
 router.post(
@@ -854,6 +1076,36 @@ router.post(
  * /api/models/{id}/prices/{priceId}:
  *   put:
  *     summary: 更新模型价格
+ *     description: |
+ *       更新指定模型的价格配置。
+ *       
+ *       **更新说明：**
+ *       - 所有字段都是可选的，只更新提供的字段
+ *       - 更新后会自动清除相关缓存，确保价格计算使用最新配置
+ *       
+ *       **maxToken字段更新：**
+ *       - 如果 `pricingType` 为 `token`，可以更新 `maxToken`
+ *       - 设置为 `null` 表示移除限制
+ *       - 设置为正整数表示设置新的最大token数
+ *       
+ *       **使用示例：**
+ *       ```bash
+ *       # 更新maxToken
+ *       curl -X PUT "http://localhost:5800/api/models/{id}/prices/{priceId}" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "maxToken": 16384
+ *         }'
+ *       
+ *       # 移除maxToken限制
+ *       curl -X PUT "http://localhost:5800/api/models/{id}/prices/{priceId}" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "maxToken": null
+ *         }'
+ *       ```
  *     tags: [模型管理]
  *     security:
  *       - bearerAuth: []
@@ -893,6 +1145,21 @@ router.post(
  *                 type: number
  *                 format: decimal
  *                 description: 调用次数单价（积分），pricingType为call时使用
+ *               maxToken:
+ *                 type: integer
+ *                 nullable: true
+ *                 example: 8192
+ *                 description: |
+ *                   最大Token数（pricingType为token时使用），用于预估费用计算
+ *                   
+ *                   **字段说明：**
+ *                   - `null` 或空：表示不限制，使用用户提供的estimatedTokens
+ *                   - 正整数：表示该模型的最大token数，预估费用计算时会优先使用此值
+ *                   
+ *                   **计费逻辑：**
+ *                   - 如果设置了 `maxToken`，预估费用计算时会优先使用 `maxToken`（即使 `estimatedTokens` 更大）
+ *                   - 如果 `maxToken` 为 `null`，使用用户提供的 `estimatedTokens`
+ *                   - 例如：`gemini-2.5-flash-image` 模型如果设置了 `maxToken=8192`，则预估费用按 `maxToken` 计算
  *               effectiveAt:
  *                 type: string
  *                 format: date-time
@@ -904,8 +1171,91 @@ router.post(
  *     responses:
  *       200:
  *         description: 更新成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: "price_123456"
+ *                         modelId:
+ *                           type: string
+ *                           example: "model_123"
+ *                         packageId:
+ *                           type: string
+ *                           nullable: true
+ *                           example: "package_123"
+ *                         pricingType:
+ *                           type: string
+ *                           enum: [token, call]
+ *                           example: "token"
+ *                         inputPrice:
+ *                           type: number
+ *                           format: decimal
+ *                           example: 0.001
+ *                         outputPrice:
+ *                           type: number
+ *                           format: decimal
+ *                           example: 0.002
+ *                         callPrice:
+ *                           type: number
+ *                           format: decimal
+ *                           example: 0.1
+ *                         maxToken:
+ *                           type: integer
+ *                           nullable: true
+ *                           example: 8192
+ *                           description: 最大Token数（pricingType为token时使用）
+ *                         effectiveAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2024-01-01T00:00:00Z"
+ *                         expiredAt:
+ *                           type: string
+ *                           format: date-time
+ *                           nullable: true
+ *                           example: "2024-12-31T23:59:59Z"
+ *                         createdAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2024-01-01T00:00:00Z"
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2024-01-01T00:00:00Z"
+ *       400:
+ *         description: 请求参数错误
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               invalidParams:
+ *                 summary: 参数验证失败
+ *                 value:
+ *                   success: false
+ *                   message: "Validation failed"
+ *                   errors: [
+ *                     {
+ *                       field: "inputPrice",
+ *                       message: "Input price is required when pricing type is token"
+ *                     }
+ *                   ]
  *       404:
  *         description: 价格不存在
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               success: false
+ *               message: "Model price not found"
  */
 // 更新模型价格
 router.put(

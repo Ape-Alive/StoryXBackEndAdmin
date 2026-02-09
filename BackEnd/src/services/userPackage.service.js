@@ -1,5 +1,7 @@
 const userPackageRepository = require('../repositories/userPackage.repository');
 const packageRepository = require('../repositories/package.repository');
+const userApiKeyService = require('./userApiKey.service');
+const packageExpirationService = require('./packageExpiration.service');
 const { NotFoundError, ConflictError, BadRequestError } = require('../utils/errors');
 const { calculateDays, calculateExpiryDate } = require('../utils/packageDuration');
 const prisma = require('../config/database');
@@ -72,6 +74,15 @@ class UserPackageService {
     // 初始化用户额度（如果不存在）
     await this.initializeUserQuota(data.userId, data.packageId, pkg);
 
+    // 自动创建API Key（如果提供商支持）
+    try {
+      await this.createApiKeysForPackage(data.userId, data.packageId, pkg);
+    } catch (error) {
+      // API Key创建失败不影响套餐绑定，只记录日志
+      const logger = require('../utils/logger');
+      logger.warn(`Failed to create API keys for package ${data.packageId}:`, error);
+    }
+
     // 记录操作日志
     if (adminId) {
       const logService = require('./log.service');
@@ -86,6 +97,96 @@ class UserPackageService {
     }
 
     return userPackage;
+  }
+
+  /**
+   * 为套餐创建API Key（自动创建）
+   */
+  async createApiKeysForPackage(userId, packageId, pkg) {
+    // 获取套餐关联的模型列表
+    let modelIds = [];
+    if (pkg.availableModels) {
+      try {
+        const models = JSON.parse(pkg.availableModels);
+        if (Array.isArray(models)) {
+          modelIds = models;
+        }
+      } catch (error) {
+        // 忽略解析错误
+      }
+    }
+
+    // 如果套餐没有指定模型，获取所有活跃模型
+    if (modelIds.length === 0) {
+      const allModels = await prisma.aIModel.findMany({
+        where: { isActive: true },
+        select: { id: true }
+      });
+      modelIds = allModels.map(m => m.id);
+    }
+
+    const logger = require('../utils/logger');
+    
+    if (modelIds.length === 0) {
+      logger.warn(`No models found for package ${packageId}, skipping API key creation`);
+      return; // 没有可用模型，不创建API Key
+    }
+
+    logger.info(`Found ${modelIds.length} models for package ${packageId}, fetching providers...`);
+
+    // 获取模型所属的提供商（去重）
+    const models = await prisma.aIModel.findMany({
+      where: {
+        id: { in: modelIds },
+        isActive: true
+      },
+      include: {
+        provider: true
+      }
+    });
+
+    if (models.length === 0) {
+      logger.warn(`No active models found for package ${packageId}, skipping API key creation`);
+      return;
+    }
+
+    const providers = new Map();
+    models.forEach(model => {
+      if (model.provider && !providers.has(model.providerId)) {
+        providers.set(model.providerId, model.provider);
+      }
+    });
+
+    if (providers.size === 0) {
+      logger.warn(`No providers found for package ${packageId}, skipping API key creation`);
+      return;
+    }
+
+    // 为每个支持创建API Key的提供商创建API Key
+    logger.info(`Creating API keys for package ${packageId}, user ${userId}, found ${providers.size} providers`);
+
+    for (const [providerId, provider] of providers) {
+      logger.debug(`Checking provider ${providerId} (${provider.name}): supportsApiKeyCreation=${provider.supportsApiKeyCreation}, mainAccountToken=${provider.mainAccountToken ? 'exists' : 'missing'}`);
+
+      if (provider.supportsApiKeyCreation) {
+        try {
+          logger.info(`Creating API key for provider ${providerId} (${provider.name})`);
+          const result = await userApiKeyService.createSystemApiKeyForPackage(userId, packageId, providerId);
+          if (result) {
+            logger.info(`Successfully created API key for provider ${providerId} (${provider.name}), API Key ID: ${result.id}`);
+          } else {
+            logger.warn(`API key creation returned null for provider ${providerId} (${provider.name})`);
+          }
+        } catch (error) {
+          // 单个提供商创建失败不影响其他提供商，只记录日志
+          logger.error(`Failed to create API key for provider ${providerId} (${provider.name}):`, error);
+        }
+      } else {
+        logger.debug(`Skipping provider ${providerId} (${provider.name}) - does not support API key creation`);
+      }
+    }
+    
+    logger.info(`Finished processing API key creation for package ${packageId}, user ${userId}`);
   }
 
   /**
@@ -111,17 +212,56 @@ class UserPackageService {
         }
       });
 
-      // 记录额度增加流水
+      // 记录额度增加流水（即使额度为0也记录，用于追踪套餐分配历史）
+      await prisma.quotaRecord.create({
+        data: {
+          userId,
+          packageId,
+          type: 'increase',
+          amount: quotaAmount,
+          before: 0,
+          after: quotaAmount,
+          reason: `Package assigned: ${pkg.displayName || pkg.name}${quotaAmount > 0 ? ` (quota: ${quotaAmount})` : ' (no quota)'}`
+        }
+      });
+    } else {
+      // 如果额度已存在，可能是重复分配套餐，也应该记录流水
+      const quotaAmount = pkg.quota ? parseFloat(pkg.quota) : 0;
+      const before = parseFloat(existing.available);
+      const after = before + quotaAmount;
+      
       if (quotaAmount > 0) {
+        // 更新额度
+        await prisma.userQuota.update({
+          where: { id: existing.id },
+          data: {
+            available: after
+          }
+        });
+
+        // 记录额度增加流水
         await prisma.quotaRecord.create({
           data: {
             userId,
             packageId,
             type: 'increase',
             amount: quotaAmount,
-            before: 0,
-            after: quotaAmount,
-            reason: `Package assigned: ${pkg.name}`
+            before,
+            after,
+            reason: `Package reassigned: ${pkg.displayName || pkg.name} (quota: ${quotaAmount})`
+          }
+        });
+      } else {
+        // 即使额度为0，也记录套餐分配流水
+        await prisma.quotaRecord.create({
+          data: {
+            userId,
+            packageId,
+            type: 'increase',
+            amount: 0,
+            before,
+            after,
+            reason: `Package reassigned: ${pkg.displayName || pkg.name} (no quota)`
           }
         });
       }
@@ -170,6 +310,46 @@ class UserPackageService {
 
     const updated = await userPackageRepository.extendExpiry(id, days);
 
+    // 同步更新关联的API Key过期时间
+    try {
+      const userApiKeyRepository = require('../repositories/userApiKey.repository');
+      const newExpireTime = updated.expiresAt 
+        ? Math.floor(updated.expiresAt.getTime() / 1000) 
+        : 0; // 如果套餐永久有效，API Key也设为永久（0表示永不过期）
+      
+      const updateResult = await userApiKeyRepository.updateExpireTimeByPackage(
+        userPackage.userId,
+        userPackage.packageId,
+        newExpireTime
+      );
+      
+      const logger = require('../utils/logger');
+      logger.info(`Extended package ${id} by ${days} days, updated ${updateResult.count} API keys`);
+      
+      // 如果API Key之前是过期状态，延期后需要重新激活
+      if (updateResult.count > 0 && newExpireTime > 0) {
+        const now = Math.floor(Date.now() / 1000);
+        if (newExpireTime > now) {
+          // 如果新的过期时间在未来，将已过期的API Key重新激活
+          await prisma.userApiKey.updateMany({
+            where: {
+              userId: userPackage.userId,
+              packageId: userPackage.packageId,
+              status: 'expired',
+              expireTime: newExpireTime
+            },
+            data: {
+              status: 'active'
+            }
+          });
+        }
+      }
+    } catch (error) {
+      // API Key更新失败不影响套餐延期，只记录日志
+      const logger = require('../utils/logger');
+      logger.error(`Failed to update API key expiry for package ${id}:`, error);
+    }
+
     // 记录操作日志
     if (adminId) {
       const logService = require('./log.service');
@@ -193,6 +373,15 @@ class UserPackageService {
     const userPackage = await userPackageRepository.findById(id);
     if (!userPackage) {
       throw new NotFoundError('User package not found');
+    }
+
+    // 删除前先清理相关资源（清零额度、禁用API Key）
+    try {
+      await packageExpirationService.handlePackageDeletion(userPackage.userId, userPackage.packageId);
+    } catch (error) {
+      // 清理失败不影响删除，只记录日志
+      const logger = require('../utils/logger');
+      logger.error(`Failed to clean up resources for user package ${id}:`, error);
     }
 
     await userPackageRepository.delete(id);
@@ -414,6 +603,15 @@ class UserPackageService {
     // 验证套餐属于当前用户
     if (userPackage.userId !== userId) {
       throw new NotFoundError('User package not found');
+    }
+
+    // 删除前先清理相关资源（清零额度、禁用API Key）
+    try {
+      await packageExpirationService.handlePackageDeletion(userId, userPackage.packageId);
+    } catch (error) {
+      // 清理失败不影响删除，只记录日志
+      const logger = require('../utils/logger');
+      logger.error(`Failed to clean up resources for user package ${id}:`, error);
     }
 
     await userPackageRepository.delete(id);

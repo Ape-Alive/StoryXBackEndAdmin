@@ -66,7 +66,7 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
             <el-button
@@ -75,6 +75,15 @@
               circle
               size="small"
               @click="handleEdit(row)"
+              title="编辑"
+            />
+            <el-button
+              type="info"
+              :icon="Key"
+              circle
+              size="small"
+              @click="handleManageApiKeys(row)"
+              title="API Key管理"
             />
             <el-button
               type="danger"
@@ -82,6 +91,7 @@
               circle
               size="small"
               @click="handleDelete(row)"
+              title="删除"
             />
           </div>
         </template>
@@ -91,7 +101,10 @@
 </template>
 
 <script setup>
-import { Edit, Delete, CircleCheck, CircleClose } from '@element-plus/icons-vue'
+import { Edit, Delete, CircleCheck, CircleClose, Key } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const props = defineProps({
   tableData: {
@@ -182,6 +195,11 @@ function handleEdit(row) {
 // 删除
 function handleDelete(row) {
   emit('delete', row)
+}
+
+// 管理API Key
+function handleManageApiKeys(row) {
+  router.push(`/model/provider/${row.id}/api-keys`)
 }
 </script>
 

@@ -337,6 +337,35 @@
           />
         </el-form-item>
 
+        <el-form-item label="可用模型">
+          <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+            <el-button type="text" size="small" @click="handleSelectAllModels">
+              {{ isAllModelsSelected ? '取消全选' : '全选' }}
+            </el-button>
+            <span style="font-size: 12px; color: #909399">
+              已选择 {{ formData.availableModels?.length || 0 }} 个模型
+            </span>
+          </div>
+          <el-select
+            v-model="formData.availableModels"
+            multiple
+            filterable
+            placeholder="请选择可用模型（不选表示所有模型都可用）"
+            style="width: 100%"
+            collapse-tags
+            collapse-tags-tooltip
+            :max-collapse-tags="3"
+          >
+            <el-option
+              v-for="model in modelOptions"
+              :key="model.id"
+              :label="model.displayName || model.name"
+              :value="model.id"
+            />
+          </el-select>
+          <div class="form-tip">不选择表示所有模型都可用，选择后只允许使用选中的模型。</div>
+        </el-form-item>
+
         <el-form-item label="是否可叠加">
           <el-switch v-model="formData.isStackable" />
         </el-form-item>
@@ -382,6 +411,7 @@ import {
   batchUpdatePackageStatus,
   batchDeletePackages
 } from '@/api/package'
+import { getModels } from '@/api/model'
 
 // 数据
 const loading = ref(false)
@@ -421,6 +451,10 @@ const formVisible = ref(false)
 const saving = ref(false)
 const currentPackage = ref(null)
 const formRef = ref()
+
+// 模型选项
+const modelOptions = ref([])
+const loadingModels = ref(false)
 
 const formData = reactive({
   id: null,
@@ -503,8 +537,46 @@ function handleSelectionChange(selection) {
   selectedIds.value = selection.map(item => item.id)
 }
 
+// 加载模型列表
+async function loadModels() {
+  if (modelOptions.value.length > 0) return // 已加载过
+
+  loadingModels.value = true
+  try {
+    const response = await getModels({ page: 1, pageSize: 1000, isActive: true })
+    if (response.success && response.data) {
+      modelOptions.value = response.data
+    }
+  } catch (error) {
+    // 错误已在 request.js 中处理
+  } finally {
+    loadingModels.value = false
+  }
+}
+
+// 计算是否全选
+const isAllModelsSelected = computed(() => {
+  if (!formData.availableModels || !Array.isArray(formData.availableModels)) {
+    return false
+  }
+  return (
+    formData.availableModels.length === modelOptions.value.length && modelOptions.value.length > 0
+  )
+})
+
+// 全选模型
+function handleSelectAllModels() {
+  if (isAllModelsSelected.value) {
+    // 如果已全选，则取消全选
+    formData.availableModels = null
+  } else {
+    // 全选所有模型
+    formData.availableModels = modelOptions.value.map(model => model.id)
+  }
+}
+
 // 新增
-function handleAdd() {
+async function handleAdd() {
   currentPackage.value = null
   Object.assign(formData, {
     id: null,
@@ -524,12 +596,24 @@ function handleAdd() {
     priority: 0,
     isActive: true
   })
+  await loadModels()
   formVisible.value = true
 }
 
 // 编辑
-function handleEdit(row) {
+async function handleEdit(row) {
   currentPackage.value = { ...row }
+
+  // 解析 availableModels（如果是 JSON 字符串）
+  let availableModels = row.availableModels
+  if (typeof availableModels === 'string') {
+    try {
+      availableModels = JSON.parse(availableModels)
+    } catch (e) {
+      availableModels = null
+    }
+  }
+
   Object.assign(formData, {
     id: row.id,
     name: row.name,
@@ -543,11 +627,12 @@ function handleEdit(row) {
     priceUnit: row.priceUnit || 'CNY',
     discount: row.discount,
     maxDevices: row.maxDevices,
-    availableModels: row.availableModels,
+    availableModels: availableModels,
     isStackable: row.isStackable,
     priority: row.priority,
     isActive: row.isActive
   })
+  await loadModels()
   formVisible.value = true
 }
 
@@ -701,11 +786,19 @@ function handleSubmit() {
         }
       }
 
-      // availableModels: 如果是空数组或 null，传 null
-      if (
-        !payload.availableModels ||
-        (Array.isArray(payload.availableModels) && payload.availableModels.length === 0)
-      ) {
+      // availableModels: 处理多选值，过滤掉全选标记，如果是空数组或 null，传 null
+      if (Array.isArray(payload.availableModels)) {
+        // 过滤掉全选标记
+        payload.availableModels = payload.availableModels.filter(id => id !== '__select_all__')
+
+        // 如果过滤后为空数组，设为 null
+        if (payload.availableModels.length === 0) {
+          payload.availableModels = null
+        } else {
+          // 转换为 JSON 字符串数组（后端期望的格式）
+          payload.availableModels = JSON.stringify(payload.availableModels)
+        }
+      } else if (!payload.availableModels) {
         payload.availableModels = null
       }
 

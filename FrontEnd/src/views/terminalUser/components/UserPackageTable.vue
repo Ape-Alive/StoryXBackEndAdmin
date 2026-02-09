@@ -43,9 +43,16 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="过期时间" width="120" align="center">
+      <el-table-column label="过期时间" width="140" align="center">
         <template #default="{ row }">
-          <span v-if="row.expiresAt" class="time-text">{{ formatDate(row.expiresAt) }}</span>
+          <div v-if="row.expiresAt">
+            <span :class="['time-text', isExpired(row) ? 'expired-time' : '']">
+              {{ formatDate(row.expiresAt) }}
+            </span>
+            <el-tag v-if="isExpired(row)" type="danger" size="small" style="margin-left: 4px">
+              已过期
+            </el-tag>
+          </div>
           <span v-else class="text-muted">永久</span>
         </template>
       </el-table-column>
@@ -75,6 +82,7 @@
               :icon="Edit"
               circle
               size="small"
+              :disabled="isExpired(row)"
               @click="handleEditPriority(row)"
               title="修改优先级"
             />
@@ -83,6 +91,7 @@
               :icon="Clock"
               circle
               size="small"
+              :disabled="isExpired(row)"
               @click="handleExtend(row)"
               title="延期"
             />
@@ -156,6 +165,14 @@ function isActive(row) {
   if (!row.expiresAt) return true
   const expiresAt = new Date(row.expiresAt)
   return expiresAt > now
+}
+
+// 判断套餐是否已过期
+function isExpired(row) {
+  if (!row.expiresAt) return false
+  const now = new Date()
+  const expiresAt = new Date(row.expiresAt)
+  return expiresAt <= now
 }
 
 // 修改优先级
@@ -237,6 +254,11 @@ function handleCancel(row) {
 .time-text {
   font-size: 13px;
   color: #64748b;
+}
+
+.expired-time {
+  color: #ef4444;
+  font-weight: 600;
 }
 
 .text-muted {

@@ -37,8 +37,16 @@ const routes = [
       {
         path: '/model/provider',
         name: 'Provider',
-        component: () => import('@/views/model/Provider.vue'),
-        meta: { title: '提供商管理', requiresAuth: true }
+        component: () => import('@/views/model/ProviderWrapper.vue'),
+        meta: { title: '提供商管理', requiresAuth: true },
+        children: [
+          {
+            path: '/model/provider/:id/api-keys',
+            name: 'ProviderApiKeys',
+            component: () => import('@/views/model/ProviderApiKeys.vue'),
+            meta: { title: '供应商API Key管理', requiresAuth: true }
+          }
+        ]
       },
       {
         path: '/model/list',

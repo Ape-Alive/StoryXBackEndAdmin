@@ -67,6 +67,23 @@
           />
           <div class="form-tip">单位：积分</div>
         </el-form-item>
+
+        <el-form-item label="最大Token数" prop="maxToken">
+          <el-input-number
+            v-model="formData.maxToken"
+            :min="1"
+            :precision="0"
+            :step="1"
+            placeholder="请输入最大Token数（可选）"
+            style="width: 100%"
+            :controls="true"
+          />
+          <div class="form-tip">
+            用于预估费用计算，例如：gemini-2.5-flash-image模型可设置为8192
+            <br />
+            留空表示不限制，将使用用户提供的estimatedTokens
+          </div>
+        </el-form-item>
       </template>
 
       <template v-if="formData.pricingType === 'call'">
@@ -153,6 +170,7 @@ const formData = reactive({
   inputPrice: 0,
   outputPrice: 0,
   callPrice: 0,
+  maxToken: null,
   effectiveAt: '',
   expiredAt: ''
 })
@@ -216,6 +234,7 @@ function handlePricingTypeChange() {
   } else {
     formData.inputPrice = 0
     formData.outputPrice = 0
+    formData.maxToken = null
   }
 }
 
@@ -229,6 +248,7 @@ watch(() => props.modelValue, (val) => {
       inputPrice: props.price.inputPrice !== undefined ? parseFloat(props.price.inputPrice) : 0,
       outputPrice: props.price.outputPrice !== undefined ? parseFloat(props.price.outputPrice) : 0,
       callPrice: props.price.callPrice !== undefined ? parseFloat(props.price.callPrice) : 0,
+      maxToken: props.price.maxToken !== undefined && props.price.maxToken !== null ? parseInt(props.price.maxToken) : null,
       effectiveAt: props.price.effectiveAt || '',
       expiredAt: props.price.expiredAt || ''
     })
@@ -241,6 +261,7 @@ watch(() => props.modelValue, (val) => {
       inputPrice: 0,
       outputPrice: 0,
       callPrice: 0,
+      maxToken: null,
       effectiveAt: '',
       expiredAt: ''
     })
@@ -281,6 +302,7 @@ function handleSubmit() {
         ...formData,
         modelId: props.modelId, // 确保包含 modelId
         packageId: formData.packageId || null,
+        maxToken: formData.maxToken || null, // 确保maxToken为null而不是0
         effectiveAt: effectiveAt,
         expiredAt: expiredAt
       }

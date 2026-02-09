@@ -204,6 +204,10 @@ async function handleFormSuccess(data) {
       const response = await createProvider(data)
       if (response.success) {
         ElMessage.success('创建成功')
+        // 如果不支持API Key创建，提示需要手动添加
+        if (!data.supportsApiKeyCreation) {
+          ElMessage.warning('当前提供商不支持API Key创建，请手动添加API Key')
+        }
         formVisible.value = false
         fetchData()
       }

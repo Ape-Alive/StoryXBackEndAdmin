@@ -298,6 +298,22 @@ const createModelPriceValidator = [
       return true;
     })
     .withMessage('Call price must be a non-negative number'),
+  body('maxToken')
+    .optional()
+    .custom((value, { req }) => {
+      // maxToken只在pricingType为token时有效
+      if (req.body.pricingType === 'token') {
+        if (value === null || value === undefined || value === '') {
+          return true; // 允许null，表示不限制
+        }
+        const intValue = typeof value === 'string' ? parseInt(value) : value;
+        if (isNaN(intValue) || intValue < 1) {
+          throw new Error('Max token must be a positive integer or null');
+        }
+      }
+      return true;
+    })
+    .withMessage('Max token must be a positive integer or null (only valid when pricing type is token)'),
   body('effectiveAt')
     .notEmpty()
     .withMessage('Effective date is required')
@@ -399,6 +415,21 @@ const updateModelPriceValidator = [
       return true;
     })
     .withMessage('Call price must be a non-negative number'),
+  body('maxToken')
+    .optional()
+    .custom((value, { req }) => {
+      // maxToken只在pricingType为token时有效
+      // 如果提供了pricingType且为token，或者当前价格是token类型
+      if (value === null || value === undefined || value === '') {
+        return true; // 允许null，表示不限制
+      }
+      const intValue = typeof value === 'string' ? parseInt(value) : value;
+      if (isNaN(intValue) || intValue < 1) {
+        throw new Error('Max token must be a positive integer or null');
+      }
+      return true;
+    })
+    .withMessage('Max token must be a positive integer or null (only valid when pricing type is token)'),
   body('effectiveAt')
     .optional()
     .custom((value) => {

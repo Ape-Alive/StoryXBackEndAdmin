@@ -80,13 +80,21 @@
         </el-select>
       </el-form-item>
 
-      <el-form-item label="账户Token" prop="mainAccountToken">
+      <el-form-item label="支持API Key创建">
+        <el-switch v-model="formData.supportsApiKeyCreation" />
+        <div class="form-tip">是否支持通过接口创建API Key（如grsai）</div>
+      </el-form-item>
+
+      <el-form-item label="账户Token" prop="mainAccountToken" :rules="mainAccountTokenRules">
         <el-input
           v-model="formData.mainAccountToken"
           type="textarea"
           :rows="2"
           placeholder="请输入主账户token"
         />
+        <div class="form-tip" v-if="!formData.supportsApiKeyCreation">
+          不支持API Key创建时，账户Token可选；支持API Key创建时，账户Token必填
+        </div>
       </el-form-item>
 
       <el-form-item label="是否启用">
@@ -106,7 +114,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, watch } from 'vue'
+import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 
 const props = defineProps({
@@ -136,7 +144,18 @@ const formData = reactive({
   quota: null,
   quotaUnit: null,
   mainAccountToken: '',
+  supportsApiKeyCreation: false,
   isActive: true
+})
+
+// 账户Token验证规则（动态）
+const mainAccountTokenRules = computed(() => {
+  if (formData.supportsApiKeyCreation) {
+    return [
+      { required: true, message: '支持API Key创建时，账户Token为必填项', trigger: 'blur' }
+    ]
+  }
+  return []
 })
 
 const rules = {
@@ -165,9 +184,6 @@ const rules = {
   ],
   quotaUnit: [
     { required: true, message: '请选择额度单位', trigger: 'change' }
-  ],
-  mainAccountToken: [
-    { required: true, message: '请输入账户Token', trigger: 'blur' }
   ]
 }
 
@@ -185,6 +201,7 @@ watch(() => props.modelValue, (val) => {
       quota: props.provider.quota !== undefined && props.provider.quota !== null ? parseFloat(props.provider.quota) : null,
       quotaUnit: props.provider.quotaUnit || null,
       mainAccountToken: props.provider.mainAccountToken || '',
+      supportsApiKeyCreation: props.provider.supportsApiKeyCreation !== undefined ? props.provider.supportsApiKeyCreation : false,
       isActive: props.provider.isActive !== undefined ? props.provider.isActive : true
     })
   } else if (val) {
@@ -200,6 +217,7 @@ watch(() => props.modelValue, (val) => {
       quota: null,
       quotaUnit: null,
       mainAccountToken: '',
+      supportsApiKeyCreation: false,
       isActive: true
     })
   }
@@ -217,6 +235,12 @@ function handleClose() {
 function handleSubmit() {
   formRef.value?.validate((valid) => {
     if (valid) {
+      // 额外验证：如果支持API Key创建，必须填写mainAccountToken
+      if (formData.supportsApiKeyCreation && (!formData.mainAccountToken || formData.mainAccountToken.trim() === '')) {
+        ElMessage.error('支持API Key创建时，账户Token为必填项')
+        return
+      }
+
       submitting.value = true
       // 处理数据，确保 quota 为 null 或数字
       const submitData = {

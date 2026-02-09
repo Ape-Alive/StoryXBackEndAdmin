@@ -196,15 +196,16 @@ function handleExtend(row) {
 
 // 取消套餐
 function handleCancel(row) {
-  ElMessageBox.confirm(
-    `确定要取消用户 "${row.user?.email || row.userId}" 的套餐 "${row.package?.displayName || row.package?.name || '未知'}" 吗？`,
-    '确认取消',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  )
+  const isExpired = row.expiresAt && new Date(row.expiresAt) <= new Date()
+  const message = isExpired
+    ? `该套餐已过期。确定要删除用户 "${row.user?.email || row.userId}" 的套餐 "${row.package?.displayName || row.package?.name || '未知'}" 吗？\n\n注意：删除后，该套餐关联的额度和API Key将被清理。`
+    : `确定要取消用户 "${row.user?.email || row.userId}" 的套餐 "${row.package?.displayName || row.package?.name || '未知'}" 吗？\n\n警告：取消后，该套餐的剩余额度将被清零，关联的API Key将被禁用。此操作不可恢复！`
+
+  ElMessageBox.confirm(message, '确认取消', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
     .then(async () => {
       try {
         const response = await cancelUserPackage(row.id)
