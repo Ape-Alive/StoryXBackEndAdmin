@@ -549,14 +549,30 @@ router.delete(
  *     description: |
  *       获取指定提供商的所有API Key列表，支持筛选。
  *
+ *       **注意：**
+ *       - 当前版本返回所有匹配的API Key，暂不支持分页
+ *       - `page` 和 `pageSize` 参数已预留，但当前不会生效
+ *       - 如果API Key数量较多，建议使用 `userId` 或 `status` 参数进行筛选
+ *
  *       **API Key类型说明：**
  *       - **系统级API Key**：`userId` 为 `null`，关联到提供商，供所有用户使用
+ *         - `type = 'provider_associated'`：管理员手动添加的提供商关联API Key
+ *         - `type = 'system_created'`：系统自动创建（用户绑定套餐时）
  *       - **用户专属API Key**：`userId` 有值，属于特定用户
+ *         - `type = 'user_created'`：用户自己创建
+ *         - `type = 'system_created'`：系统为用户自动创建
  *
  *       **筛选说明：**
- *       - `userId=null`：只获取系统级API Key
- *       - `userId=具体用户ID`：获取该用户的API Key
+ *       - 不传 `userId`：返回该提供商的所有API Key（包括系统级和用户级）
+ *       - `userId=null`：只返回系统级API Key（`userId` 为 `null`）
+ *       - `userId=具体用户ID`：只返回该用户的API Key
  *       - `status`：按状态筛选（active/expired/revoked）
+ *
+ *       **返回数据说明：**
+ *       - API Key字段已解密（`apiKey` 字段返回解密后的值）
+ *       - `expireTime` 为0表示永不过期
+ *       - `credits` 为0表示无限制（使用用户内部额度或提供商主账户额度）
+ *       - 包含关联的用户信息（如果 `userId` 不为null）
  *
  *       **使用示例：**
  *       ```bash
@@ -568,8 +584,16 @@ router.delete(
  *       curl -X GET "http://localhost:5800/api/providers/{id}/api-keys?userId=null" \
  *         -H "Authorization: Bearer {token}"
  *
+ *       # 获取特定用户的API Key
+ *       curl -X GET "http://localhost:5800/api/providers/{id}/api-keys?userId=cml7efj6f0001guqcwcty7k6u" \
+ *         -H "Authorization: Bearer {token}"
+ *
  *       # 获取活跃状态的API Key
  *       curl -X GET "http://localhost:5800/api/providers/{id}/api-keys?status=active" \
+ *         -H "Authorization: Bearer {token}"
+ *
+ *       # 组合筛选：获取系统级且活跃的API Key
+ *       curl -X GET "http://localhost:5800/api/providers/{id}/api-keys?userId=null&status=active" \
  *         -H "Authorization: Bearer {token}"
  *       ```
  *     tags: [提供商API Key管理]
@@ -601,6 +625,23 @@ router.delete(
  *           enum: [active, expired, revoked]
  *         description: 状态筛选（可选）
  *         example: active
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: 页码（从1开始，当前版本暂未实现分页，返回所有结果）
+ *         example: 1
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           minimum: 1
+ *           maximum: 100
+ *         description: 每页数量（当前版本暂未实现分页，返回所有结果）
+ *         example: 20
  *     responses:
  *       200:
  *         description: 获取成功
@@ -632,17 +673,31 @@ router.delete(
  *                             example: "系统API Key_001"
  *                           type:
  *                             type: string
- *                             enum: [system_created, user_created]
- *                             example: "system_created"
+ *                             enum: [system_created, user_created, provider_associated]
+ *                             example: "provider_associated"
+ *                             description: |
+ *                               API Key类型：
+ *                               - `system_created`：系统自动创建（用户绑定套餐时）
+ *                               - `user_created`：用户自己创建
+ *                               - `provider_associated`：管理员手动添加的提供商关联API Key
  *                           credits:
  *                             type: number
  *                             example: 10000
- *                             description: 积分额度（0表示无限制）
+ *                             description: |
+ *                               积分额度
+ *                               - `0`：表示无限制（使用用户内部额度或提供商主账户额度）
+ *                               - 大于0：表示该API Key在第三方平台的额度限制
+ *                               - 对于用户创建的API Key，credits通常为0，使用内部额度系统
+ *                               - 对于提供商关联的API Key，credits表示第三方平台的额度
  *                           expireTime:
  *                             type: integer
  *                             format: int64
  *                             example: 1735689600
- *                             description: 到期时间（时间戳，0表示永不过期）
+ *                             description: |
+ *                               到期时间（Unix时间戳，秒级）
+ *                               - `0`：表示永不过期
+ *                               - 大于0：表示具体的过期时间戳
+ *                               - 如果已过期，status会自动变为'expired'
  *                           status:
  *                             type: string
  *                             enum: [active, expired, revoked]
@@ -665,10 +720,82 @@ router.delete(
  *                             properties:
  *                               id:
  *                                 type: string
+ *                                 example: "cml7efj6f0001guqcwcty7k6u"
  *                               email:
  *                                 type: string
+ *                                 example: "user@example.com"
  *                               phone:
  *                                 type: string
+ *                                 example: "13800138000"
+ *                           apiKey:
+ *                             type: string
+ *                             description: API Key值（已解密）
+ *                             example: "sk-xxxxxxxxxxxxxx"
+ *             examples:
+ *               example1:
+ *                 summary: 获取所有API Key
+ *                 value:
+ *                   success: true
+ *                   message: "Provider API Keys retrieved successfully"
+ *                   data:
+ *                     - id: "api_key_123456"
+ *                       userId: null
+ *                       providerId: "cmkurq76s000013wwssui4g6m"
+ *                       name: "系统API Key_001"
+ *                       type: "provider_associated"
+ *                       credits: 10000
+ *                       expireTime: 1735689600
+ *                       status: "active"
+ *                       packageId: null
+ *                       createdAt: "2024-01-01T00:00:00Z"
+ *                       updatedAt: "2024-01-01T00:00:00Z"
+ *                       apiKey: "sk-xxxxxxxxxxxxxx"
+ *                     - id: "api_key_789012"
+ *                       userId: "cml7efj6f0001guqcwcty7k6u"
+ *                       providerId: "cmkurq76s000013wwssui4g6m"
+ *                       name: "用户API Key_001"
+ *                       type: "user_created"
+ *                       credits: 0
+ *                       expireTime: 0
+ *                       status: "active"
+ *                       packageId: null
+ *                       createdAt: "2024-01-02T00:00:00Z"
+ *                       updatedAt: "2024-01-02T00:00:00Z"
+ *                       apiKey: "sk-yyyyyyyyyyyyyy"
+ *                       user:
+ *                         id: "cml7efj6f0001guqcwcty7k6u"
+ *                         email: "user@example.com"
+ *                         phone: "13800138000"
+ *               example2:
+ *                 summary: 只获取系统级API Key
+ *                 value:
+ *                   success: true
+ *                   message: "Provider API Keys retrieved successfully"
+ *                   data:
+ *                     - id: "api_key_123456"
+ *                       userId: null
+ *                       providerId: "cmkurq76s000013wwssui4g6m"
+ *                       name: "系统API Key_001"
+ *                       type: "provider_associated"
+ *                       credits: 10000
+ *                       expireTime: 1735689600
+ *                       status: "active"
+ *                       packageId: null
+ *                       createdAt: "2024-01-01T00:00:00Z"
+ *                       updatedAt: "2024-01-01T00:00:00Z"
+ *                       apiKey: "sk-xxxxxxxxxxxxxx"
+ *       400:
+ *         description: 请求参数错误
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               success: false
+ *               message: "Validation failed"
+ *               errors:
+ *                 - field: "id"
+ *                   message: "Invalid provider ID"
  *       404:
  *         description: 提供商不存在
  *         content:
@@ -678,6 +805,15 @@ router.delete(
  *             example:
  *               success: false
  *               message: "Provider not found"
+ *       500:
+ *         description: 服务器内部错误
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               success: false
+ *               message: "Internal server error"
  */
 router.get(
     '/:id/api-keys',
@@ -697,29 +833,60 @@ router.get(
  *
  *       **重要说明：**
  *       - 添加的API Key为系统级（`userId=null`），不属于特定用户
+ *       - API Key类型为 `provider_associated`（提供商关联）
  *       - 添加成功后，提供商的总额度（`quota`）会自动增加该API Key的 `credits` 额度
- *       - API Key会被加密存储到数据库
- *       - 该API Key会被添加到提供商的 `apiKeys` 数组中
+ *       - API Key会被加密存储到数据库（使用AES-256-GCM加密）
+ *       - 该API Key会被添加到提供商的 `apiKeys` JSON数组中
  *
  *       **额度管理：**
- *       - 如果设置了 `credits`，该额度会累加到提供商的总额度中
- *       - 删除API Key时，对应的额度会从提供商总额度中扣除
+ *       - 如果设置了 `credits > 0`，该额度会累加到提供商的总额度（`quota`）中
+ *       - 如果 `credits = 0`（无限制），不会影响提供商总额度
+ *       - 删除API Key时，如果API Key有 `credits > 0`，对应的额度会从提供商总额度中扣除
+ *       - 额度扣除时，如果总额度小于0，会被设置为0
+ *
+ *       **API Key选择优先级（在授权请求时）：**
+ *       1. 用户专属API Key（`user_created` 或 `system_created`，credits=0，使用用户内部额度）
+ *       2. 提供商关联的API Key（`provider_associated`，credits>0时检查提供商quota>0）
+ *       3. 提供商主账户Token（检查提供商quota>0）
  *
  *       **使用场景：**
  *       - 提供商不支持通过接口创建API Key时，手动添加API Key
  *       - 为提供商添加备用API Key，提高可用性
+ *       - 为提供商添加有额度限制的API Key，用于特定场景
  *
  *       **使用示例：**
  *       ```bash
+ *       # 添加无限制API Key
  *       curl -X POST "http://localhost:5800/api/providers/{id}/api-keys" \
  *         -H "Authorization: Bearer {token}" \
  *         -H "Content-Type: application/json" \
  *         -d '{
  *           "apiKey": "sk-xxxxxxxxxxxxxx",
- *           "name": "系统API Key_001",
- *           "apiKeyId": "xxx",
+ *           "name": "系统API Key_001"
+ *         }'
+ *
+ *       # 添加有限额API Key（ISO格式过期时间）
+ *       curl -X POST "http://localhost:5800/api/providers/{id}/api-keys" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "apiKey": "sk-yyyyyyyyyyyyyy",
+ *           "name": "系统API Key_002",
+ *           "apiKeyId": "api_key_123",
  *           "credits": 10000,
  *           "expireTime": "2024-12-31T23:59:59Z"
+ *         }'
+ *
+ *       # 添加有限额API Key（时间戳格式过期时间）
+ *       curl -X POST "http://localhost:5800/api/providers/{id}/api-keys" \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "apiKey": "sk-zzzzzzzzzzzzzz",
+ *           "name": "系统API Key_003",
+ *           "apiKeyId": "api_key_456",
+ *           "credits": 50000,
+ *           "expireTime": 1735689600
  *         }'
  *       ```
  *     tags: [提供商API Key管理]
@@ -769,14 +936,21 @@ router.get(
  *                   - 添加成功后，该额度会累加到提供商的总额度中
  *                 example: 10000
  *               expireTime:
- *                 type: string
- *                 format: date-time
+ *                 oneOf:
+ *                   - type: string
+ *                     format: date-time
+ *                     description: ISO格式日期时间字符串
+ *                     example: "2024-12-31T23:59:59Z"
+ *                   - type: integer
+ *                     format: int64
+ *                     description: Unix时间戳（秒级）
+ *                     example: 1735689600
  *                 description: |
  *                   过期时间（可选）
  *                   - ISO格式：如 "2024-12-31T23:59:59Z"
  *                   - 时间戳：如 1735689600（10位秒级时间戳）
- *                   - 不传或0：表示永不过期
- *                 example: "2024-12-31T23:59:59Z"
+ *                   - 不传、null、0或"0"：表示永不过期
+ *                 nullable: true
  *           examples:
  *             example1:
  *               summary: 添加无限制API Key
@@ -785,13 +959,21 @@ router.get(
  *                 name: "系统API Key_001"
  *                 credits: 0
  *             example2:
- *               summary: 添加有限额API Key
+ *               summary: 添加有限额API Key（ISO格式）
  *               value:
  *                 apiKey: "sk-yyyyyyyyyyyyyy"
  *                 name: "系统API Key_002"
  *                 apiKeyId: "api_key_123"
  *                 credits: 10000
  *                 expireTime: "2024-12-31T23:59:59Z"
+ *             example3:
+ *               summary: 添加有限额API Key（时间戳格式）
+ *               value:
+ *                 apiKey: "sk-zzzzzzzzzzzzzz"
+ *                 name: "系统API Key_003"
+ *                 apiKeyId: "api_key_456"
+ *                 credits: 50000
+ *                 expireTime: 1735689600
  *     responses:
  *       201:
  *         description: 添加成功
@@ -821,7 +1003,13 @@ router.get(
  *                           example: "系统API Key_001"
  *                         type:
  *                           type: string
- *                           example: "system_created"
+ *                           enum: [system_created, user_created, provider_associated]
+ *                           example: "provider_associated"
+ *                           description: |
+ *                             API Key类型：
+ *                             - `system_created`：系统自动创建
+ *                             - `user_created`：用户创建
+ *                             - `provider_associated`：管理员手动添加的提供商关联API Key
  *                         credits:
  *                           type: number
  *                           example: 10000
@@ -836,6 +1024,33 @@ router.get(
  *                           type: string
  *                           format: date-time
  *                           example: "2024-01-01T00:00:00Z"
+ *                         updatedAt:
+ *                           type: string
+ *                           format: date-time
+ *                           example: "2024-01-01T00:00:00Z"
+ *                         apiKeyId:
+ *                           type: string
+ *                           nullable: true
+ *                           example: "api_key_123"
+ *                           description: 第三方返回的API Key ID（可选）
+ *             examples:
+ *               example1:
+ *                 summary: 添加成功
+ *                 value:
+ *                   success: true
+ *                   message: "Provider API Key created successfully"
+ *                   data:
+ *                     id: "api_key_123456"
+ *                     userId: null
+ *                     providerId: "cmkurq76s000013wwssui4g6m"
+ *                     name: "系统API Key_001"
+ *                     type: "provider_associated"
+ *                     credits: 10000
+ *                     expireTime: 1735689600
+ *                     status: "active"
+ *                     apiKeyId: "api_key_123"
+ *                     createdAt: "2024-01-01T00:00:00Z"
+ *                     updatedAt: "2024-01-01T00:00:00Z"
  *       400:
  *         description: 请求参数错误
  *         content:
@@ -854,6 +1069,25 @@ router.get(
  *                       message: "API Key is required"
  *                     }
  *                   ]
+ *             examples:
+ *               validationError:
+ *                 summary: 验证失败
+ *                 value:
+ *                   success: false
+ *                   message: "Validation failed"
+ *                   errors:
+ *                     - field: "apiKey"
+ *                       message: "API Key is required"
+ *                     - field: "name"
+ *                       message: "Name must be a string"
+ *               invalidExpireTime:
+ *                 summary: 过期时间格式错误
+ *                 value:
+ *                   success: false
+ *                   message: "Validation failed"
+ *                   errors:
+ *                     - field: "expireTime"
+ *                       message: "Expire time must be a valid timestamp or ISO date string"
  *       404:
  *         description: 提供商不存在
  *         content:
@@ -863,6 +1097,23 @@ router.get(
  *             example:
  *               success: false
  *               message: "Provider not found"
+ *       500:
+ *         description: 服务器内部错误
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               encryptionError:
+ *                 summary: API Key加密失败
+ *                 value:
+ *                   success: false
+ *                   message: "Failed to encrypt API Key"
+ *               quotaUpdateError:
+ *                 summary: 额度更新失败
+ *                 value:
+ *                   success: false
+ *                   message: "Failed to update provider quota"
  */
 router.post(
     '/:id/api-keys',
@@ -883,17 +1134,25 @@ router.post(
  *
  *       **重要说明：**
  *       - 只能删除系统级API Key（`userId=null`），不能删除用户专属API Key
- *       - 删除成功后，该API Key的 `credits` 额度会从提供商的总额度中扣除
- *       - 该API Key会从提供商的 `apiKeys` 数组中移除
+ *       - 删除成功后，该API Key的 `credits` 额度会从提供商的总额度（`quota`）中扣除
+ *       - 该API Key会从提供商的 `apiKeys` JSON数组中移除
+ *       - API Key记录会被标记为 `status='revoked'`（已撤销）
  *       - 删除操作不可恢复，请谨慎操作
  *
  *       **额度处理：**
- *       - 如果API Key有 `credits` 额度，删除时会从提供商总额度中扣除
+ *       - 如果API Key有 `credits > 0`，删除时会从提供商总额度（`quota`）中扣除
+ *       - 如果 `credits = 0`，不会影响提供商总额度
  *       - 如果扣除后总额度小于0，会被设置为0
+ *       - 所有操作都在事务中完成，确保数据一致性
  *
  *       **使用示例：**
  *       ```bash
+ *       # 删除API Key
  *       curl -X DELETE "http://localhost:5800/api/providers/{id}/api-keys/{apiKeyId}" \
+ *         -H "Authorization: Bearer {token}"
+ *
+ *       # 示例：删除ID为 api_key_123456 的API Key
+ *       curl -X DELETE "http://localhost:5800/api/providers/cmkurq76s000013wwssui4g6m/api-keys/api_key_123456" \
  *         -H "Authorization: Bearer {token}"
  *       ```
  *     tags: [提供商API Key管理]
@@ -960,6 +1219,23 @@ router.post(
  *                 value:
  *                   success: false
  *                   message: "API Key not found"
+ *       500:
+ *         description: 服务器内部错误
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               quotaUpdateError:
+ *                 summary: 额度更新失败
+ *                 value:
+ *                   success: false
+ *                   message: "Failed to update provider quota"
+ *               databaseError:
+ *                 summary: 数据库操作失败
+ *                 value:
+ *                   success: false
+ *                   message: "Database operation failed"
  */
 router.delete(
     '/:id/api-keys/:apiKeyId',
