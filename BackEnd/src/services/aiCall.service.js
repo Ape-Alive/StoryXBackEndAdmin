@@ -328,7 +328,13 @@ class AICallService {
 
     if (filters.status) {
       // 将前端的状态映射到数据库状态（success/failure）
-      where.status = filters.status === 'success' ? 'success' : 'failure';
+      // 数据库只支持 success 和 failure，其他状态都映射为 failure
+      if (filters.status === 'success') {
+        where.status = 'success';
+      } else {
+        // failed, failure, timeout, error 都映射为 failure
+        where.status = 'failure';
+      }
     }
 
     if (filters.startDate || filters.endDate) {

@@ -47,17 +47,21 @@ class UserPackageRepository {
 
     // 筛选活跃或非活跃套餐
     if (filters.activeOnly === true) {
-      // 只返回活跃套餐（未过期）
-      where.OR = [
-        { expiresAt: null },
-        { expiresAt: { gt: new Date() } }
+      // 只返回活跃套餐（未过期且已开始）
+      const now = new Date();
+      where.AND = [
+        {
+          OR: [
+            { expiresAt: null },
+            { expiresAt: { gt: now } }
+          ]
+        },
+        {
+          startedAt: { lte: now }
+        }
       ];
-    } else if (filters.activeOnly === false) {
-      // 只返回已过期套餐
-      where.expiresAt = {
-        lt: new Date()
-      };
     }
+    // 如果 activeOnly === false 或 undefined，不添加过滤条件，返回所有套餐
 
     if (filters.expiresBefore) {
       where.expiresAt = {
@@ -164,6 +168,9 @@ class UserPackageRepository {
     if (data.priority !== undefined) updateData.priority = data.priority;
     if (data.expiresAt !== undefined) {
       updateData.expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
+    }
+    if (data.startedAt !== undefined) {
+      updateData.startedAt = data.startedAt ? new Date(data.startedAt) : new Date();
     }
 
     updateData.updatedAt = new Date();

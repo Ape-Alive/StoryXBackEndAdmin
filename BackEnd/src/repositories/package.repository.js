@@ -69,11 +69,15 @@ class PackageRepository {
       prisma.package.count({ where })
     ]);
 
-    const formattedData = data.map(item => ({
-      ...item,
-      userCount: item._count.userPackages,
-      quotaRecordCount: item._count.quotaRecords
-    }));
+    const formattedData = data.map(item => {
+      // 确保 availableModels 字段被正确保留
+      const { _count, ...rest } = item;
+      return {
+        ...rest,
+        userCount: _count.userPackages,
+        quotaRecordCount: _count.quotaRecords
+      };
+    });
 
     return {
       data: formattedData,
@@ -120,9 +124,27 @@ class PackageRepository {
         discount: data.discount,
         maxDevices: data.maxDevices,
         // availableModels: null 或空数组表示所有模型都可用
-        availableModels: data.availableModels && Array.isArray(data.availableModels) && data.availableModels.length > 0
-          ? JSON.stringify(data.availableModels)
-          : null,
+        // 处理 availableModels：如果是数组且长度>0，转换为JSON字符串；否则为null
+        availableModels: (() => {
+          const models = data.availableModels;
+          // 如果是字符串，尝试解析
+          if (typeof models === 'string' && models.trim() !== '') {
+            try {
+              const parsed = JSON.parse(models);
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                return JSON.stringify(parsed);
+              }
+            } catch (e) {
+              // 解析失败，返回 null
+            }
+          }
+          // 如果是数组且长度>0，转换为JSON字符串
+          if (Array.isArray(models) && models.length > 0) {
+            return JSON.stringify(models);
+          }
+          // 其他情况（null、undefined、空数组、空字符串）都返回 null
+          return null;
+        })(),
         isStackable: data.isStackable !== undefined ? data.isStackable : false,
         priority: data.priority || 0,
         isActive: data.isActive !== undefined ? data.isActive : true
@@ -148,9 +170,24 @@ class PackageRepository {
     if (data.maxDevices !== undefined) updateData.maxDevices = data.maxDevices;
     if (data.availableModels !== undefined) {
       // availableModels: null 或空数组表示所有模型都可用
-      updateData.availableModels = data.availableModels && Array.isArray(data.availableModels) && data.availableModels.length > 0
-        ? JSON.stringify(data.availableModels)
-        : null;
+      // 处理 availableModels：如果是数组且长度>0，转换为JSON字符串；否则为null
+      const models = data.availableModels;
+      if (typeof models === 'string' && models.trim() !== '') {
+        try {
+          const parsed = JSON.parse(models);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            updateData.availableModels = JSON.stringify(parsed);
+          } else {
+            updateData.availableModels = null;
+          }
+        } catch (e) {
+          updateData.availableModels = null;
+        }
+      } else if (Array.isArray(models) && models.length > 0) {
+        updateData.availableModels = JSON.stringify(models);
+      } else {
+        updateData.availableModels = null;
+      }
     }
     if (data.isStackable !== undefined) updateData.isStackable = data.isStackable;
     if (data.priority !== undefined) updateData.priority = data.priority;

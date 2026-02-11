@@ -9,7 +9,41 @@ class PackageService {
    * 获取套餐列表
    */
   async getPackages(filters = {}, pagination = {}, sort = {}) {
-    return await packageRepository.findPackages(filters, pagination, sort);
+    const result = await packageRepository.findPackages(filters, pagination, sort);
+    
+    // 解析每个套餐的 availableModels JSON 字符串
+    if (result.data && Array.isArray(result.data)) {
+      result.data = result.data.map(pkg => {
+        // 创建一个新对象，确保不修改原始对象
+        const processedPkg = { ...pkg };
+        
+        // 解析 availableModels JSON
+        // null、undefined 或空字符串表示所有模型都可用
+        const availableModelsValue = processedPkg.availableModels;
+        
+        // 确保 availableModels 字段存在（即使是 null）
+        if (availableModelsValue && 
+            typeof availableModelsValue === 'string' && 
+            availableModelsValue.trim() !== '') {
+          try {
+            const parsed = JSON.parse(availableModelsValue);
+            // 如果是数组且长度大于0，返回数组；否则返回 null
+            processedPkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+          } catch (e) {
+            // 解析失败时视为所有模型都可用
+            processedPkg.availableModels = null;
+          }
+        } else {
+          // null、undefined、空字符串都统一为 null（表示所有模型都可用）
+          // 确保字段存在，即使是 null
+          processedPkg.availableModels = null;
+        }
+        
+        return processedPkg;
+      });
+    }
+    
+    return result;
   }
 
   /**
@@ -60,6 +94,18 @@ class PackageService {
 
     const pkg = await packageRepository.create(data);
 
+    // 解析返回的 availableModels JSON 字符串
+    if (pkg.availableModels && typeof pkg.availableModels === 'string' && pkg.availableModels.trim() !== '') {
+      try {
+        const parsed = JSON.parse(pkg.availableModels);
+        pkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+      } catch (e) {
+        pkg.availableModels = null;
+      }
+    } else {
+      pkg.availableModels = null;
+    }
+
     // 记录操作日志
     if (adminId) {
       const logService = require('./log.service');
@@ -102,6 +148,18 @@ class PackageService {
     }
 
     const updated = await packageRepository.update(id, data);
+
+    // 解析返回的 availableModels JSON 字符串
+    if (updated.availableModels && typeof updated.availableModels === 'string' && updated.availableModels.trim() !== '') {
+      try {
+        const parsed = JSON.parse(updated.availableModels);
+        updated.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+      } catch (e) {
+        updated.availableModels = null;
+      }
+    } else {
+      updated.availableModels = null;
+    }
 
     // 记录操作日志
     if (adminId) {

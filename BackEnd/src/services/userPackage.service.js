@@ -14,7 +14,111 @@ class UserPackageService {
    * 获取用户套餐列表
    */
   async getUserPackages(filters = {}, pagination = {}) {
-    return await userPackageRepository.findUserPackages(filters, pagination);
+    const result = await userPackageRepository.findUserPackages(filters, pagination);
+    
+    if (result.data.length === 0) {
+      return result;
+    }
+    
+    // 批量查询所有套餐的积分信息（优化性能，避免N+1查询）
+    const userId = result.data[0].userId;
+    const packageIds = result.data.map(up => up.packageId);
+    const userQuotas = await prisma.userQuota.findMany({
+      where: {
+        userId,
+        packageId: { in: packageIds }
+      }
+    });
+    
+    // 创建积分信息映射表
+    const quotaMap = new Map();
+    userQuotas.forEach(quota => {
+      quotaMap.set(quota.packageId, quota);
+    });
+    
+    // 为每个套餐添加状态和不可用原因
+    const now = new Date();
+    const enrichedData = result.data.map((userPackage) => {
+      const enriched = { ...userPackage };
+      
+      // 检查套餐是否被禁用
+      if (!userPackage.package || !userPackage.package.isActive) {
+        enriched.status = 'inactive';
+        enriched.unavailableReason = '套餐已禁用';
+        enriched.quotaInfo = null;
+        return enriched;
+      }
+      
+      // 检查套餐是否已过期
+      const isExpired = userPackage.expiresAt && new Date(userPackage.expiresAt) < now;
+      if (isExpired) {
+        enriched.status = 'expired';
+        enriched.unavailableReason = '套餐已过期';
+        enriched.quotaInfo = null;
+        return enriched;
+      }
+      
+      // 检查套餐是否已开始
+      const isStarted = userPackage.startedAt && new Date(userPackage.startedAt) <= now;
+      if (!isStarted) {
+        enriched.status = 'not_started';
+        enriched.unavailableReason = '套餐尚未开始';
+        enriched.quotaInfo = null;
+        return enriched;
+      }
+      
+      // 检查积分是否用完（如果套餐有积分配置）
+      if (userPackage.package.quota) {
+        const userQuota = quotaMap.get(userPackage.packageId);
+        
+        if (userQuota) {
+          const available = parseFloat(userQuota.available) || 0;
+          const frozen = parseFloat(userQuota.frozen) || 0;
+          const used = parseFloat(userQuota.used) || 0;
+          const total = parseFloat(userPackage.package.quota) || 0;
+          
+          enriched.quotaInfo = {
+            available,
+            frozen,
+            used,
+            total,
+            remaining: available + frozen
+          };
+          
+          // 如果积分用完
+          if (available + frozen <= 0) {
+            enriched.status = 'no_quota';
+            enriched.unavailableReason = '积分已用完';
+            return enriched;
+          }
+        } else {
+          // 如果没有额度记录，认为积分已用完
+          enriched.status = 'no_quota';
+          enriched.unavailableReason = '积分已用完';
+          enriched.quotaInfo = {
+            available: 0,
+            frozen: 0,
+            used: 0,
+            total: parseFloat(userPackage.package.quota) || 0,
+            remaining: 0
+          };
+          return enriched;
+        }
+      } else {
+        // 套餐没有积分配置
+        enriched.quotaInfo = null;
+      }
+      
+      // 套餐可用
+      enriched.status = 'active';
+      enriched.unavailableReason = null;
+      return enriched;
+    });
+    
+    return {
+      ...result,
+      data: enrichedData
+    };
   }
 
   /**
@@ -49,7 +153,61 @@ class UserPackageService {
     // 检查用户是否已有该套餐
     const existing = await userPackageRepository.findByUserAndPackage(data.userId, data.packageId);
     if (existing) {
-      throw new ConflictError('User already has this package');
+      // 检查套餐是否已过期
+      const now = new Date();
+      const isExpired = existing.expiresAt && new Date(existing.expiresAt) < now;
+      
+      if (isExpired) {
+        // 如果套餐已过期，允许重新购买（续费），更新现有记录
+        // 使用套餐的默认时长
+        let expiresAt = null;
+        if (pkg.duration && pkg.durationUnit && !data.expiresAt && !data.packageDuration) {
+          const days = calculateDays(pkg.duration, pkg.durationUnit);
+          if (days !== null) {
+            expiresAt = calculateExpiryDate(pkg.duration, pkg.durationUnit);
+          }
+        } else if (data.expiresAt) {
+          expiresAt = new Date(data.expiresAt);
+        } else if (data.packageDuration) {
+          expiresAt = calculateExpiryDate(data.packageDuration, 'day');
+        }
+        
+        // 更新已过期的套餐记录（续费）
+        const updated = await userPackageRepository.update(existing.id, {
+          startedAt: new Date(),
+          expiresAt,
+          priority: data.priority !== undefined ? data.priority : existing.priority
+        });
+        
+        // 重新初始化用户额度
+        await this.initializeUserQuota(data.userId, data.packageId, pkg);
+        
+        // 重新创建API Key（如果提供商支持）
+        try {
+          await this.createApiKeysForPackage(data.userId, data.packageId, pkg);
+        } catch (error) {
+          const logger = require('../utils/logger');
+          logger.warn(`Failed to create API keys for package ${data.packageId}:`, error);
+        }
+        
+        // 记录操作日志
+        if (adminId) {
+          const logService = require('./log.service');
+          await logService.logAdminAction({
+            adminId,
+            action: 'RENEW_PACKAGE',
+            targetType: 'user_package',
+            targetId: updated.id,
+            details: { userId: data.userId, packageId: data.packageId, previousExpiresAt: existing.expiresAt, newExpiresAt: expiresAt },
+            ipAddress
+          });
+        }
+        
+        return updated;
+      } else {
+        // 如果套餐未过期，不允许重复购买
+        throw new ConflictError('User already has this package and it is still active');
+      }
     }
 
     // 如果套餐不可叠加，检查用户是否已有套餐
@@ -494,9 +652,70 @@ class UserPackageService {
     // 检查用户是否已有该套餐
     const existing = await userPackageRepository.findByUserAndPackage(userId, packageId);
     if (existing) {
-      // 如果套餐可叠加，允许重复订阅（但通常不允许）
-      if (!pkg.isStackable) {
-        throw new ConflictError('User already has this package and it is not stackable');
+      // 检查套餐是否已过期
+      const now = new Date();
+      const isExpired = existing.expiresAt && new Date(existing.expiresAt) < now;
+      
+      // 检查积分是否用完（available + frozen = 0）
+      let hasNoQuota = false;
+      if (!isExpired && pkg.quota) {
+        // 如果套餐有积分配置，检查用户当前积分
+        const userQuota = await prisma.userQuota.findFirst({
+          where: {
+            userId,
+            packageId
+          }
+        });
+        if (userQuota) {
+          const available = parseFloat(userQuota.available) || 0;
+          const frozen = parseFloat(userQuota.frozen) || 0;
+          hasNoQuota = (available + frozen) <= 0;
+        } else {
+          // 如果没有额度记录，认为积分已用完
+          hasNoQuota = true;
+        }
+      }
+      
+      if (isExpired || hasNoQuota) {
+        // 如果套餐已过期或积分用完，允许重新购买（续费），更新现有记录
+        // 计算有效期
+        let expiresAt = null;
+        if (pkg.duration && pkg.durationUnit) {
+          expiresAt = calculateExpiryDate(pkg.duration, pkg.durationUnit);
+        }
+        
+        // 更新已过期或积分用完的套餐记录（续费）
+        const updated = await userPackageRepository.update(existing.id, {
+          startedAt: new Date(),
+          expiresAt,
+          priority: priority !== null ? priority : existing.priority
+        });
+        
+        // 重新初始化用户额度（会重置或增加额度）
+        await this.initializeUserQuota(userId, packageId, pkg);
+        
+        // 重新创建API Key（如果提供商支持）
+        try {
+          await this.createApiKeysForPackage(userId, packageId, pkg);
+        } catch (error) {
+          const logger = require('../utils/logger');
+          logger.warn(`Failed to create API keys for package ${packageId}:`, error);
+        }
+        
+        const logger = require('../utils/logger');
+        if (isExpired) {
+          logger.info(`User ${userId} renewed expired package ${packageId}`);
+        } else {
+          logger.info(`User ${userId} renewed package ${packageId} with no quota`);
+        }
+        
+        return updated;
+      } else {
+        // 如果套餐未过期且还有积分
+        if (!pkg.isStackable) {
+          throw new ConflictError('User already has this package and it is still active');
+        }
+        // 如果套餐可叠加，允许重复订阅（但通常不允许，这里保留原有逻辑）
       }
     }
 

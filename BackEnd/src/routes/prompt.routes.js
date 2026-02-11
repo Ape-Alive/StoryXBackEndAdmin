@@ -202,6 +202,10 @@ router.use(authenticate);
  *                         type: string
  *                         description: 提示词ID
  *                         example: "clx123456789"
+ *                       functionKey:
+ *                         type: string
+ *                         description: 功能键，唯一标识该提示词
+ *                         example: "python_code_generator"
  *                       title:
  *                         type: string
  *                         description: 标题

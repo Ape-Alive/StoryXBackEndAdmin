@@ -257,77 +257,130 @@ class QuotaRecordRepository {
   }
 
   /**
-   * 获取使用趋势统计（按时间段）
+   * 获取使用趋势统计（按时间段和模型）
    * @param {Object} filters - 筛选条件
    * @param {string} filters.userId - 用户ID（可选）
-   * @param {string} filters.packageId - 套餐ID（可选）
+   * @param {string} filters.packageId - 套餐ID（可选，暂不支持，保留用于兼容）
    * @param {Date} filters.startDate - 开始时间
    * @param {Date} filters.endDate - 结束时间
    * @param {string} filters.period - 时间段类型：day, week, month
-   * @returns {Promise<Array>} 时间段统计数据
+   * @returns {Promise<Array>} 时间段统计数据，按模型分组
    */
   async getUsageTrend(filters = {}) {
+    // 基于 AICallLog 表统计，因为只有这里有 modelId 和 cost 信息
     const where = {
-      type: 'decrease' // 只统计使用（减少）的记录
+      status: 'success' // 只统计成功的调用
     };
 
     if (filters.userId) {
       where.userId = filters.userId;
     }
 
-    if (filters.packageId) {
-      where.packageId = filters.packageId;
-    }
-
     if (filters.startDate) {
-      where.createdAt = { ...where.createdAt, gte: new Date(filters.startDate) };
+      where.requestTime = { ...where.requestTime, gte: new Date(filters.startDate) };
     }
 
     if (filters.endDate) {
-      where.createdAt = { ...where.createdAt, lte: new Date(filters.endDate) };
+      where.requestTime = { ...where.requestTime, lte: new Date(filters.endDate) };
     }
 
     const period = filters.period || 'day';
 
-    // 获取所有符合条件的记录
-    const records = await prisma.quotaRecord.findMany({
+    // 获取所有符合条件的调用日志记录
+    const logs = await prisma.aICallLog.findMany({
       where,
       select: {
-        createdAt: true,
-        amount: true
+        modelId: true,
+        cost: true,
+        requestTime: true,
+        model: {
+          select: {
+            id: true,
+            name: true,
+            displayName: true,
+            provider: {
+              select: {
+                id: true,
+                name: true,
+                displayName: true
+              }
+            }
+          }
+        }
       },
       orderBy: {
-        createdAt: 'asc'
+        requestTime: 'asc'
       }
     });
 
-    // 按时间段分组统计
+    // 按模型和时间段分组统计
     const grouped = {};
-    records.forEach(record => {
-      const date = new Date(record.createdAt);
-      let key = '';
+    logs.forEach(log => {
+      const date = new Date(log.requestTime);
+      let periodKey = '';
 
       if (period === 'day') {
-        key = date.toISOString().split('T')[0]; // YYYY-MM-DD
+        periodKey = date.toISOString().split('T')[0]; // YYYY-MM-DD
       } else if (period === 'week') {
         const week = QuotaRecordRepository.getWeekNumber(date);
-        key = `${date.getFullYear()}-W${String(week).padStart(2, '0')}`;
+        periodKey = `${date.getFullYear()}-W${String(week).padStart(2, '0')}`;
       } else if (period === 'month') {
-        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       }
+
+      const modelId = log.modelId;
+      const key = `${modelId}_${periodKey}`;
 
       if (!grouped[key]) {
         grouped[key] = {
-          period: key,
-          totalAmount: 0,
+          modelId: modelId,
+          model: log.model || null,
+          period: periodKey,
+          totalCost: 0,
           totalCount: 0
         };
       }
-      grouped[key].totalAmount += parseFloat(record.amount || 0);
+      // 处理cost字段（可能是BigInt或Decimal）
+      const cost = typeof log.cost === 'bigint' 
+        ? parseFloat(log.cost.toString()) 
+        : parseFloat(log.cost || 0);
+      grouped[key].totalCost += cost;
       grouped[key].totalCount += 1;
     });
 
-    return Object.values(grouped).sort((a, b) => a.period.localeCompare(b.period));
+    // 转换为数组并按模型和时间段排序
+    const result = Object.values(grouped).sort((a, b) => {
+      // 先按模型ID排序，再按时间段排序
+      if (a.modelId !== b.modelId) {
+        return a.modelId.localeCompare(b.modelId);
+      }
+      return a.period.localeCompare(b.period);
+    });
+
+    // 按模型分组组织数据
+    const modelGroups = {};
+    result.forEach(item => {
+      if (!modelGroups[item.modelId]) {
+        modelGroups[item.modelId] = {
+          modelId: item.modelId,
+          model: item.model,
+          trends: []
+        };
+      }
+      modelGroups[item.modelId].trends.push({
+        period: item.period,
+        totalCost: parseFloat(item.totalCost) || 0, // 确保转换为数字
+        totalCount: item.totalCount
+      });
+    });
+
+    // 对每个模型的trends数组按时间段排序
+    Object.values(modelGroups).forEach(group => {
+      group.trends.sort((a, b) => a.period.localeCompare(b.period));
+    });
+
+    // 返回按模型分组的数组
+    return Object.values(modelGroups);
   }
 
   /**

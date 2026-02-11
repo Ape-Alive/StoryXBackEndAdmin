@@ -469,7 +469,7 @@ const formData = reactive({
   priceUnit: 'CNY',
   discount: null,
   maxDevices: null,
-  availableModels: null,
+  availableModels: [], // 改为空数组，el-select 多选需要数组类型
   isStackable: false,
   priority: 0,
   isActive: true
@@ -556,7 +556,7 @@ async function loadModels() {
 
 // 计算是否全选
 const isAllModelsSelected = computed(() => {
-  if (!formData.availableModels || !Array.isArray(formData.availableModels)) {
+  if (!Array.isArray(formData.availableModels) || formData.availableModels.length === 0) {
     return false
   }
   return (
@@ -568,7 +568,7 @@ const isAllModelsSelected = computed(() => {
 function handleSelectAllModels() {
   if (isAllModelsSelected.value) {
     // 如果已全选，则取消全选
-    formData.availableModels = null
+    formData.availableModels = []
   } else {
     // 全选所有模型
     formData.availableModels = modelOptions.value.map(model => model.id)
@@ -591,7 +591,7 @@ async function handleAdd() {
     priceUnit: 'CNY',
     discount: null,
     maxDevices: null,
-    availableModels: null,
+    availableModels: [], // 改为空数组
     isStackable: false,
     priority: 0,
     isActive: true
@@ -610,8 +610,12 @@ async function handleEdit(row) {
     try {
       availableModels = JSON.parse(availableModels)
     } catch (e) {
-      availableModels = null
+      availableModels = []
     }
+  }
+  // 确保是数组类型，null 或 undefined 转为空数组
+  if (!Array.isArray(availableModels)) {
+    availableModels = []
   }
 
   Object.assign(formData, {
@@ -788,17 +792,20 @@ function handleSubmit() {
 
       // availableModels: 处理多选值，过滤掉全选标记，如果是空数组或 null，传 null
       if (Array.isArray(payload.availableModels)) {
-        // 过滤掉全选标记
-        payload.availableModels = payload.availableModels.filter(id => id !== '__select_all__')
+        // 过滤掉全选标记和无效值
+        payload.availableModels = payload.availableModels.filter(id => {
+          return id !== '__select_all__' && id !== null && id !== undefined
+        })
 
-        // 如果过滤后为空数组，设为 null
+        // 如果过滤后为空数组，设为 null（表示所有模型都可用）
         if (payload.availableModels.length === 0) {
           payload.availableModels = null
         } else {
           // 转换为 JSON 字符串数组（后端期望的格式）
           payload.availableModels = JSON.stringify(payload.availableModels)
         }
-      } else if (!payload.availableModels) {
+      } else {
+        // 如果不是数组，设为 null
         payload.availableModels = null
       }
 

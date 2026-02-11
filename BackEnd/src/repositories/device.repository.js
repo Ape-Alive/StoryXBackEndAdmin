@@ -24,7 +24,8 @@ class DeviceRepository {
     }
 
     if (filters.deviceFingerprint) {
-      where.deviceFingerprint = { contains: filters.deviceFingerprint };
+      // 精确匹配设备指纹
+      where.deviceFingerprint = filters.deviceFingerprint;
     }
 
     if (filters.status) {
@@ -32,7 +33,8 @@ class DeviceRepository {
     }
 
     if (filters.ipAddress) {
-      where.ipAddress = { contains: filters.ipAddress };
+      // 精确匹配IP地址
+      where.ipAddress = filters.ipAddress;
     }
 
     if (filters.lastUsedAt) {
@@ -57,12 +59,11 @@ class DeviceRepository {
 
     // 构建排序
     const orderBy = {};
-    if (sort.lastUsedAt) {
-      orderBy.lastUsedAt = sort.lastUsedAt;
-    } else if (sort.createdAt) {
-      orderBy.createdAt = sort.createdAt;
+    if (sort.orderBy === 'createdAt') {
+      orderBy.createdAt = sort.order || 'desc';
     } else {
-      orderBy.lastUsedAt = 'desc';
+      // 默认按最后使用时间排序
+      orderBy.lastUsedAt = sort.order || 'desc';
     }
 
     const [data, total] = await Promise.all([

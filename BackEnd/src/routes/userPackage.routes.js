@@ -16,9 +16,10 @@ const { body, param, query } = require('express-validator');
  *       公开接口，无需认证即可访问，用于客户端展示可订阅的套餐列表。
  *
  *       **安全防护：**
- *       - 已添加速率限制防护，每个IP地址在15分钟内最多允许100次请求
+ *       - 已添加速率限制防护，每个IP地址在15分钟内最多允许300次请求
  *       - 超过限制将返回429状态码，响应中包含重试时间（retryAfter字段）
  *       - 使用真实IP地址识别（支持代理环境）
+ *       - 建议前端添加缓存机制，避免频繁重复请求
  *
  *       **返回说明：**
  *       - 仅返回已启用（isActive=true）的套餐
@@ -65,12 +66,12 @@ const { body, param, query } = require('express-validator');
  *             description: 速率限制窗口内的最大请求数
  *             schema:
  *               type: integer
- *               example: 100
+ *               example: 300
  *           RateLimit-Remaining:
  *             description: 当前窗口内剩余的请求数
  *             schema:
  *               type: integer
- *               example: 95
+ *               example: 295
  *           RateLimit-Reset:
  *             description: 速率限制重置时间（Unix时间戳，秒）
  *             schema:
@@ -251,18 +252,24 @@ router.use(authenticate);
  *       - 如果套餐不可叠加（isStackable=false），且用户已有其他套餐，则不能订阅
  *       - 如果套餐可叠加（isStackable=true），用户可以同时拥有多个该套餐
  *
+ *       **重新购买（续费）规则：**
+ *       - 如果用户已订阅该套餐，但套餐已过期，允许重新购买（续费）
+ *       - 如果用户已订阅该套餐，套餐未过期但积分已用完（available + frozen = 0），也允许重新购买（续费）
+ *       - 重新购买时会更新套餐的开始时间和过期时间，并重新初始化用户额度
+ *       - 重新购买时会重新创建API Key（如果提供商支持）
+ *
  *       **订阅后的操作：**
- *       - 自动创建用户套餐关系
+ *       - 自动创建用户套餐关系（如果不存在）或更新现有关系（如果重新购买）
  *       - 根据套餐的有效期（duration和durationUnit）计算过期时间
- *       - 如果套餐有额度（quota），会自动初始化用户额度
+ *       - 如果套餐有额度（quota），会自动初始化用户额度（重新购买时会重置或增加额度）
  *       - 如果套餐是永久套餐（duration为null），则过期时间也为null
  *
  *       **优先级说明：**
- *       - priority参数可选，如果不提供，则使用套餐的默认优先级
+ *       - priority参数可选，如果不提供，则使用套餐的默认优先级（重新购买时保留原优先级）
  *       - 优先级用于多个套餐时的排序和选择
  *
  *       **注意事项：**
- *       - 如果用户已订阅该套餐且套餐不可叠加，会返回409错误
+ *       - 如果用户已订阅该套餐且套餐未过期且还有积分，且套餐不可叠加，会返回409错误
  *       - 如果套餐已禁用，会返回404错误
  *       - 付费套餐必须通过创建订单的方式购买
  *     tags: [套餐订阅]
@@ -334,14 +341,22 @@ router.use(authenticate);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       409:
- *         description: 已订阅该套餐或套餐不可叠加
+ *         description: 已订阅该套餐且套餐未过期且还有积分，且套餐不可叠加
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
- *             example:
- *               success: false
- *               message: "User already has this package and it is not stackable"
+ *             examples:
+ *               activePackage:
+ *                 summary: 套餐未过期且还有积分
+ *                 value:
+ *                   success: false
+ *                   message: "User already has this package and it is still active"
+ *               notStackable:
+ *                 summary: 套餐不可叠加
+ *                 value:
+ *                   success: false
+ *                   message: "User already has this package and it is not stackable"
  */
 router.post(
     '/subscribe',
@@ -368,13 +383,33 @@ router.post(
  *
  *       **返回数据：**
  *       - 包含套餐的完整信息（套餐详情、有效期、优先级等）
+ *       - 包含套餐状态（status）和不可用原因（unavailableReason）
+ *       - 包含积分信息（quotaInfo），如果套餐有积分配置
  *       - 按优先级（priority）降序排列
  *       - 支持分页查询
  *
- *       **套餐状态说明：**
- *       - 活跃套餐：已开始且未过期（或永久套餐）
- *       - 已过期套餐：expiresAt小于当前时间
- *       - 未开始套餐：startedAt大于当前时间（通常不会出现）
+ *       **套餐状态（status）说明：**
+ *       - `active`：套餐可用（已开始、未过期、有积分或无需积分）
+ *       - `expired`：套餐已过期
+ *       - `no_quota`：积分已用完（套餐有积分配置但可用积分 <= 0）
+ *       - `inactive`：套餐已禁用
+ *       - `not_started`：套餐尚未开始（startedAt > 当前时间，通常不会出现）
+ *
+ *       **不可用原因（unavailableReason）说明：**
+ *       - 当 `status` 为 `active` 时，`unavailableReason` 为 `null`
+ *       - 当 `status` 为 `expired` 时，`unavailableReason` 为 `"套餐已过期"`
+ *       - 当 `status` 为 `no_quota` 时，`unavailableReason` 为 `"积分已用完"`
+ *       - 当 `status` 为 `inactive` 时，`unavailableReason` 为 `"套餐已禁用"`
+ *       - 当 `status` 为 `not_started` 时，`unavailableReason` 为 `"套餐尚未开始"`
+ *
+ *       **积分信息（quotaInfo）说明：**
+ *       - 如果套餐有积分配置（package.quota），返回积分详情
+ *       - `available`：可用积分
+ *       - `frozen`：冻结积分
+ *       - `used`：已使用积分
+ *       - `total`：套餐总积分
+ *       - `remaining`：剩余积分（available + frozen）
+ *       - 如果套餐没有积分配置，`quotaInfo` 为 `null`
  *     tags: [套餐订阅]
  *     security:
  *       - bearerAuth: []
@@ -440,6 +475,47 @@ router.post(
  *                       priority:
  *                         type: integer
  *                         description: 优先级，数字越大优先级越高
+ *                       status:
+ *                         type: string
+ *                         enum: [active, expired, no_quota, inactive, not_started]
+ *                         description: |
+ *                           套餐状态
+ *                           - active：套餐可用
+ *                           - expired：套餐已过期
+ *                           - no_quota：积分已用完
+ *                           - inactive：套餐已禁用
+ *                           - not_started：套餐尚未开始
+ *                         example: "active"
+ *                       unavailableReason:
+ *                         type: string
+ *                         nullable: true
+ *                         description: 不可用原因，当status为active时为null
+ *                         example: null
+ *                       quotaInfo:
+ *                         type: object
+ *                         nullable: true
+ *                         description: 积分信息，如果套餐有积分配置则返回，否则为null
+ *                         properties:
+ *                           available:
+ *                             type: number
+ *                             description: 可用积分
+ *                             example: 5000.00
+ *                           frozen:
+ *                             type: number
+ *                             description: 冻结积分
+ *                             example: 100.00
+ *                           used:
+ *                             type: number
+ *                             description: 已使用积分
+ *                             example: 4900.00
+ *                           total:
+ *                             type: number
+ *                             description: 套餐总积分
+ *                             example: 10000.00
+ *                           remaining:
+ *                             type: number
+ *                             description: 剩余积分（available + frozen）
+ *                             example: 5100.00
  *                       createdAt:
  *                         type: string
  *                         format: date-time
@@ -489,6 +565,74 @@ router.post(
  *                   type: integer
  *                   description: 每页数量
  *                   example: 20
+ *             examples:
+ *               activePackage:
+ *                 summary: 可用套餐（有积分）
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     - id: "clx987654321"
+ *                       userId: "clx111111111"
+ *                       packageId: "clx123456789"
+ *                       startedAt: "2024-01-01T00:00:00.000Z"
+ *                       expiresAt: "2024-02-01T00:00:00.000Z"
+ *                       priority: 10
+ *                       status: "active"
+ *                       unavailableReason: null
+ *                       quotaInfo:
+ *                         available: 5000.00
+ *                         frozen: 100.00
+ *                         used: 4900.00
+ *                         total: 10000.00
+ *                         remaining: 5100.00
+ *                       package:
+ *                         id: "clx123456789"
+ *                         name: "premium_monthly"
+ *                         displayName: "高级套餐（月付）"
+ *                         quota: 10000.00
+ *               expiredPackage:
+ *                 summary: 已过期套餐
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     - id: "clx987654322"
+ *                       userId: "clx111111111"
+ *                       packageId: "clx123456790"
+ *                       startedAt: "2023-12-01T00:00:00.000Z"
+ *                       expiresAt: "2023-12-31T23:59:59.000Z"
+ *                       priority: 5
+ *                       status: "expired"
+ *                       unavailableReason: "套餐已过期"
+ *                       quotaInfo: null
+ *                       package:
+ *                         id: "clx123456790"
+ *                         name: "trial_weekly"
+ *                         displayName: "试用套餐（周）"
+ *                         quota: 1000.00
+ *               noQuotaPackage:
+ *                 summary: 积分已用完的套餐
+ *                 value:
+ *                   success: true
+ *                   data:
+ *                     - id: "clx987654323"
+ *                       userId: "clx111111111"
+ *                       packageId: "clx123456791"
+ *                       startedAt: "2024-01-01T00:00:00.000Z"
+ *                       expiresAt: "2024-02-01T00:00:00.000Z"
+ *                       priority: 8
+ *                       status: "no_quota"
+ *                       unavailableReason: "积分已用完"
+ *                       quotaInfo:
+ *                         available: 0.00
+ *                         frozen: 0.00
+ *                         used: 10000.00
+ *                         total: 10000.00
+ *                         remaining: 0.00
+ *                       package:
+ *                         id: "clx123456791"
+ *                         name: "basic_monthly"
+ *                         displayName: "基础套餐（月付）"
+ *                         quota: 10000.00
  */
 router.get(
     '/my-packages',

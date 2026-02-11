@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
  */
 const publicApiLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 分钟
-    max: 100, // 限制每个 IP 在 15 分钟内最多 100 次请求
+    max: 300, // 限制每个 IP 在 15 分钟内最多 300 次请求（从100增加到300，避免前端频繁调用触发限流）
     message: {
         success: false,
         message: '请求过于频繁，请稍后再试'

@@ -378,7 +378,15 @@ router.patch(
  * @swagger
  * /api/users/{userId}/devices:
  *   get:
- *     summary: 获取用户设备列表
+ *     summary: 获取用户设备列表（管理员）
+ *     description: |
+ *       管理员获取指定用户的所有设备列表，支持分页。
+ *       
+ *       **权限说明**：
+ *       - super_admin、platform_admin、operator、read_only 可访问
+ *       
+ *       **排序说明**：
+ *       - 默认按最后使用时间降序排列（最近使用的在前）
  *     tags: [终端用户管理]
  *     security:
  *       - bearerAuth: []
@@ -389,18 +397,24 @@ router.patch(
  *         schema:
  *           type: string
  *         description: 用户ID
+ *         example: "clx987654321"
  *       - in: query
  *         name: page
  *         schema:
  *           type: integer
  *           default: 1
- *         description: 页码
+ *           minimum: 1
+ *         description: 页码（从1开始）
+ *         example: 1
  *       - in: query
  *         name: pageSize
  *         schema:
  *           type: integer
  *           default: 20
- *         description: 每页数量
+ *           minimum: 1
+ *           maximum: 100
+ *         description: 每页数量（最大100）
+ *         example: 20
  *     responses:
  *       200:
  *         description: 获取成功
@@ -418,27 +432,60 @@ router.patch(
  *                         properties:
  *                           id:
  *                             type: string
- *                             example: clx123456789
+ *                             description: 设备ID
+ *                             example: "clx123456789"
  *                           userId:
  *                             type: string
- *                             example: clx987654321
- *                           fingerprint:
+ *                             description: 用户ID
+ *                             example: "clx987654321"
+ *                           deviceFingerprint:
  *                             type: string
- *                             example: device_fingerprint_hash_12345
+ *                             description: 设备指纹
+ *                             example: "device_fingerprint_hash_12345"
+ *                           name:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 设备名称（用户自定义）
+ *                           remark:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 备注
  *                           ipAddress:
  *                             type: string
  *                             nullable: true
+ *                             description: IP地址
  *                             example: "192.168.1.100"
+ *                           region:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 地区
+ *                           status:
+ *                             type: string
+ *                             enum: [active, revoked]
+ *                             description: 设备状态（active=活跃，revoked=已撤销）
+ *                             example: "active"
  *                           lastUsedAt:
  *                             type: string
  *                             format: date-time
+ *                             description: 最后使用时间
  *                             example: "2024-01-15T10:30:00Z"
  *                           createdAt:
  *                             type: string
  *                             format: date-time
+ *                             description: 创建时间
  *                             example: "2024-01-01T08:00:00Z"
+ *                           updatedAt:
+ *                             type: string
+ *                             format: date-time
+ *                             description: 更新时间
  *                     pagination:
  *                       $ref: '#/components/schemas/Pagination'
+ *       401:
+ *         description: 未认证或token无效
+ *       403:
+ *         description: 权限不足
+ *       404:
+ *         description: 用户不存在
  */
 // 获取用户设备列表
 router.get(
@@ -453,7 +500,16 @@ router.get(
  * @swagger
  * /api/users/{userId}/devices:
  *   delete:
- *     summary: 强制解绑用户设备
+ *     summary: 强制解绑用户设备（管理员）
+ *     description: |
+ *       管理员强制解绑指定用户的设备，将设备状态设置为 revoked（已撤销）。
+ *       
+ *       **权限说明**：
+ *       - super_admin、platform_admin、operator 可访问
+ *       
+ *       **注意事项**：
+ *       - 解绑后设备将无法继续使用
+ *       - 操作会记录到操作日志中
  *     tags: [终端用户管理]
  *     security:
  *       - bearerAuth: []
@@ -464,6 +520,7 @@ router.get(
  *         schema:
  *           type: string
  *         description: 用户ID
+ *         example: "clx987654321"
  *     requestBody:
  *       required: true
  *       content:
@@ -475,7 +532,7 @@ router.get(
  *             properties:
  *               deviceId:
  *                 type: string
- *                 example: clx123456789
+ *                 example: "clx123456789"
  *                 description: 设备ID
  *     responses:
  *       200:
@@ -490,8 +547,14 @@ router.get(
  *                   success: true
  *                   message: Device unbound successfully
  *                   data: null
+ *       400:
+ *         description: 请求参数错误（deviceId 缺失）
+ *       401:
+ *         description: 未认证或token无效
+ *       403:
+ *         description: 权限不足
  *       404:
- *         description: 设备不存在
+ *         description: 用户不存在或设备不存在
  */
 // 强制解绑设备
 router.delete(
@@ -643,7 +706,17 @@ router.patch(
  * @swagger
  * /api/users/{userId}/devices/batch:
  *   delete:
- *     summary: 批量解绑用户设备
+ *     summary: 批量解绑用户设备（管理员）
+ *     description: |
+ *       管理员批量强制解绑指定用户的多个设备，将设备状态设置为 revoked（已撤销）。
+ *       
+ *       **权限说明**：
+ *       - super_admin、platform_admin、operator 可访问
+ *       
+ *       **注意事项**：
+ *       - 解绑后设备将无法继续使用
+ *       - 操作会记录到操作日志中
+ *       - 如果某个设备不存在，会跳过该设备继续处理其他设备
  *     tags: [终端用户管理]
  *     security:
  *       - bearerAuth: []
@@ -654,6 +727,7 @@ router.patch(
  *         schema:
  *           type: string
  *         description: 用户ID
+ *         example: "clx987654321"
  *     requestBody:
  *       required: true
  *       content:
@@ -668,7 +742,7 @@ router.patch(
  *                 items:
  *                   type: string
  *                 example: ["clx123456789", "clx987654321"]
- *                 description: 设备ID数组
+ *                 description: 设备ID数组（至少包含一个设备ID）
  *     responses:
  *       200:
  *         description: 解绑成功
@@ -683,6 +757,13 @@ router.patch(
  *                   message: Devices unbound successfully
  *                   data:
  *                     count: 2
+ *                     failed: 0
+ *       400:
+ *         description: 请求参数错误（deviceIds 为空或不是数组）
+ *       401:
+ *         description: 未认证或token无效
+ *       403:
+ *         description: 权限不足
  *       404:
  *         description: 用户不存在
  */

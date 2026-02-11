@@ -336,7 +336,7 @@ router.get(
  *   get:
  *     summary: 获取我的使用趋势 [仅终端用户]
  *     description: |
- *       终端用户查询自己的使用趋势，按时间段（日/周/月）统计额度使用情况。
+ *       终端用户查询自己的使用趋势，按时间段（日/周/月）和模型统计额度消耗情况。
  *
  *       **权限说明：**
  *       - 只能查询自己的使用趋势
@@ -348,31 +348,30 @@ router.get(
  *       - month：按月统计，返回格式为 "YYYY-MM"，如 "2024-01"
  *
  *       **筛选参数：**
- *       - packageId：可选，按套餐ID筛选，只统计该套餐的使用情况
  *       - startDate：可选，开始时间，ISO 8601格式
  *       - endDate：可选，结束时间，ISO 8601格式
  *       - period：可选，时间段类型，默认为 "day"
  *
  *       **统计说明：**
- *       - 只统计额度使用记录（type='decrease'），不包括增加、冻结、解冻等操作
- *       - 每个时间段返回该时间段内的总使用额度和总使用次数
- *       - 数据按时间段升序排列
+ *       - 基于AI调用日志（AICallLog）统计，只统计成功的调用（status='success'）
+ *       - 按模型分组，每个模型包含该时间段内的消耗趋势
+ *       - 每个时间段返回该时间段内的总消耗额度（totalCost）和总调用次数（totalCount）
+ *       - 数据按模型ID和时间段排序
+ *
+ *       **返回数据结构：**
+ *       - 返回数组，每个元素代表一个模型的使用趋势
+ *       - 每个模型包含：modelId、model信息（名称、显示名称、提供商）、trends数组
+ *       - trends数组包含该模型在不同时间段的使用情况
  *
  *       **使用场景：**
- *       - 查看每日使用趋势，了解使用规律
- *       - 查看每周使用趋势，分析周度变化
- *       - 查看每月使用趋势，分析月度变化
- *       - 对比不同套餐的使用趋势
+ *       - 查看不同模型在每日的使用趋势，了解各模型的使用规律
+ *       - 查看不同模型在每周的使用趋势，分析周度变化
+ *       - 查看不同模型在每月的使用趋势，分析月度变化
+ *       - 对比不同模型的消耗情况
  *     tags: [终端用户额度管理]
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: query
- *         name: packageId
- *         schema:
- *           type: string
- *         description: 套餐ID（可选）。如果提供，只统计该套餐的使用趋势；如果不提供，统计所有套餐的使用趋势
- *         example: "clx123456789"
  *       - in: query
  *         name: startDate
  *         schema:
@@ -401,25 +400,156 @@ router.get(
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Success'
- *             example:
- *               success: true
- *               message: "My usage trend retrieved successfully"
- *               data:
- *                 - period: "2024-01-01"
- *                   totalAmount: 500.00
- *                   totalCount: 5
- *                 - period: "2024-01-02"
- *                   totalAmount: 800.00
- *                   totalCount: 8
- *                 - period: "2024-01-03"
- *                   totalAmount: 600.00
- *                   totalCount: 6
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: array
+ *                       description: 按模型分组的使用趋势数据
+ *                       items:
+ *                         type: object
+ *                         properties:
+ *                           modelId:
+ *                             type: string
+ *                             example: "model_123"
+ *                             description: 模型ID
+ *                           model:
+ *                             type: object
+ *                             description: 模型信息
+ *                             properties:
+ *                               id:
+ *                                 type: string
+ *                                 example: "model_123"
+ *                               name:
+ *                                 type: string
+ *                                 example: "deepseek-chat"
+ *                                 description: 模型名称（内部标识）
+ *                               displayName:
+ *                                 type: string
+ *                                 example: "DeepSeek Chat"
+ *                                 description: 模型显示名称
+ *                               provider:
+ *                                 type: object
+ *                                 description: 模型提供商信息
+ *                                 properties:
+ *                                   id:
+ *                                     type: string
+ *                                     example: "provider_123"
+ *                                   name:
+ *                                     type: string
+ *                                     example: "DeepSeek"
+ *                                   displayName:
+ *                                     type: string
+ *                                     example: "DeepSeek AI"
+ *                           trends:
+ *                             type: array
+ *                             description: 该模型在不同时间段的使用趋势
+ *                             items:
+ *                               type: object
+ *                               properties:
+ *                                 period:
+ *                                   type: string
+ *                                   example: "2024-01-01"
+ *                                   description: 时间段标识（格式取决于period参数）
+ *                                 totalCost:
+ *                                   type: number
+ *                                   example: 500.00
+ *                                   description: 该时间段内的总消耗额度（积分）
+ *                                 totalCount:
+ *                                   type: integer
+ *                                   example: 5
+ *                                   description: 该时间段内的总调用次数
+ *             examples:
+ *               example1:
+ *                 summary: 按日统计的使用趋势
+ *                 value:
+ *                   success: true
+ *                   message: "My usage trend retrieved successfully"
+ *                   data:
+ *                     - modelId: "model_123"
+ *                       model:
+ *                         id: "model_123"
+ *                         name: "deepseek-chat"
+ *                         displayName: "DeepSeek Chat"
+ *                         provider:
+ *                           id: "provider_123"
+ *                           name: "DeepSeek"
+ *                           displayName: "DeepSeek AI"
+ *                       trends:
+ *                         - period: "2024-01-01"
+ *                           totalCost: 500.00
+ *                           totalCount: 5
+ *                         - period: "2024-01-02"
+ *                           totalCost: 800.00
+ *                           totalCount: 8
+ *                         - period: "2024-01-03"
+ *                           totalCost: 600.00
+ *                           totalCount: 6
+ *                     - modelId: "model_456"
+ *                       model:
+ *                         id: "model_456"
+ *                         name: "gpt-4"
+ *                         displayName: "GPT-4"
+ *                         provider:
+ *                           id: "provider_456"
+ *                           name: "OpenAI"
+ *                           displayName: "OpenAI"
+ *                       trends:
+ *                         - period: "2024-01-01"
+ *                           totalCost: 300.00
+ *                           totalCount: 3
+ *                         - period: "2024-01-02"
+ *                           totalCost: 400.00
+ *                           totalCount: 4
+ *               example2:
+ *                 summary: 按周统计的使用趋势
+ *                 value:
+ *                   success: true
+ *                   message: "My usage trend retrieved successfully"
+ *                   data:
+ *                     - modelId: "model_123"
+ *                       model:
+ *                         id: "model_123"
+ *                         name: "deepseek-chat"
+ *                         displayName: "DeepSeek Chat"
+ *                         provider:
+ *                           id: "provider_123"
+ *                           name: "DeepSeek"
+ *                           displayName: "DeepSeek AI"
+ *                       trends:
+ *                         - period: "2024-W01"
+ *                           totalCost: 3500.00
+ *                           totalCount: 35
+ *                         - period: "2024-W02"
+ *                           totalCost: 4200.00
+ *                           totalCount: 42
+ *               example3:
+ *                 summary: 按月统计的使用趋势
+ *                 value:
+ *                   success: true
+ *                   message: "My usage trend retrieved successfully"
+ *                   data:
+ *                     - modelId: "model_123"
+ *                       model:
+ *                         id: "model_123"
+ *                         name: "deepseek-chat"
+ *                         displayName: "DeepSeek Chat"
+ *                         provider:
+ *                           id: "provider_123"
+ *                           name: "DeepSeek"
+ *                           displayName: "DeepSeek AI"
+ *                       trends:
+ *                         - period: "2024-01"
+ *                           totalCost: 15000.00
+ *                           totalCount: 150
+ *                         - period: "2024-02"
+ *                           totalCost: 18000.00
+ *                           totalCount: 180
  */
 router.get(
   '/usage/trend',
   [
-    query('packageId').optional().isString().withMessage('Package ID must be a string'),
     query('startDate').optional().isISO8601().withMessage('Start date must be a valid ISO 8601 date'),
     query('endDate').optional().isISO8601().withMessage('End date must be a valid ISO 8601 date'),
     query('period').optional().isIn(['day', 'week', 'month']).withMessage('Period must be day, week, or month')

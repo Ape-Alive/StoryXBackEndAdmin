@@ -426,7 +426,6 @@ class QuotaController {
 
       const filters = {
         userId: userId, // 强制使用当前登录用户的ID
-        packageId: req.query.packageId,
         startDate: req.query.startDate,
         endDate: req.query.endDate,
         period: req.query.period || 'day'

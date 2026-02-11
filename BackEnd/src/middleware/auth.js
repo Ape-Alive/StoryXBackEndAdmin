@@ -22,7 +22,14 @@ const authenticate = (req, res, next) => {
     if (error.name === 'JsonWebTokenError') {
       next(new UnauthorizedError('Invalid token'));
     } else if (error.name === 'TokenExpiredError') {
-      next(new UnauthorizedError('Token expired'));
+      // Token过期，返回更详细的错误信息
+      const expiredAt = error.expiredAt ? new Date(error.expiredAt * 1000).toISOString() : null;
+      const message = expiredAt 
+        ? `Token expired at ${expiredAt}. Please login again to get a new token.`
+        : 'Token expired. Please login again to get a new token.';
+      const expiredError = new UnauthorizedError(message);
+      expiredError.expiredAt = expiredAt;
+      next(expiredError);
     } else {
       next(error);
     }

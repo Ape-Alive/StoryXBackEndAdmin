@@ -1,0 +1,1003 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "设备管理"
+    }
+  ],
+  "paths": {
+    "/api/devices": {
+      "get": {
+        "summary": "获取设备列表（管理员）",
+        "deprecated": false,
+        "description": "管理员获取所有设备列表，支持多条件筛选、分页和排序。\n\n**权限说明**：\n- super_admin、platform_admin、operator、risk_control、read_only 可访问\n\n**筛选说明**：\n- 所有筛选参数都是可选的，可以组合使用\n- 支持精确匹配：deviceId、userId、deviceFingerprint、status、ipAddress\n- 支持时间范围筛选：lastUsedStart/lastUsedEnd（最后使用时间）、startDate/endDate（创建时间）\n\n**排序说明**：\n- 默认按最后使用时间降序排列（最近使用的在前）\n- 支持按创建时间或最后使用时间排序\n",
+        "tags": [
+          "设备管理"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码（从1开始）",
+            "required": false,
+            "example": 1,
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "每页数量（最大100）",
+            "required": false,
+            "example": 20,
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "deviceId",
+            "in": "query",
+            "description": "设备ID（精确匹配）",
+            "required": false,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "用户ID（精确匹配）",
+            "required": false,
+            "example": "clx987654321",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "deviceFingerprint",
+            "in": "query",
+            "description": "设备指纹（精确匹配）",
+            "required": false,
+            "example": "device_fingerprint_hash_12345",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "设备状态筛选（active=活跃，revoked=已撤销）",
+            "required": false,
+            "example": "active",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "active",
+                "revoked"
+              ]
+            }
+          },
+          {
+            "name": "ipAddress",
+            "in": "query",
+            "description": "IP地址（精确匹配）",
+            "required": false,
+            "example": "192.168.1.100",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "lastUsedStart",
+            "in": "query",
+            "description": "最后使用开始时间（ISO 8601格式）",
+            "required": false,
+            "example": "2024-01-01T00:00:00Z",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "lastUsedEnd",
+            "in": "query",
+            "description": "最后使用结束时间（ISO 8601格式）",
+            "required": false,
+            "example": "2024-12-31T23:59:59Z",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "创建开始时间（ISO 8601格式）",
+            "required": false,
+            "example": "2024-01-01T00:00:00Z",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "创建结束时间（ISO 8601格式）",
+            "required": false,
+            "example": "2024-12-31T23:59:59Z",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "orderBy",
+            "in": "query",
+            "description": "排序字段（createdAt=创建时间，lastUsedAt=最后使用时间）",
+            "required": false,
+            "example": "lastUsedAt",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "createdAt",
+                "lastUsedAt"
+              ],
+              "default": "lastUsedAt"
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "description": "排序顺序（asc=升序，desc=降序）",
+            "required": false,
+            "example": "desc",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "default": "desc"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "description": "设备ID",
+                                "example": "clx123456789"
+                              },
+                              "userId": {
+                                "type": "string",
+                                "description": "用户ID",
+                                "example": "clx987654321"
+                              },
+                              "deviceFingerprint": {
+                                "type": "string",
+                                "description": "设备指纹",
+                                "example": "device_fingerprint_hash_12345"
+                              },
+                              "name": {
+                                "type": "string",
+                                "description": "设备名称（用户自定义）",
+                                "nullable": true,
+                                "example": "我的电脑"
+                              },
+                              "remark": {
+                                "type": "string",
+                                "description": "备注",
+                                "nullable": true,
+                                "example": "公司办公电脑"
+                              },
+                              "ipAddress": {
+                                "type": "string",
+                                "description": "IP地址",
+                                "nullable": true,
+                                "example": "192.168.1.100"
+                              },
+                              "region": {
+                                "type": "string",
+                                "description": "地区",
+                                "nullable": true,
+                                "example": "北京"
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "active",
+                                  "revoked"
+                                ],
+                                "description": "设备状态（active=活跃，revoked=已撤销）",
+                                "example": "active"
+                              },
+                              "lastUsedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "最后使用时间",
+                                "example": "2024-01-15T10:30:00Z"
+                              },
+                              "createdAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "创建时间",
+                                "example": "2024-01-01T08:00:00Z"
+                              },
+                              "updatedAt": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "更新时间",
+                                "example": "2024-01-15T10:30:00Z"
+                              },
+                              "user": {
+                                "type": "object",
+                                "description": "用户信息",
+                                "properties": {
+                                  "id": {
+                                    "type": "string",
+                                    "description": "用户ID"
+                                  },
+                                  "email": {
+                                    "type": "string",
+                                    "format": "email",
+                                    "description": "用户邮箱",
+                                    "example": "user@example.com"
+                                  },
+                                  "phone": {
+                                    "type": "string",
+                                    "description": "用户手机号",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "pagination": {
+                          "$ref": "#/components/schemas/Pagination"
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证或token无效",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices/{id}": {
+      "get": {
+        "summary": "获取设备详情（管理员）",
+        "deprecated": false,
+        "description": "管理员获取指定设备的详细信息，包括设备基本信息和关联用户信息。\n\n**权限说明**：\n- super_admin、platform_admin、operator、risk_control、read_only 可访问\n",
+        "tags": [
+          "设备管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "设备ID",
+                              "example": "clx123456789"
+                            },
+                            "userId": {
+                              "type": "string",
+                              "description": "用户ID",
+                              "example": "clx987654321"
+                            },
+                            "deviceFingerprint": {
+                              "type": "string",
+                              "description": "设备指纹",
+                              "example": "device_fingerprint_hash_12345"
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "设备名称（用户自定义）",
+                              "nullable": true,
+                              "example": "我的电脑"
+                            },
+                            "remark": {
+                              "type": "string",
+                              "description": "备注",
+                              "nullable": true,
+                              "example": "公司办公电脑"
+                            },
+                            "ipAddress": {
+                              "type": "string",
+                              "description": "IP地址",
+                              "nullable": true,
+                              "example": "192.168.1.100"
+                            },
+                            "region": {
+                              "type": "string",
+                              "description": "地区",
+                              "nullable": true,
+                              "example": "北京"
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "revoked"
+                              ],
+                              "description": "设备状态（active=活跃，revoked=已撤销）",
+                              "example": "active"
+                            },
+                            "lastUsedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "最后使用时间",
+                              "example": "2024-01-15T10:30:00Z"
+                            },
+                            "createdAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "创建时间",
+                              "example": "2024-01-01T08:00:00Z"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "更新时间",
+                              "example": "2024-01-15T10:30:00Z"
+                            },
+                            "user": {
+                              "type": "object",
+                              "description": "用户信息",
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "description": "用户ID"
+                                },
+                                "email": {
+                                  "type": "string",
+                                  "format": "email",
+                                  "description": "用户邮箱",
+                                  "example": "user@example.com"
+                                },
+                                "phone": {
+                                  "type": "string",
+                                  "description": "用户手机号",
+                                  "nullable": true
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证或token无效",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          },
+          "404": {
+            "description": "设备不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      },
+      "patch": {
+        "summary": "更新设备信息（管理员）",
+        "deprecated": false,
+        "description": "管理员更新设备信息，可以修改设备名称、备注和状态。\n\n**权限说明**：\n- super_admin、platform_admin、operator、risk_control 可访问\n\n**注意事项**：\n- 所有字段都是可选的，只传需要更新的字段\n- 更新操作会记录到操作日志中\n",
+        "tags": [
+          "设备管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "maxLength": 50,
+                    "description": "设备名称（可选，最大50字符）",
+                    "example": "我的电脑"
+                  },
+                  "remark": {
+                    "type": "string",
+                    "maxLength": 200,
+                    "description": "备注（可选，最大200字符）",
+                    "example": "公司办公电脑"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "revoked"
+                    ],
+                    "description": "设备状态（可选，active=活跃，revoked=已撤销）",
+                    "example": "active"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "设备ID"
+                            },
+                            "name": {
+                              "type": "string",
+                              "description": "设备名称",
+                              "nullable": true
+                            },
+                            "remark": {
+                              "type": "string",
+                              "description": "备注",
+                              "nullable": true
+                            },
+                            "status": {
+                              "type": "string",
+                              "enum": [
+                                "active",
+                                "revoked"
+                              ],
+                              "description": "设备状态"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "更新时间"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证或token无效",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          },
+          "404": {
+            "description": "设备不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices/{id}/revoke": {
+      "post": {
+        "summary": "强制解绑设备（管理员）",
+        "deprecated": false,
+        "description": "管理员强制解绑设备，将设备状态设置为 revoked（已撤销）。\n\n**权限说明**：\n- super_admin、platform_admin、operator、risk_control 可访问\n\n**注意事项**：\n- 解绑后设备将无法继续使用\n- 操作会记录到操作日志中\n",
+        "tags": [
+          "设备管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "解绑成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "设备ID"
+                            },
+                            "status": {
+                              "type": "string",
+                              "description": "设备状态（已撤销）",
+                              "example": "revoked"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "更新时间"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证或token无效",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          },
+          "404": {
+            "description": "设备不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices/{id}/allow": {
+      "post": {
+        "summary": "恢复设备（管理员）",
+        "deprecated": false,
+        "description": "管理员恢复已撤销的设备，将设备状态从 revoked 改为 active（活跃）。\n\n**权限说明**：\n- super_admin、platform_admin、operator、risk_control 可访问\n\n**注意事项**：\n- 只能恢复状态为 revoked 的设备\n- 操作会记录到操作日志中\n",
+        "tags": [
+          "设备管理"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "设备ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "恢复成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string",
+                              "description": "设备ID"
+                            },
+                            "status": {
+                              "type": "string",
+                              "description": "设备状态（活跃）",
+                              "example": "active"
+                            },
+                            "updatedAt": {
+                              "type": "string",
+                              "format": "date-time",
+                              "description": "更新时间"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "设备状态不是 revoked，无法恢复",
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证或token无效",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          },
+          "404": {
+            "description": "设备不存在",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices/batch/status": {
+      "patch": {
+        "summary": "批量更新设备状态（管理员）",
+        "deprecated": false,
+        "description": "管理员批量更新多个设备的状态。\n\n**权限说明**：\n- super_admin、platform_admin、operator、risk_control 可访问\n\n**注意事项**：\n- 可以批量将设备设置为 active 或 revoked\n- 操作会记录到操作日志中\n- 如果某个设备不存在，会跳过该设备继续处理其他设备\n",
+        "tags": [
+          "设备管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids",
+                  "status"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "设备ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "active",
+                      "revoked"
+                    ],
+                    "description": "目标状态（active=活跃，revoked=已撤销）",
+                    "example": "revoked"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "更新成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer",
+                              "description": "成功更新的设备数量",
+                              "example": 2
+                            },
+                            "failed": {
+                              "type": "integer",
+                              "description": "更新失败的设备数量",
+                              "example": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误（ids为空或status无效）",
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证或token无效",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/devices/batch": {
+      "delete": {
+        "summary": "批量删除设备（管理员）",
+        "deprecated": false,
+        "description": "管理员批量删除设备记录。\n\n**权限说明**：\n- super_admin、platform_admin、operator 可访问\n\n**注意事项**：\n- 删除操作不可恢复\n- 操作会记录到操作日志中\n- 如果某个设备不存在，会跳过该设备继续处理其他设备\n",
+        "tags": [
+          "设备管理"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "ids"
+                ],
+                "properties": {
+                  "ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "设备ID数组",
+                    "example": [
+                      "clx123456789",
+                      "clx987654321"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "删除成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "properties": {
+                            "count": {
+                              "type": "integer",
+                              "description": "成功删除的设备数量",
+                              "example": 2
+                            },
+                            "failed": {
+                              "type": "integer",
+                              "description": "删除失败的设备数量",
+                              "example": 0
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误（ids为空）",
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证或token无效",
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（需要 super_admin、platform_admin 或 operator）",
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Success message"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

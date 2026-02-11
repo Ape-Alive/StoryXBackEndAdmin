@@ -96,11 +96,32 @@ const createPackageValidator = [
     .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
     .optional({ nullable: true })
-    .custom((value) => {
-      if (value === null || value === undefined) return true;
-      return Array.isArray(value);
+    .custom((value, { req }) => {
+      if (value === null || value === undefined || value === '') {
+        req.body.availableModels = null;
+        return true;
+      }
+      // 如果是字符串，尝试解析为 JSON
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            req.body.availableModels = parsed.length > 0 ? parsed : null;
+            return true;
+          }
+          throw new Error('Available models must be an array');
+        } catch (e) {
+          throw new Error('Available models must be a valid JSON array string or null');
+        }
+      }
+      // 如果已经是数组
+      if (Array.isArray(value)) {
+        req.body.availableModels = value.length > 0 ? value : null;
+        return true;
+      }
+      throw new Error('Available models must be an array or null');
     })
-    .withMessage('Available models must be an array or null'),
+    .withMessage('Available models must be an array, JSON array string, or null'),
   body('maxDevices')
     .optional({ nullable: true })
     .custom((value) => {
@@ -174,11 +195,32 @@ const updatePackageValidator = [
     .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
     .optional({ nullable: true })
-    .custom((value) => {
-      if (value === null || value === undefined) return true;
-      return Array.isArray(value);
+    .custom((value, { req }) => {
+      if (value === null || value === undefined || value === '') {
+        req.body.availableModels = null;
+        return true;
+      }
+      // 如果是字符串，尝试解析为 JSON
+      if (typeof value === 'string') {
+        try {
+          const parsed = JSON.parse(value);
+          if (Array.isArray(parsed)) {
+            req.body.availableModels = parsed.length > 0 ? parsed : null;
+            return true;
+          }
+          throw new Error('Available models must be an array');
+        } catch (e) {
+          throw new Error('Available models must be a valid JSON array string or null');
+        }
+      }
+      // 如果已经是数组
+      if (Array.isArray(value)) {
+        req.body.availableModels = value.length > 0 ? value : null;
+        return true;
+      }
+      throw new Error('Available models must be an array or null');
     })
-    .withMessage('Available models must be an array or null'),
+    .withMessage('Available models must be an array, JSON array string, or null'),
   body('maxDevices')
     .optional({ nullable: true })
     .custom((value) => {

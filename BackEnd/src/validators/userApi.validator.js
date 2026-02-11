@@ -113,8 +113,8 @@ const getCallLogsValidator = [
     .withMessage('Model ID must be a string'),
   query('status')
     .optional()
-    .isIn(['success', 'failed', 'timeout', 'error'])
-    .withMessage('Status must be one of: success, failed, timeout, error'),
+    .isIn(['success', 'failure', 'failed', 'timeout', 'error'])
+    .withMessage('Status must be one of: success, failure, failed, timeout, error'),
   query('startDate')
     .optional()
     .isISO8601()

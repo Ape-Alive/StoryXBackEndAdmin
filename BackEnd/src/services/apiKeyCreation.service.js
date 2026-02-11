@@ -178,12 +178,18 @@ class ApiKeyCreationService {
       where: { id: providerId }
     });
 
+    logger.info(`[ApiKeyCreation] Selecting API Key for userId=${userId}, providerId=${providerId}`);
+    logger.debug(`[ApiKeyCreation] Provider info: name=${provider?.name}, apiKeys=${provider?.apiKeys}, quota=${provider?.quota}`);
+
+    // 优先从 provider.apiKeys 数组中查找（如果配置了）
     if (provider && provider.apiKeys) {
       try {
         const apiKeyIds = JSON.parse(provider.apiKeys);
+        logger.info(`[ApiKeyCreation] Found ${apiKeyIds.length} API Key IDs in provider.apiKeys array`);
         if (Array.isArray(apiKeyIds) && apiKeyIds.length > 0) {
           // 遍历所有API Key，找到第一个可用的
           for (const apiKeyId of apiKeyIds) {
+            logger.debug(`[ApiKeyCreation] Checking API Key ID: ${apiKeyId}`);
             const providerApiKey = await userApiKeyRepository.findById(apiKeyId);
             if (providerApiKey && providerApiKey.status === 'active') {
               // 检查是否过期
@@ -196,39 +202,62 @@ class ApiKeyCreationService {
                   const providerQuota = parseFloat(provider.quota) || 0;
                   if (providerQuota <= 0) {
                     // 提供商没有积分，跳过这个API Key
-                    logger.warn(`Provider ${providerId} has no quota, skipping API Key ${apiKeyId}`);
+                    logger.warn(`[ApiKeyCreation] Provider ${providerId} has no quota (${providerQuota}), skipping API Key ${apiKeyId}`);
                     continue;
                   }
                 }
                 // API Key可用（无限制或提供商有积分）
+                logger.info(`[ApiKeyCreation] Found available API Key from provider.apiKeys array: ${apiKeyId}`);
                 return decryptApiKey(providerApiKey.apiKey);
+              } else {
+                logger.debug(`[ApiKeyCreation] API Key ${apiKeyId} is expired`);
               }
+            } else {
+              logger.debug(`[ApiKeyCreation] API Key ${apiKeyId} status is not active: ${providerApiKey?.status}`);
             }
           }
         }
       } catch (error) {
-        logger.warn(`Failed to parse provider apiKeys for provider ${providerId}:`, error);
+        logger.warn(`[ApiKeyCreation] Failed to parse provider apiKeys for provider ${providerId}:`, error);
       }
     }
 
-    // 3. 使用提供商主账户Token（需要检查提供商是否有积分）
-    if (provider && provider.mainAccountToken) {
-      // 检查提供商是否有积分（如果提供商设置了积分限制）
-      const providerQuota = parseFloat(provider.quota) || 0;
-      if (providerQuota !== null && providerQuota !== undefined) {
-        // 如果提供商设置了积分，检查是否大于0
-        if (providerQuota > 0) {
-          return provider.mainAccountToken;
+    // 如果 provider.apiKeys 数组为空或没有找到可用的，直接查找所有系统级API Key（userId=null）
+    logger.info(`[ApiKeyCreation] No API Key found from provider.apiKeys array, searching all system-level API Keys (userId=null)`);
+    const systemApiKeys = await userApiKeyRepository.findByProvider(providerId, { userId: null, status: 'active' });
+    logger.info(`[ApiKeyCreation] Found ${systemApiKeys.length} system-level API Keys for provider ${providerId}`);
+    
+    if (systemApiKeys && systemApiKeys.length > 0) {
+      const now = Math.floor(Date.now() / 1000);
+      for (const apiKey of systemApiKeys) {
+        logger.debug(`[ApiKeyCreation] Checking system API Key: id=${apiKey.id}, name=${apiKey.name}, expireTime=${apiKey.expireTime}`);
+        // 检查是否过期
+        const expireTime = typeof apiKey.expireTime === 'bigint' ? Number(apiKey.expireTime) : apiKey.expireTime;
+        if (expireTime === 0 || expireTime > now) {
+          // 检查API Key的积分额度（如果有限制）
+          const apiKeyCredits = parseFloat(apiKey.credits) || 0;
+          if (apiKeyCredits > 0) {
+            // API Key有积分限制，需要检查提供商是否有足够积分
+            const providerQuota = parseFloat(provider?.quota) || 0;
+            if (providerQuota <= 0) {
+              // 提供商没有积分，跳过这个API Key
+              logger.warn(`[ApiKeyCreation] Provider ${providerId} has no quota (${providerQuota}), skipping API Key ${apiKey.id}`);
+              continue;
+            }
+          }
+          // API Key可用（无限制或提供商有积分）
+          logger.info(`[ApiKeyCreation] Found available system-level API Key: ${apiKey.id}`);
+          return decryptApiKey(apiKey.apiKey);
         } else {
-          // 提供商积分为0或负数，不能使用主账户Token
-          logger.warn(`Provider ${providerId} has no quota (${providerQuota}), cannot use main account token`);
-          return null;
+          logger.debug(`[ApiKeyCreation] System API Key ${apiKey.id} is expired`);
         }
       }
-      // 如果提供商没有设置积分限制（quota为null），可以使用主账户Token
-      return provider.mainAccountToken;
     }
 
+    // 注意：mainAccountToken 不能直接返回给客户端使用，它只用于调用第三方 API 创建 API Key
+    // 如果以上都没有找到可用的 API Key，返回 null
+
+    logger.warn(`[ApiKeyCreation] No API Key available for userId=${userId}, providerId=${providerId}`);
     return null;
   }
 }

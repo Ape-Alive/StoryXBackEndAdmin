@@ -37,9 +37,15 @@ const errorHandler = (err, req, res, next) => {
     message = 'Invalid token';
   }
 
-  if (err.name === 'TokenExpiredError') {
+  // Token过期错误处理
+  let expiredAt = null;
+  if (err.name === 'TokenExpiredError' || (err.statusCode === 401 && err.message && err.message.includes('Token expired'))) {
     statusCode = 401;
-    message = 'Token expired';
+    message = err.message || 'Token expired';
+    // 如果错误对象包含过期时间，保存到变量中
+    if (err.expiredAt) {
+      expiredAt = err.expiredAt;
+    }
   }
 
   // 开发环境返回详细错误信息
@@ -47,6 +53,7 @@ const errorHandler = (err, req, res, next) => {
     success: false,
     message,
     ...(errors && { errors }),
+    ...(expiredAt && { expiredAt }),
     ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
   };
 
