@@ -16,12 +16,19 @@ class AuthorizationController {
         callToken: req.query.callToken,
         status: req.query.status,
         requestId: req.query.requestId,
-        activeOnly: req.query.activeOnly === 'true',
-        createdAt: {
-          gte: req.query.startDate,
-          lte: req.query.endDate
-        }
+        activeOnly: req.query.activeOnly === 'true'
       };
+
+      // 只有在提供了日期参数时才添加 createdAt 过滤
+      if (req.query.startDate || req.query.endDate) {
+        filters.createdAt = {};
+        if (req.query.startDate) {
+          filters.createdAt.gte = req.query.startDate;
+        }
+        if (req.query.endDate) {
+          filters.createdAt.lte = req.query.endDate;
+        }
+      }
 
       const pagination = {
         page: parseInt(req.query.page) || 1,
@@ -87,6 +94,28 @@ class AuthorizationController {
       const { userId } = req.params;
       const stats = await authorizationService.getUserAuthorizationStats(userId);
       return ResponseHandler.success(res, stats, 'Authorization stats retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 获取全部用户的授权统计（支持设备指纹、用户ID、状态、日期范围筛选）
+   */
+  async getAllUsersAuthorizationStats(req, res, next) {
+    try {
+      const filters = {
+        deviceFingerprint: req.query.deviceFingerprint,
+        userId: req.query.userId,
+        status: req.query.status,
+        startDate: req.query.startDate,
+        endDate: req.query.endDate
+      };
+      Object.keys(filters).forEach((key) => {
+        if (filters[key] === undefined || filters[key] === '') delete filters[key];
+      });
+      const stats = await authorizationService.getAllUsersAuthorizationStats(filters);
+      return ResponseHandler.success(res, stats, 'All users authorization stats retrieved successfully');
     } catch (error) {
       next(error);
     }

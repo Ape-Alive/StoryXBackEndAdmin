@@ -1,5 +1,6 @@
 const logService = require('../services/log.service');
 const ResponseHandler = require('../utils/response');
+const { NotFoundError } = require('../utils/errors');
 
 /**
  * 日志控制器
@@ -20,10 +21,9 @@ class LogController {
         endDate: req.query.endDate
       };
 
-      const pagination = {
-        page: parseInt(req.query.page) || 1,
-        pageSize: parseInt(req.query.pageSize) || 20
-      };
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 20));
+      const pagination = { page, pageSize };
 
       const result = await logService.getOperationLogs(filters, pagination);
 
@@ -44,6 +44,9 @@ class LogController {
     try {
       const { id } = req.params;
       const log = await logService.getOperationLogDetail(id);
+      if (!log) {
+        throw new NotFoundError('Operation log not found');
+      }
       return ResponseHandler.success(res, log, 'Operation log detail retrieved successfully');
     } catch (error) {
       next(error);
@@ -64,10 +67,9 @@ class LogController {
         endDate: req.query.endDate
       };
 
-      const pagination = {
-        page: parseInt(req.query.page) || 1,
-        pageSize: parseInt(req.query.pageSize) || 20
-      };
+      const page = Math.max(1, parseInt(req.query.page) || 1);
+      const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 20));
+      const pagination = { page, pageSize };
 
       const result = await logService.getAICallLogs(filters, pagination);
 
@@ -88,6 +90,9 @@ class LogController {
     try {
       const { requestId } = req.params;
       const log = await logService.getAICallLogDetail(requestId);
+      if (!log) {
+        throw new NotFoundError('AI call log not found');
+      }
       return ResponseHandler.success(res, log, 'AI call log detail retrieved successfully');
     } catch (error) {
       next(error);

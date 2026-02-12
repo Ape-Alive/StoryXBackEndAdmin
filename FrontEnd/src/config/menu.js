@@ -8,13 +8,13 @@ export const MENU_STRUCTURE = [
         title: '指挥中心',
         icon: 'Odometer',
         children: [
-            { id: 'dashboard', label: '运行总览大屏', path: '/dashboard', icon: 'Odometer' },
-            {
-                id: 'statistics',
-                label: '调用数据分析',
-                path: '/dashboard/statistics',
-                icon: 'DataAnalysis'
-            }
+            { id: 'dashboard', label: '运行总览大屏', path: '/dashboard', icon: 'Odometer' }
+            // {
+            //     id: 'statistics',
+            //     label: '调用数据分析',
+            //     path: '/dashboard/statistics',
+            //     icon: 'DataAnalysis'
+            // }
         ]
     },
     {
@@ -125,8 +125,8 @@ export const MENU_STRUCTURE = [
 
 // 顶部导航菜单
 export const TOP_NAV_MENU = [
-    { label: '概览', path: '/dashboard' },
-    { label: '监控', path: '/monitor' },
-    { label: '路由', path: '/route' },
-    { label: '审计', path: '/audit' }
+    { label: '总览', path: '/dashboard' },
+    { label: '授权', path: '/authorization/list' },
+//     { label: '路由', path: '/route' },
+//     { label: '审计', path: '/audit' }
 ]

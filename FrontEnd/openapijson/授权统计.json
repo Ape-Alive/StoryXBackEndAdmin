@@ -1,0 +1,621 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "授权管理"
+    }
+  ],
+  "paths": {
+    "/api/authorization/stats": {
+      "get": {
+        "summary": "获取全部用户的授权统计",
+        "deprecated": false,
+        "description": "获取系统中所有用户的授权统计汇总信息，包括：\n- 按状态分组的授权数量统计\n- 总授权数量\n- 最近7天和30天的授权数量\n- 当前活跃授权数量（未过期且状态为active）\n- 当前冻结的额度总和\n- 有授权的用户总数\n- 按模型分组的统计（前10个）\n- 按用户分组的统计（前10个）\n- 按设备分组的统计（前10个）\n\n该接口用于管理员查看整个系统的授权使用情况，帮助分析系统整体使用模式和趋势。\n",
+        "tags": [
+          "授权管理"
+        ],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "description": "全部用户的授权统计信息",
+                          "properties": {
+                            "statusStats": {
+                              "type": "array",
+                              "description": "按状态分组的统计信息",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "active",
+                                      "revoked",
+                                      "expired",
+                                      "used"
+                                    ],
+                                    "description": "授权状态",
+                                    "example": "active"
+                                  },
+                                  "_count": {
+                                    "type": "integer",
+                                    "description": "该状态下的授权数量",
+                                    "example": 150
+                                  }
+                                }
+                              },
+                              "example": [
+                                {
+                                  "status": "active",
+                                  "_count": 100
+                                },
+                                {
+                                  "status": "revoked",
+                                  "_count": 30
+                                },
+                                {
+                                  "status": "expired",
+                                  "_count": 20
+                                }
+                              ]
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "总授权数量（所有状态）",
+                              "example": 500
+                            },
+                            "last7DaysCount": {
+                              "type": "integer",
+                              "description": "最近7天的授权数量",
+                              "example": 80
+                            },
+                            "last30DaysCount": {
+                              "type": "integer",
+                              "description": "最近30天的授权数量",
+                              "example": 250
+                            },
+                            "activeCount": {
+                              "type": "integer",
+                              "description": "当前活跃授权数量（未过期且状态为active）",
+                              "example": 75
+                            },
+                            "totalFrozenQuota": {
+                              "type": "number",
+                              "format": "decimal",
+                              "description": "当前冻结的额度总和（所有活跃授权的frozenQuota之和）",
+                              "example": 1250.5
+                            },
+                            "uniqueUsersCount": {
+                              "type": "integer",
+                              "description": "有授权的用户总数（去重）",
+                              "example": 120
+                            },
+                            "modelStats": {
+                              "type": "array",
+                              "description": "按模型分组的统计（前10个，按数量降序）",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "modelId": {
+                                    "type": "string",
+                                    "description": "模型ID",
+                                    "example": "clx111222333"
+                                  },
+                                  "_count": {
+                                    "type": "integer",
+                                    "description": "该模型的授权数量",
+                                    "example": 150
+                                  }
+                                }
+                              },
+                              "example": [
+                                {
+                                  "modelId": "clx111222333",
+                                  "_count": 150
+                                },
+                                {
+                                  "modelId": "clx444555666",
+                                  "_count": 100
+                                }
+                              ]
+                            },
+                            "userStats": {
+                              "type": "array",
+                              "description": "按用户分组的统计（前10个，按数量降序）",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "userId": {
+                                    "type": "string",
+                                    "description": "用户ID",
+                                    "example": "clx123456789"
+                                  },
+                                  "_count": {
+                                    "type": "integer",
+                                    "description": "该用户的授权数量",
+                                    "example": 50
+                                  }
+                                }
+                              },
+                              "example": [
+                                {
+                                  "userId": "clx123456789",
+                                  "_count": 50
+                                },
+                                {
+                                  "userId": "clx987654321",
+                                  "_count": 40
+                                }
+                              ]
+                            },
+                            "deviceStats": {
+                              "type": "array",
+                              "description": "按设备分组的统计（前10个，按数量降序）",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "deviceFingerprint": {
+                                    "type": "string",
+                                    "description": "设备指纹",
+                                    "example": "device-fingerprint-123"
+                                  },
+                                  "_count": {
+                                    "type": "integer",
+                                    "description": "该设备的授权数量",
+                                    "example": 80
+                                  }
+                                }
+                              },
+                              "example": [
+                                {
+                                  "deviceFingerprint": "device-fingerprint-123",
+                                  "_count": 80
+                                },
+                                {
+                                  "deviceFingerprint": "device-fingerprint-456",
+                                  "_count": 60
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "example": {
+                  "success": true,
+                  "message": "All users authorization stats retrieved successfully",
+                  "data": {
+                    "statusStats": [
+                      {
+                        "status": "active",
+                        "_count": 100
+                      },
+                      {
+                        "status": "revoked",
+                        "_count": 30
+                      },
+                      {
+                        "status": "expired",
+                        "_count": 20
+                      }
+                    ],
+                    "total": 500,
+                    "last7DaysCount": 80,
+                    "last30DaysCount": 250,
+                    "activeCount": 75,
+                    "totalFrozenQuota": 1250.5,
+                    "uniqueUsersCount": 120,
+                    "modelStats": [
+                      {
+                        "modelId": "clx111222333",
+                        "_count": 150
+                      },
+                      {
+                        "modelId": "clx444555666",
+                        "_count": 100
+                      }
+                    ],
+                    "userStats": [
+                      {
+                        "userId": "clx123456789",
+                        "_count": 50
+                      },
+                      {
+                        "userId": "clx987654321",
+                        "_count": 40
+                      }
+                    ],
+                    "deviceStats": [
+                      {
+                        "deviceFingerprint": "device-fingerprint-123",
+                        "_count": 80
+                      },
+                      {
+                        "deviceFingerprint": "device-fingerprint-456",
+                        "_count": 60
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（需要 super_admin、platform_admin 或 read_only 角色）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/authorization/users/{userId}/stats": {
+      "get": {
+        "summary": "获取用户授权统计",
+        "deprecated": false,
+        "description": "获取指定用户的详细授权统计信息，包括：\n- 按状态分组的授权数量统计\n- 总授权数量\n- 最近7天和30天的授权数量\n- 当前活跃授权数量（未过期且状态为active）\n- 当前冻结的额度总和\n- 按模型分组的统计（前10个）\n- 按设备分组的统计（前10个）\n\n该接口用于管理员查看用户的授权使用情况，帮助分析用户行为和使用模式。\n",
+        "tags": [
+          "授权管理"
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "path",
+            "description": "用户ID",
+            "required": true,
+            "example": "clx123456789",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/Success"
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "data": {
+                          "type": "object",
+                          "description": "用户授权统计信息",
+                          "properties": {
+                            "statusStats": {
+                              "type": "array",
+                              "description": "按状态分组的统计信息",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "status": {
+                                    "type": "string",
+                                    "enum": [
+                                      "active",
+                                      "revoked",
+                                      "expired",
+                                      "used"
+                                    ],
+                                    "description": "授权状态",
+                                    "example": "active"
+                                  },
+                                  "_count": {
+                                    "type": "integer",
+                                    "description": "该状态下的授权数量",
+                                    "example": 25
+                                  }
+                                }
+                              },
+                              "example": [
+                                {
+                                  "status": "active",
+                                  "_count": 10
+                                },
+                                {
+                                  "status": "revoked",
+                                  "_count": 5
+                                },
+                                {
+                                  "status": "expired",
+                                  "_count": 8
+                                }
+                              ]
+                            },
+                            "total": {
+                              "type": "integer",
+                              "description": "总授权数量（所有状态）",
+                              "example": 50
+                            },
+                            "last7DaysCount": {
+                              "type": "integer",
+                              "description": "最近7天的授权数量",
+                              "example": 15
+                            },
+                            "last30DaysCount": {
+                              "type": "integer",
+                              "description": "最近30天的授权数量",
+                              "example": 35
+                            },
+                            "activeCount": {
+                              "type": "integer",
+                              "description": "当前活跃授权数量（未过期且状态为active）",
+                              "example": 8
+                            },
+                            "totalFrozenQuota": {
+                              "type": "number",
+                              "format": "decimal",
+                              "description": "当前冻结的额度总和（活跃授权的frozenQuota之和）",
+                              "example": 125.5
+                            },
+                            "modelStats": {
+                              "type": "array",
+                              "description": "按模型分组的统计（前10个，按数量降序）",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "modelId": {
+                                    "type": "string",
+                                    "description": "模型ID",
+                                    "example": "clx111222333"
+                                  },
+                                  "_count": {
+                                    "type": "integer",
+                                    "description": "该模型的授权数量",
+                                    "example": 12
+                                  }
+                                }
+                              },
+                              "example": [
+                                {
+                                  "modelId": "clx111222333",
+                                  "_count": 12
+                                },
+                                {
+                                  "modelId": "clx444555666",
+                                  "_count": 8
+                                }
+                              ]
+                            },
+                            "deviceStats": {
+                              "type": "array",
+                              "description": "按设备分组的统计（前10个，按数量降序）",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "deviceFingerprint": {
+                                    "type": "string",
+                                    "description": "设备指纹",
+                                    "example": "device-fingerprint-123"
+                                  },
+                                  "_count": {
+                                    "type": "integer",
+                                    "description": "该设备的授权数量",
+                                    "example": 20
+                                  }
+                                }
+                              },
+                              "example": [
+                                {
+                                  "deviceFingerprint": "device-fingerprint-123",
+                                  "_count": 20
+                                },
+                                {
+                                  "deviceFingerprint": "device-fingerprint-456",
+                                  "_count": 15
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "example": {
+                  "success": true,
+                  "message": "Authorization stats retrieved successfully",
+                  "data": {
+                    "statusStats": [
+                      {
+                        "status": "active",
+                        "_count": 10
+                      },
+                      {
+                        "status": "revoked",
+                        "_count": 5
+                      },
+                      {
+                        "status": "expired",
+                        "_count": 8
+                      }
+                    ],
+                    "total": 50,
+                    "last7DaysCount": 15,
+                    "last30DaysCount": 35,
+                    "activeCount": 8,
+                    "totalFrozenQuota": 125.5,
+                    "modelStats": [
+                      {
+                        "modelId": "clx111222333",
+                        "_count": 12
+                      },
+                      {
+                        "modelId": "clx444555666",
+                        "_count": 8
+                      }
+                    ],
+                    "deviceStats": [
+                      {
+                        "deviceFingerprint": "device-fingerprint-123",
+                        "_count": 20
+                      },
+                      {
+                        "deviceFingerprint": "device-fingerprint-456",
+                        "_count": 15
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "success": false,
+                  "message": "User ID must be a string"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "未授权",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足（需要 super_admin、platform_admin 或 read_only 角色）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "用户不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                },
+                "example": {
+                  "success": false,
+                  "message": "User not found"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Error message"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      },
+      "Success": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": true
+          },
+          "message": {
+            "type": "string",
+            "example": "Success message"
+          },
+          "data": {
+            "type": "object",
+            "properties": {}
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

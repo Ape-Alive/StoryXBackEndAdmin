@@ -18,13 +18,7 @@ const routes = [
         path: 'dashboard',
         name: 'Dashboard',
         component: () => import('@/views/dashboard/Index.vue'),
-        meta: { title: '仪表盘' }
-      },
-      {
-        path: 'model/provider',
-        name: 'Provider',
-        component: () => import('@/views/model/Provider.vue'),
-        meta: { title: '提供商配置' }
+        meta: { title: '仪表盘', showBreadcrumb: false }
       }
     ]
   },
@@ -32,7 +26,7 @@ const routes = [
     path: '/model',
     name: 'Model',
     component: () => import('@/layouts/MainLayout.vue'),
-    meta: { title: '模型管理', requiresAuth: true },
+    meta: { title: '模型矩阵', requiresAuth: true },
     children: [
       {
         path: '/model/provider',
@@ -163,6 +157,46 @@ const routes = [
         name: 'PromptCategory',
         component: () => import('@/views/prompt/PromptCategory.vue'),
         meta: { title: '提示词分类管理', requiresAuth: true }
+      }
+    ]
+  },
+  {
+    path: '/authorization',
+    name: 'Authorization',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { title: '授权管理', requiresAuth: true },
+    children: [
+      {
+        path: '/authorization/list',
+        name: 'AuthorizationList',
+        component: () => import('@/views/authorization/AuthorizationList.vue'),
+        meta: { title: '授权列表', requiresAuth: true }
+      },
+      {
+        path: '/authorization/stats',
+        name: 'AuthorizationStats',
+        component: () => import('@/views/authorization/AuthorizationStats.vue'),
+        meta: { title: '授权统计', requiresAuth: true }
+      }
+    ]
+  },
+  {
+    path: '/log',
+    name: 'Log',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { title: '日志审计', requiresAuth: true },
+    children: [
+      {
+        path: '/log/operation',
+        name: 'LogOperation',
+        component: () => import('@/views/log/LogOperation.vue'),
+        meta: { title: '操作日志', requiresAuth: true }
+      },
+      {
+        path: '/log/ai-call',
+        name: 'LogAiCall',
+        component: () => import('@/views/log/LogAiCall.vue'),
+        meta: { title: 'AI调用日志', requiresAuth: true }
       }
     ]
   }

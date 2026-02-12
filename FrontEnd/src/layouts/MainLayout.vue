@@ -8,9 +8,7 @@
             <el-icon :size="24"><Grid /></el-icon>
           </div>
           <div class="logo-text">
-            <h1 class="logo-title">
-              CAPABILITY <span class="logo-highlight">HUB</span>
-            </h1>
+            <h1 class="logo-title">CAPABILITY <span class="logo-highlight">HUB</span></h1>
             <p class="logo-subtitle">Admin Control v2.5</p>
           </div>
         </div>
@@ -87,11 +85,7 @@
       <aside :class="['sidebar', { collapsed: sidebarCollapsed }]">
         <div class="sidebar-content">
           <div ref="menuListRef" class="menu-list" :style="{ height: menuListHeight + 'px' }">
-            <div
-              v-for="(menu, index) in menuStructure"
-              :key="index"
-              class="menu-group"
-            >
+            <div v-for="(menu, index) in menuStructure" :key="index" class="menu-group">
               <!-- 菜单标题（小字） -->
               <div v-if="!sidebarCollapsed" class="menu-title">
                 {{ menu.title }}
@@ -109,9 +103,7 @@
                   <el-icon :size="20" class="menu-item-icon">
                     <component :is="child.icon || menu.icon" />
                   </el-icon>
-                  <span v-if="!sidebarCollapsed" class="menu-item-label">{{
-                    child.label
-                  }}</span>
+                  <span v-if="!sidebarCollapsed" class="menu-item-label">{{ child.label }}</span>
                 </button>
               </div>
             </div>
@@ -127,10 +119,7 @@
         </div>
 
         <!-- 折叠按钮 -->
-        <button
-          class="collapse-button"
-          @click="handleSidebarToggle"
-        >
+        <button class="collapse-button" @click="handleSidebarToggle">
           <el-icon>
             <component :is="sidebarCollapsed ? 'ArrowRight' : 'ArrowLeft'" />
           </el-icon>
@@ -140,8 +129,8 @@
       <!-- 主内容区 -->
       <main class="main-content">
         <div class="content-wrapper">
-          <!-- 面包屑导航 -->
-          <Breadcrumb />
+          <!-- 面包屑导航（可通过路由 meta.showBreadcrumb 控制是否展示，默认 true） -->
+          <Breadcrumb v-if="showBreadcrumb" />
           <router-view />
         </div>
       </main>
@@ -161,6 +150,12 @@ import Breadcrumb from './components/Breadcrumb.vue'
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+
+// 是否展示面包屑（路由 meta.showBreadcrumb，默认 true；设置为 false 时隐藏）
+const showBreadcrumb = computed(() => {
+  const meta = route.matched[route.matched.length - 1]?.meta
+  return meta?.showBreadcrumb !== false
+})
 
 const searchKeyword = ref('')
 const showUserMenu = ref(false)
@@ -314,10 +309,11 @@ onUnmounted(() => {
 
 <style scoped>
 .main-layout {
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: #f8fafc;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue',
-    Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* 顶部导航栏 */
@@ -786,11 +782,12 @@ onUnmounted(() => {
   flex: 1;
   overflow-y: auto;
   padding: 48px;
-  background: #f8fafc;
+  background: #ffffff;
+  height: calc(100vh - 60px);
 }
 
 .content-wrapper {
-  max-width: 1500px;
+  /* max-width: 1500px; */
   margin: 0 auto;
 }
 
@@ -828,4 +825,3 @@ onUnmounted(() => {
   }
 }
 </style>
-

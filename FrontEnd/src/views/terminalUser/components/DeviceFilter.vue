@@ -155,36 +155,44 @@ const filters = reactive({
 const lastUsedDateRange = ref(null)
 const createdDateRange = ref(null)
 
-watch(() => props.modelValue, (val) => {
-  filters.deviceId = val.deviceId || ''
-  filters.userId = val.userId || ''
-  filters.deviceFingerprint = val.deviceFingerprint || ''
-  filters.ipAddress = val.ipAddress || ''
-  filters.status = val.status
-  filters.lastUsedStart = val.lastUsedStart || ''
-  filters.lastUsedEnd = val.lastUsedEnd || ''
-  filters.startDate = val.startDate || ''
-  filters.endDate = val.endDate || ''
-  filters.orderBy = val.orderBy || 'lastUsedAt'
-  filters.order = val.order || 'desc'
-  
-  // 设置日期范围选择器的值
-  if (val.lastUsedStart && val.lastUsedEnd) {
-    lastUsedDateRange.value = [val.lastUsedStart, val.lastUsedEnd]
-  } else {
-    lastUsedDateRange.value = null
-  }
-  
-  if (val.startDate && val.endDate) {
-    createdDateRange.value = [val.startDate, val.endDate]
-  } else {
-    createdDateRange.value = null
-  }
-}, { deep: true })
+watch(
+  () => props.modelValue,
+  val => {
+    filters.deviceId = val.deviceId || ''
+    filters.userId = val.userId || ''
+    filters.deviceFingerprint = val.deviceFingerprint || ''
+    filters.ipAddress = val.ipAddress || ''
+    filters.status = val.status
+    filters.lastUsedStart = val.lastUsedStart || ''
+    filters.lastUsedEnd = val.lastUsedEnd || ''
+    filters.startDate = val.startDate || ''
+    filters.endDate = val.endDate || ''
+    filters.orderBy = val.orderBy || 'lastUsedAt'
+    filters.order = val.order || 'desc'
 
-watch(filters, (val) => {
-  emit('update:modelValue', { ...val })
-}, { deep: true })
+    // 设置日期范围选择器的值
+    if (val.lastUsedStart && val.lastUsedEnd) {
+      lastUsedDateRange.value = [val.lastUsedStart, val.lastUsedEnd]
+    } else {
+      lastUsedDateRange.value = null
+    }
+
+    if (val.startDate && val.endDate) {
+      createdDateRange.value = [val.startDate, val.endDate]
+    } else {
+      createdDateRange.value = null
+    }
+  },
+  { deep: true }
+)
+
+watch(
+  filters,
+  val => {
+    emit('update:modelValue', { ...val })
+  },
+  { deep: true }
+)
 
 function handleSearch() {
   emit('search', { ...filters })
@@ -219,6 +227,7 @@ function handleCreatedDateRangeChange(value) {
   gap: 12px;
   align-items: flex-end;
   flex-wrap: wrap;
+  flex: 1;
 }
 
 .filter-input {

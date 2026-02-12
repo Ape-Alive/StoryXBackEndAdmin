@@ -41,7 +41,7 @@ class AuthorizationService {
   }
 
   /**
-   * 撤销授权
+   * 撤销授权（管理员操作，需要释放冻结的额度）
    */
   async revokeAuthorization(id, adminId = null, ipAddress = null) {
     const authorization = await authorizationRepository.findById(id);
@@ -49,26 +49,82 @@ class AuthorizationService {
       throw new NotFoundError('Authorization not found');
     }
 
-    await authorizationRepository.revoke(id);
+    // 如果授权是活跃状态且有冻结额度，需要释放额度
+    const frozenQuota = parseFloat(authorization.frozenQuota) || 0;
+    
+    return await prisma.$transaction(async (tx) => {
+      // 如果授权是活跃状态且有冻结额度，释放额度
+      if (authorization.status === 'active' && frozenQuota > 0) {
+        const userId = authorization.userId;
+        
+        // 获取用户额度（需要找到对应的套餐）
+        const userQuotas = await tx.userQuota.findMany({
+          where: { userId }
+        });
 
-    // 记录操作日志
-    if (adminId) {
-      const logService = require('./log.service');
-      await logService.logAdminAction({
-        adminId,
-        action: 'REVOKE_AUTHORIZATION',
-        targetType: 'authorization',
-        targetId: id,
+        // 从冻结额度中释放（简化处理：释放到第一个有冻结额度的套餐）
+        let remainingToUnfreeze = frozenQuota;
+        for (const quota of userQuotas) {
+          if (remainingToUnfreeze <= 0) break;
+
+          const frozen = parseFloat(quota.frozen);
+          if (frozen > 0) {
+            const unfreezeAmount = Math.min(frozen, remainingToUnfreeze);
+            
+            await tx.userQuota.update({
+              where: { id: quota.id },
+              data: {
+                available: { increment: unfreezeAmount },
+                frozen: { decrement: unfreezeAmount }
+              }
+            });
+
+            await tx.quotaRecord.create({
+              data: {
+                userId,
+                packageId: quota.packageId,
+                type: 'unfreeze',
+                amount: unfreezeAmount,
+                before: frozen,
+                after: frozen - unfreezeAmount,
+                reason: `Authorization revoked by admin: ${id}`
+              }
+            });
+
+            remainingToUnfreeze -= unfreezeAmount;
+          }
+        }
+      }
+
+      // 更新授权状态（在同一事务中）
+      await tx.authorization.update({
+        where: { id },
+        data: {
+          status: 'revoked',
+          updatedAt: new Date()
+        }
+      });
+
+      // 记录操作日志
+      if (adminId) {
+        const logService = require('./log.service');
+        await logService.logAdminAction({
+          adminId,
+          action: 'REVOKE_AUTHORIZATION',
+          targetType: 'authorization',
+          targetId: id,
           details: {
             userId: authorization.userId,
             modelId: authorization.modelId,
-            callToken: authorization.callToken
+            callToken: authorization.callToken,
+            refundedQuota: frozenQuota
           },
-        ipAddress
-      });
-    }
+          ipAddress
+        });
+      }
 
-    return { success: true };
+      return { success: true, refundedQuota: frozenQuota };
+    });
   }
 
   /**
@@ -287,7 +343,7 @@ class AuthorizationService {
       return {
         id: authorization.id,
         callToken: authorization.callToken,
-        apiKey: selectedApiKey || model.provider.mainAccountToken || null, // 返回AI密钥（优先使用用户专属API Key）
+        apiKey: selectedApiKey || null, // 返回AI密钥（优先使用用户专属API Key，注意：mainAccountToken 不能返回给客户端）
         providerBaseUrl: model.provider.baseUrl || null,
         modelBaseUrl: model.baseUrl,
         modelName: model.name,
@@ -383,7 +439,24 @@ class AuthorizationService {
    * 获取用户授权统计
    */
   async getUserAuthorizationStats(userId) {
+    // 验证用户是否存在
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true }
+    });
+    
+    if (!user) {
+      throw new NotFoundError('User not found');
+    }
+
     return await authorizationRepository.getUserAuthorizationStats(userId);
+  }
+
+  /**
+   * 获取全部用户的授权统计（支持筛选，用于授权统计看板）
+   */
+  async getAllUsersAuthorizationStats(filters = {}) {
+    return await authorizationRepository.getAllUsersAuthorizationStats(filters);
   }
 }
 

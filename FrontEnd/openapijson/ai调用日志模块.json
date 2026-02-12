@@ -1,0 +1,448 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "日志审计"
+    }
+  ],
+  "paths": {
+    "/api/logs/ai": {
+      "get": {
+        "summary": "获取 AI 调用日志列表",
+        "deprecated": false,
+        "description": "分页获取 AI 模型调用日志，支持按用户、模型、状态、请求ID、时间范围筛选。\n用于审计终端用户的 AI 调用记录，含 token 消耗、成本、耗时等。\n**权限**：需 super_admin、platform_admin、risk_control、finance 或 read_only 角色。\n",
+        "tags": [
+          "日志审计"
+        ],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "description": "每页数量（最大100）",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "userId",
+            "in": "query",
+            "description": "用户ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "modelId",
+            "in": "query",
+            "description": "模型ID筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "调用状态",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "success",
+                "failure"
+              ]
+            }
+          },
+          {
+            "name": "requestId",
+            "in": "query",
+            "description": "请求ID",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "startDate",
+            "in": "query",
+            "description": "开始日期（ISO 8601）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "endDate",
+            "in": "query",
+            "description": "结束日期（ISO 8601）",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Success"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AICallLog"
+                      }
+                    },
+                    "pagination": {
+                      "$ref": "#/components/schemas/Pagination"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "400": {
+            "description": "请求参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    },
+    "/api/logs/ai/{requestId}": {
+      "get": {
+        "summary": "获取 AI 调用日志详情",
+        "deprecated": false,
+        "description": "根据请求ID获取单条 AI 调用日志的详细信息",
+        "tags": [
+          "日志审计"
+        ],
+        "parameters": [
+          {
+            "name": "requestId",
+            "in": "path",
+            "description": "请求ID",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "获取成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "example": true
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "AI call log detail retrieved successfully"
+                    },
+                    "data": {
+                      "$ref": "#/components/schemas/AICallLog"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "401": {
+            "description": "未认证",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "403": {
+            "description": "权限不足",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          },
+          "404": {
+            "description": "日志不存在",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "example": false
+          },
+          "message": {
+            "type": "string",
+            "example": "Error message"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {}
+            }
+          }
+        }
+      },
+      "Pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "example": 1
+          },
+          "pageSize": {
+            "type": "integer",
+            "example": 20
+          },
+          "total": {
+            "type": "integer",
+            "example": 100
+          },
+          "totalPages": {
+            "type": "integer",
+            "example": 5
+          }
+        }
+      },
+      "AICallLog": {
+        "type": "object",
+        "description": "AI 调用日志",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "日志ID"
+          },
+          "requestId": {
+            "type": "string",
+            "description": "请求ID",
+            "example": "req-abc123"
+          },
+          "userId": {
+            "type": "string",
+            "description": "用户ID"
+          },
+          "modelId": {
+            "type": "string",
+            "description": "模型ID"
+          },
+          "inputTokens": {
+            "type": "integer",
+            "description": "输入 token 数"
+          },
+          "outputTokens": {
+            "type": "integer",
+            "description": "输出 token 数"
+          },
+          "totalTokens": {
+            "type": "integer",
+            "description": "总 token 数"
+          },
+          "cost": {
+            "type": "number",
+            "format": "decimal",
+            "description": "调用成本"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "failure"
+            ],
+            "description": "调用状态"
+          },
+          "errorMessage": {
+            "type": "string",
+            "description": "错误信息",
+            "nullable": true
+          },
+          "requestTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "请求时间"
+          },
+          "responseTime": {
+            "type": "string",
+            "format": "date-time",
+            "description": "响应时间",
+            "nullable": true
+          },
+          "duration": {
+            "type": "integer",
+            "description": "响应耗时（毫秒）",
+            "nullable": true
+          },
+          "deviceFingerprint": {
+            "type": "string",
+            "description": "设备指纹",
+            "nullable": true
+          },
+          "ipAddress": {
+            "type": "string",
+            "description": "IP地址",
+            "nullable": true
+          },
+          "user": {
+            "type": "object",
+            "description": "用户信息",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string",
+                "nullable": true
+              },
+              "phone": {
+                "type": "string",
+                "nullable": true
+              }
+            }
+          },
+          "model": {
+            "type": "object",
+            "description": "模型信息",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "displayName": {
+                "type": "string",
+                "nullable": true
+              },
+              "provider": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "displayName": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {},
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "输入 JWT Token，格式：Bearer {token}"
+      }
+    }
+  },
+  "servers": [],
+  "security": []
+}

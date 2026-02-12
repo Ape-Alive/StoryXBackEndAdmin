@@ -16,20 +16,20 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs --fix --ignore-path .gitignore"
   },
   "dependencies": {
-    "vue": "^3.4.21",
-    "vue-router": "^4.3.0",
-    "pinia": "^2.1.7",
+    "@element-plus/icons-vue": "^2.3.1",
     "axios": "^1.6.7",
+    "echarts": "^6.0.0",
     "element-plus": "^2.5.6",
-    "@element-plus/icons-vue": "^2.3.1"
+    "pinia": "^2.1.7",
+    "vue": "^3.4.21",
+    "vue-router": "^4.3.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.4",
-    "vite": "^5.1.4",
+    "@vue/eslint-config-prettier": "^9.0.0",
     "eslint": "^8.57.0",
     "eslint-plugin-vue": "^9.23.0",
-    "@vue/eslint-config-prettier": "^9.0.0",
-    "prettier": "^3.2.5"
+    "prettier": "^3.2.5",
+    "vite": "^5.1.4"
   }
 }
-
