@@ -1,21 +1,21 @@
-const express = require('express');
-const router = express.Router();
-const userApiController = require('../controllers/userApi.controller');
-const { authenticate, authorize } = require('../middleware/auth');
-const validate = require('../middleware/validate');
+const express = require('express')
+const router = express.Router()
+const userApiController = require('../controllers/userApi.controller')
+const { authenticate, authorize } = require('../middleware/auth')
+const validate = require('../middleware/validate')
 const {
   requestAuthorizationValidator,
   reportCallValidator,
   getMyAuthorizationsValidator,
   getCallLogsValidator,
   getCallLogDetailValidator,
-  cancelAuthorizationValidator
-} = require('../validators/userApi.validator');
-const { ROLES } = require('../constants/roles');
+  cancelAuthorizationValidator,
+} = require('../validators/userApi.validator')
+const { ROLES } = require('../constants/roles')
 
 // 所有路由需要认证（终端用户）
-router.use(authenticate);
-router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
+router.use(authenticate)
+router.use(authorize(ROLES.USER, ROLES.BASIC_USER))
 
 /**
  * @swagger
@@ -31,7 +31,7 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *     summary: 申请调用授权 [仅终端用户]
  *     description: |
  *       桌面端在调用AI服务前，需要先申请授权获取API密钥和调用令牌。
- *       
+ *
  *       **流程说明：**
  *       1. 验证设备指纹格式和状态
  *       2. 验证用户状态（必须为normal状态）
@@ -42,7 +42,7 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *       7. 预冻结额度（从优先级高的套餐开始冻结）
  *       8. 选择API Key（按优先级：用户专属 > 提供商关联 > 主账户Token）
  *       9. 生成callToken并返回AI密钥等信息
- *       
+ *
  *       **返回信息：**
  *       - apiKey：AI服务提供商的API密钥（按优先级选择，详见下方说明）
  *       - providerBaseUrl：提供商的基础URL（完整URL，如：https://api.deepseek.com）
@@ -53,7 +53,7 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *       - estimatedCost：预估费用（积分）
  *       - maxToken：模型的最大Token数（如果价格配置中设置了maxToken）
  *       - usedMaxToken：是否使用了maxToken进行费用预估
- *       
+ *
  *       **API Key选择优先级：**
  *       系统会按以下优先级选择API Key，返回第一个可用的：
  *       1. **用户专属API Key**（优先使用）
@@ -69,12 +69,12 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *          - 如果提供商设置了积分限制（`provider.quota` 不为null），需要检查 `provider.quota > 0`
  *          - 如果提供商积分不足，返回null（调用会失败）
  *          - 如果提供商没有设置积分限制（`provider.quota` 为null），可以使用
- *       
+ *
  *       **重要说明：**
  *       - 如果所有API Key都不可用（已过期、已禁用、提供商积分不足等），`apiKey` 可能返回 `null`
  *       - 客户端应该检查 `apiKey` 是否为 `null`，如果为 `null`，说明当前无法调用该模型
  *       - 提供商积分检查：对于有积分限制的API Key或主账户Token，系统会检查提供商的 `quota` 字段
- *       
+ *
  *       **注意事项：**
  *       - 授权有效期为10分钟，过期后需要重新申请
  *       - 预冻结的额度会在调用完成后根据实际消耗结算
@@ -87,7 +87,7 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *         * 如果 `quota > 0`：可以使用
  *         * 如果 `quota <= 0`：不能使用，会继续查找下一个可用的API Key
  *         * 如果 `quota` 为 `null`：表示无限制，可以使用
- *       
+ *
  *       **费用预估说明：**
  *       - 对于按Token计价的模型（pricingType=token）：
  *         * 如果模型价格配置中设置了maxToken，预估费用会优先使用maxToken计算（即使estimatedTokens更大）
@@ -96,7 +96,7 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *       - 对于按调用次数计价的模型（pricingType=call）：
  *         * 直接使用callPrice作为预估费用
  *         * estimatedTokens和maxToken不影响费用计算
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       curl -X POST http://localhost:5800/api/user/authorization/request \
@@ -134,12 +134,12 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *                 example: 1000
  *                 description: |
  *                   预估的token数量（可选），用于计算预估费用和预冻结额度
- *                   
+ *
  *                   **计费策略：**
  *                   - 如果模型价格配置中设置了 `maxToken`，则优先使用 `maxToken` 计算费用（即使 `estimatedTokens` 更大）
  *                   - 如果模型价格配置中 `maxToken` 为 `null`，则使用 `estimatedTokens` 计算费用
  *                   - 如果 `pricingType` 为 `call`（按调用次数计价），`estimatedTokens` 不影响费用计算
- *                   
+ *
  *                   **示例：**
  *                   - 模型：`gemini-2.5-flash-image`，`maxToken=8192`，用户传入 `estimatedTokens=10000`
  *                   - 实际预估费用按 `maxToken=8192` 计算（而不是10000）
@@ -170,11 +170,11 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *                             AI服务提供商的API密钥（按优先级选择）
  *                             - 可能为 `null`：如果所有API Key都不可用（已过期、已禁用、提供商积分不足等）
  *                             - 客户端应该检查该值，如果为 `null`，说明当前无法调用该模型
- *                             
+ *
  *                             **选择优先级：**
  *                             1. 用户专属API Key（user_created > system_created）
  *                             2. 提供商关联的API Key（provider_associated类型，userId=null，检查提供商quota）
- *                             
+ *
  *                             **注意：**
  *                             - 主账户Token（mainAccountToken）仅用于调用第三方API创建API Key，不会返回给客户端使用
  *                             - 如果提供商不支持API Key自动创建，管理员需要在"供应商API Key管理"页面手动添加提供商关联的API Key
@@ -300,7 +300,7 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER));
  *                   - 用户专属API Key已过期或已禁用
  *                   - 提供商关联的API Key已过期、已禁用或提供商积分不足
  *                   - 提供商不支持API Key自动创建且管理员未手动添加提供商关联的API Key
- *                   
+ *
  *                   **注意：** 主账户Token（mainAccountToken）不会返回给客户端使用，仅用于调用第三方API创建API Key
  *       401:
  *         description: 未认证
@@ -353,7 +353,7 @@ router.post(
   requestAuthorizationValidator,
   validate,
   userApiController.requestAuthorization.bind(userApiController)
-);
+)
 
 /**
  * @swagger
@@ -362,23 +362,23 @@ router.post(
  *     summary: 获取我的授权列表 [仅终端用户]
  *     description: |
  *       查询当前用户的所有授权记录，支持按模型、状态筛选和分页查询。
- *       
+ *
  *       **授权状态：**
  *       - active：活跃，可以使用
  *       - used：已使用，已完成调用
  *       - expired：已过期
  *       - revoked：已撤销
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       # 获取所有授权
  *       curl "http://localhost:5800/api/user/authorization/my-authorizations?page=1&pageSize=20" \
  *         -H "Authorization: Bearer {token}"
- *       
+ *
  *       # 获取活跃的授权
  *       curl "http://localhost:5800/api/user/authorization/my-authorizations?status=active&activeOnly=true" \
  *         -H "Authorization: Bearer {token}"
- *       
+ *
  *       # 按模型筛选
  *       curl "http://localhost:5800/api/user/authorization/my-authorizations?modelId=clx123456789" \
  *         -H "Authorization: Bearer {token}"
@@ -513,7 +513,7 @@ router.get(
   getMyAuthorizationsValidator,
   validate,
   userApiController.getMyAuthorizations.bind(userApiController)
-);
+)
 
 /**
  * @swagger
@@ -522,13 +522,13 @@ router.get(
  *     summary: 取消授权 [仅终端用户]
  *     description: |
  *       取消指定的授权，释放预冻结的额度。
- *       
+ *
  *       **注意事项：**
  *       - 只能取消自己的授权
  *       - 只能取消状态为active的授权
  *       - 取消后会释放所有预冻结的额度
  *       - 取消操作是立即生效的，无法恢复
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       curl -X POST "http://localhost:5800/api/user/authorization/{id}/cancel" \
@@ -605,7 +605,7 @@ router.post(
   cancelAuthorizationValidator,
   validate,
   userApiController.cancelAuthorization.bind(userApiController)
-);
+)
 
 /**
  * @swagger
@@ -614,7 +614,7 @@ router.post(
  *     summary: 上报调用结果 [仅终端用户]
  *     description: |
  *       桌面端在完成AI调用后，需要上报调用结果用于额度结算和日志记录。
- *       
+ *
  *       **流程说明：**
  *       1. 验证callToken并获取授权记录
  *       2. 计算实际费用（根据实际token消耗）
@@ -624,18 +624,18 @@ router.post(
  *          - 如果调用失败：释放所有预冻结额度
  *       4. 记录调用日志
  *       5. 更新授权状态为used
- *       
+ *
  *       **Token说明：**
  *       - 如果pricingType为token，需要提供inputTokens和outputTokens
  *       - 如果pricingType为call，token数量不影响费用计算
  *       - totalTokens = inputTokens + outputTokens（可选，用于记录）
- *       
+ *
  *       **状态说明：**
  *       - success：调用成功
  *       - failed：调用失败
  *       - timeout：调用超时
  *       - error：调用错误
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       # 成功调用
@@ -652,7 +652,7 @@ router.post(
  *           "duration": 1500,
  *           "responseTime": "2024-01-01T12:00:00Z"
  *         }'
- *       
+ *
  *       # 失败调用
  *       curl -X POST http://localhost:5800/api/user/ai/call/report \
  *         -H "Authorization: Bearer {token}" \
@@ -812,12 +812,7 @@ router.post(
  *               success: false
  *               message: "Authorization not found"
  */
-router.post(
-  '/ai/call/report',
-  reportCallValidator,
-  validate,
-  userApiController.reportCall.bind(userApiController)
-);
+router.post('/ai/call/report', reportCallValidator, validate, userApiController.reportCall.bind(userApiController))
 
 /**
  * @swagger
@@ -826,7 +821,7 @@ router.post(
  *     summary: 获取调用日志列表 [仅终端用户]
  *     description: |
  *       查询当前用户的所有AI调用日志，支持按模型、状态、时间范围筛选和分页查询。
- *       
+ *
  *       **返回字段说明：**
  *       - **requestTime**：请求时间（客户端发起AI调用请求的时间）
  *       - **model**：调用的AI模型信息（包含模型名称、显示名称、提供商信息）
@@ -841,26 +836,26 @@ router.post(
  *       - **responseTime**：响应时间（AI服务返回结果的时间）
  *       - **errorMessage**：错误信息（如果调用失败）
  *       - **deviceFingerprint**：设备指纹（用于设备识别）
- *       
+ *
  *       **状态值说明：**
  *       - 查询参数 `status` 支持：`success`, `failure`, `failed`, `timeout`, `error`
  *       - 返回数据中的 `status` 字段只包含：`success` 或 `failure`
  *       - 查询时使用 `failed`, `timeout`, `error` 都会查询到 `status=failure` 的记录
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       # 获取所有日志
  *       curl "http://localhost:5800/api/user/ai/logs?page=1&pageSize=20" \
  *         -H "Authorization: Bearer {token}"
- *       
+ *
  *       # 按状态筛选（支持 success, failure, failed, timeout, error）
  *       curl "http://localhost:5800/api/user/ai/logs?status=failure" \
  *         -H "Authorization: Bearer {token}"
- *       
+ *
  *       # 按时间范围筛选
  *       curl "http://localhost:5800/api/user/ai/logs?startDate=2024-01-01T00:00:00Z&endDate=2024-01-31T23:59:59Z" \
  *         -H "Authorization: Bearer {token}"
- *       
+ *
  *       # 组合筛选
  *       curl "http://localhost:5800/api/user/ai/logs?modelId=clx123456789&status=success&page=1&pageSize=10" \
  *         -H "Authorization: Bearer {token}"
@@ -898,7 +893,7 @@ router.post(
  *           - `failed`：调用失败（兼容旧版本，会映射为failure）
  *           - `timeout`：调用超时（会映射为failure）
  *           - `error`：调用错误（会映射为failure）
- *           
+ *
  *           **注意**：除了 `success` 之外，其他所有状态值（`failure`, `failed`, `timeout`, `error`）在数据库中都会存储为 `failure`。
  *       - in: query
  *         name: startDate
@@ -1068,8 +1063,8 @@ router.post(
  *                       duration: 500
  *                       deviceFingerprint: "device_hash_abc123"
  *                       ipAddress: "192.168.1.1"
- *                     pagination:
- *                       $ref: '#/components/schemas/Pagination'
+ *                   pagination:
+ *                     $ref: '#/components/schemas/Pagination'
  *       400:
  *         description: 请求参数错误
  *         content:
@@ -1089,12 +1084,7 @@ router.post(
  *             schema:
  *               $ref: '#/components/schemas/Error'
  */
-router.get(
-  '/ai/logs',
-  getCallLogsValidator,
-  validate,
-  userApiController.getCallLogs.bind(userApiController)
-);
+router.get('/ai/logs', getCallLogsValidator, validate, userApiController.getCallLogs.bind(userApiController))
 
 /**
  * @swagger
@@ -1103,11 +1093,11 @@ router.get(
  *     summary: 获取调用日志详情 [仅终端用户]
  *     description: |
  *       根据requestId获取调用日志的详细信息，包括完整的调用参数、响应信息等。
- *       
+ *
  *       **注意事项：**
  *       - 只能查看自己的调用日志
  *       - requestId必须唯一，由客户端生成
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       curl "http://localhost:5800/api/user/ai/logs/req_123456" \
@@ -1270,6 +1260,6 @@ router.get(
   getCallLogDetailValidator,
   validate,
   userApiController.getCallLogDetail.bind(userApiController)
-);
+)
 
-module.exports = router;
+module.exports = router

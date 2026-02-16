@@ -1,20 +1,20 @@
-const express = require('express');
-const router = express.Router();
-const authorizationController = require('../controllers/authorization.controller');
-const { authenticate, authorize } = require('../middleware/auth');
-const validate = require('../middleware/validate');
-const { ROLES } = require('../constants/roles');
+const express = require('express')
+const router = express.Router()
+const authorizationController = require('../controllers/authorization.controller')
+const { authenticate, authorize } = require('../middleware/auth')
+const validate = require('../middleware/validate')
+const { ROLES } = require('../constants/roles')
 const {
   getAuthorizationsValidator,
   getAuthorizationDetailValidator,
   getByCallTokenValidator,
   revokeAuthorizationValidator,
   getUserAuthorizationStatsValidator,
-  getAllUsersAuthorizationStatsValidator
-} = require('../validators/authorization.validator');
+  getAllUsersAuthorizationStatsValidator,
+} = require('../validators/authorization.validator')
 
 // 所有路由需要认证
-router.use(authenticate);
+router.use(authenticate)
 
 /**
  * @swagger
@@ -118,12 +118,12 @@ router.use(authenticate);
  *               $ref: '#/components/schemas/Error'
  */
 router.get(
-    '/',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
-    getAuthorizationsValidator,
-    validate,
-    authorizationController.getAuthorizations.bind(authorizationController)
-);
+  '/',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getAuthorizationsValidator,
+  validate,
+  authorizationController.getAuthorizations.bind(authorizationController)
+)
 
 /**
  * @swagger
@@ -285,10 +285,10 @@ router.get(
  *                                 type: string
  *                               email:
  *                                 type: string
- *                               nullable: true
+ *                                 nullable: true
  *                               phone:
  *                                 type: string
- *                               nullable: true
+ *                                 nullable: true
  *                               _count:
  *                                 type: integer
  *                                 description: 授权数量
@@ -378,12 +378,12 @@ router.get(
  *               $ref: '#/components/schemas/Error'
  */
 router.get(
-    '/stats',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
-    getAllUsersAuthorizationStatsValidator,
-    validate,
-    authorizationController.getAllUsersAuthorizationStats.bind(authorizationController)
-);
+  '/stats',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getAllUsersAuthorizationStatsValidator,
+  validate,
+  authorizationController.getAllUsersAuthorizationStats.bind(authorizationController)
+)
 
 /**
  * @swagger
@@ -484,20 +484,20 @@ router.get(
  *               $ref: '#/components/schemas/Error'
  */
 router.get(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
-    getAuthorizationDetailValidator,
-    validate,
-    authorizationController.getAuthorizationDetail.bind(authorizationController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getAuthorizationDetailValidator,
+  validate,
+  authorizationController.getAuthorizationDetail.bind(authorizationController)
+)
 
 router.delete(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    revokeAuthorizationValidator,
-    validate,
-    authorizationController.revokeAuthorization.bind(authorizationController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  revokeAuthorizationValidator,
+  validate,
+  authorizationController.revokeAuthorization.bind(authorizationController)
+)
 
 /**
  * @swagger
@@ -547,12 +547,12 @@ router.delete(
  *               $ref: '#/components/schemas/Error'
  */
 router.get(
-    '/call-token/:callToken',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
-    getByCallTokenValidator,
-    validate,
-    authorizationController.getByCallToken.bind(authorizationController)
-);
+  '/call-token/:callToken',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getByCallTokenValidator,
+  validate,
+  authorizationController.getByCallToken.bind(authorizationController)
+)
 
 /**
  * @swagger
@@ -568,7 +568,7 @@ router.get(
  *       - 当前冻结的额度总和
  *       - 按模型分组的统计（前10个）
  *       - 按设备分组的统计（前10个）
- *       
+ *
  *       该接口用于管理员查看用户的授权使用情况，帮助分析用户行为和使用模式。
  *     tags: [授权管理]
  *     security:
@@ -676,11 +676,11 @@ router.get(
  *               $ref: '#/components/schemas/Error'
  */
 router.get(
-    '/users/:userId/stats',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
-    getUserAuthorizationStatsValidator,
-    validate,
-    authorizationController.getUserAuthorizationStats.bind(authorizationController)
-);
+  '/users/:userId/stats',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getUserAuthorizationStatsValidator,
+  validate,
+  authorizationController.getUserAuthorizationStats.bind(authorizationController)
+)
 
-module.exports = router;
+module.exports = router

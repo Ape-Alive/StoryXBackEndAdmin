@@ -1,21 +1,21 @@
-const express = require('express');
-const router = express.Router();
-const providerController = require('../controllers/provider.controller');
-const providerApiKeyController = require('../controllers/providerApiKey.controller');
-const { authenticate, authorize } = require('../middleware/auth');
-const validate = require('../middleware/validate');
+const express = require('express')
+const router = express.Router()
+const providerController = require('../controllers/provider.controller')
+const providerApiKeyController = require('../controllers/providerApiKey.controller')
+const { authenticate, authorize } = require('../middleware/auth')
+const validate = require('../middleware/validate')
 const {
-    getProvidersValidator,
-    createProviderValidator,
-    updateProviderValidator,
-    getProviderDetailValidator,
-    updateProviderStatusValidator
-} = require('../validators/provider.validator');
-const { addProviderApiKeyValidator } = require('../validators/userApiKey.validator');
-const { ROLES } = require('../constants/roles');
+  getProvidersValidator,
+  createProviderValidator,
+  updateProviderValidator,
+  getProviderDetailValidator,
+  updateProviderStatusValidator,
+} = require('../validators/provider.validator')
+const { addProviderApiKeyValidator } = require('../validators/userApiKey.validator')
+const { ROLES } = require('../constants/roles')
 
 // 所有路由需要认证
-router.use(authenticate);
+router.use(authenticate)
 
 /**
  * @swagger
@@ -196,12 +196,12 @@ router.use(authenticate);
  */
 // 获取提供商列表（管理员和终端用户都可以访问）
 router.get(
-    '/',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
-    getProvidersValidator,
-    validate,
-    providerController.getProviders.bind(providerController)
-);
+  '/',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
+  getProvidersValidator,
+  validate,
+  providerController.getProviders.bind(providerController)
+)
 
 /**
  * @swagger
@@ -296,12 +296,12 @@ router.get(
  */
 // 获取提供商详情（管理员和终端用户都可以访问）
 router.get(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
-    getProviderDetailValidator,
-    validate,
-    providerController.getProviderDetail.bind(providerController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
+  getProviderDetailValidator,
+  validate,
+  providerController.getProviderDetail.bind(providerController)
+)
 
 /**
  * @swagger
@@ -382,12 +382,12 @@ router.get(
  */
 // 创建提供商（仅超级管理员）
 router.post(
-    '/',
-    authorize(ROLES.SUPER_ADMIN),
-    createProviderValidator,
-    validate,
-    providerController.createProvider.bind(providerController)
-);
+  '/',
+  authorize(ROLES.SUPER_ADMIN),
+  createProviderValidator,
+  validate,
+  providerController.createProvider.bind(providerController)
+)
 
 /**
  * @swagger
@@ -459,12 +459,12 @@ router.post(
  */
 // 更新提供商（仅超级管理员）
 router.put(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN),
-    updateProviderValidator,
-    validate,
-    providerController.updateProvider.bind(providerController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN),
+  updateProviderValidator,
+  validate,
+  providerController.updateProvider.bind(providerController)
+)
 
 /**
  * @swagger
@@ -502,12 +502,12 @@ router.put(
  */
 // 更新提供商状态（仅超级管理员）
 router.patch(
-    '/:id/status',
-    authorize(ROLES.SUPER_ADMIN),
-    updateProviderStatusValidator,
-    validate,
-    providerController.updateProviderStatus.bind(providerController)
-);
+  '/:id/status',
+  authorize(ROLES.SUPER_ADMIN),
+  updateProviderStatusValidator,
+  validate,
+  providerController.updateProviderStatus.bind(providerController)
+)
 
 /**
  * @swagger
@@ -534,12 +534,12 @@ router.patch(
  */
 // 删除提供商（仅超级管理员）
 router.delete(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN),
-    getProviderDetailValidator,
-    validate,
-    providerController.deleteProvider.bind(providerController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN),
+  getProviderDetailValidator,
+  validate,
+  providerController.deleteProvider.bind(providerController)
+)
 
 /**
  * @swagger
@@ -816,12 +816,12 @@ router.delete(
  *               message: "Internal server error"
  */
 router.get(
-    '/:id/api-keys',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
-    getProviderDetailValidator,
-    validate,
-    providerApiKeyController.getProviderApiKeys.bind(providerApiKeyController)
-);
+  '/:id/api-keys',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getProviderDetailValidator,
+  validate,
+  providerApiKeyController.getProviderApiKeys.bind(providerApiKeyController)
+)
 
 /**
  * @swagger
@@ -1069,7 +1069,6 @@ router.get(
  *                       message: "API Key is required"
  *                     }
  *                   ]
- *             examples:
  *               validationError:
  *                 summary: 验证失败
  *                 value:
@@ -1116,13 +1115,13 @@ router.get(
  *                   message: "Failed to update provider quota"
  */
 router.post(
-    '/:id/api-keys',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    getProviderDetailValidator,
-    addProviderApiKeyValidator,
-    validate,
-    providerApiKeyController.addProviderApiKey.bind(providerApiKeyController)
-);
+  '/:id/api-keys',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  getProviderDetailValidator,
+  addProviderApiKeyValidator,
+  validate,
+  providerApiKeyController.addProviderApiKey.bind(providerApiKeyController)
+)
 
 /**
  * @swagger
@@ -1238,11 +1237,11 @@ router.post(
  *                   message: "Database operation failed"
  */
 router.delete(
-    '/:id/api-keys/:apiKeyId',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    getProviderDetailValidator,
-    validate,
-    providerApiKeyController.deleteProviderApiKey.bind(providerApiKeyController)
-);
+  '/:id/api-keys/:apiKeyId',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  getProviderDetailValidator,
+  validate,
+  providerApiKeyController.deleteProviderApiKey.bind(providerApiKeyController)
+)
 
-module.exports = router;
+module.exports = router
