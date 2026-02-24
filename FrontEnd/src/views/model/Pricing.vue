@@ -4,23 +4,12 @@
     <div class="page-header">
       <div class="header-left">
         <h1 class="page-title">模型计费策略</h1>
-        <p class="page-description">
-          管理 AI 模型的价格配置，支持按Token计价和按调用次数计价。
-        </p>
+        <p class="page-description">管理 AI 模型的价格配置，支持按Token计价和按调用次数计价。</p>
       </div>
-      <el-button
-        type="primary"
-        :icon="Plus"
-        @click="handleAdd"
-        :disabled="!selectedModelId"
-      >
+      <el-button type="primary" :icon="Plus" @click="handleAdd" :disabled="!selectedModelId">
         新增价格
       </el-button>
-      <el-button
-        type="default"
-        @click="handleViewAll"
-        :disabled="selectedModelId === ''"
-      >
+      <el-button type="default" @click="handleViewAll" :disabled="selectedModelId === ''">
         查看全部
       </el-button>
     </div>
@@ -36,10 +25,7 @@
         @change="handleModelChange"
         :loading="modelsLoading"
       >
-        <el-option
-          label="全部模型"
-          value=""
-        />
+        <el-option label="全部模型" value="" />
         <el-option
           v-for="model in models"
           :key="model.id"
@@ -48,7 +34,11 @@
         >
           <div style="display: flex; justify-content: space-between; align-items: center">
             <span>{{ model.displayName || model.name }}</span>
-            <el-tag :type="model.isActive ? 'success' : 'info'" size="small" style="margin-left: 8px">
+            <el-tag
+              :type="model.isActive ? 'success' : 'info'"
+              size="small"
+              style="margin-left: 8px"
+            >
               {{ model.isActive ? '已启用' : '已禁用' }}
             </el-tag>
           </div>
@@ -91,7 +81,9 @@
     <!-- 分页器 -->
     <div class="pagination-wrapper">
       <div class="pagination-info">
-        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{ paginationRange.end }}
+        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{
+          paginationRange.end
+        }}
       </div>
       <el-pagination
         :current-page="pagination.page"
@@ -134,7 +126,8 @@ import {
   getModels,
   getModelPrices,
   createModelPrice,
-  updateModelPrice
+  updateModelPrice,
+  deleteModelPrice
 } from '@/api/model'
 import { getPackages } from '@/api/package'
 
@@ -173,7 +166,7 @@ const pagination = reactive({
 // 当前选中的模型名称
 const selectedModelName = computed(() => {
   const model = models.value.find(m => m.id === selectedModelId.value)
-  return model ? (model.displayName || model.name) : ''
+  return model ? model.displayName || model.name : ''
 })
 
 // 统计信息
@@ -281,24 +274,23 @@ function handleEdit(row) {
 
 // 删除
 function handleDelete(row) {
-  ElMessageBox.confirm(
-    `确定要删除该价格配置吗？`,
-    '确认删除',
-    {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }
-  )
+  const modelId = row.modelId || row.model?.id
+  if (!modelId) {
+    ElMessage.error('无法获取模型ID')
+    return
+  }
+  ElMessageBox.confirm(`确定要删除该价格配置吗？`, '确认删除', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  })
     .then(async () => {
       try {
-        // 注意：这里需要确认后端是否有删除接口，如果没有需要添加
-        ElMessage.success('删除功能待实现')
-        // const response = await deleteModelPrice(selectedModelId.value, row.id)
-        // if (response.success) {
-        //   ElMessage.success('删除成功')
-        //   fetchData()
-        // }
+        const response = await deleteModelPrice(modelId, row.id)
+        if (response.success) {
+          ElMessage.success('删除成功')
+          fetchData()
+        }
       } catch (error) {
         // 错误已在 request.js 中处理
       }
@@ -310,7 +302,8 @@ function handleDelete(row) {
 async function handleFormSuccess(data) {
   try {
     // 获取模型ID：编辑时从 data 或 currentPrice 中获取，新增时使用 selectedModelId
-    const modelId = data.modelId || (currentPrice.value && currentPrice.value.modelId) || selectedModelId.value
+    const modelId =
+      data.modelId || (currentPrice.value && currentPrice.value.modelId) || selectedModelId.value
 
     if (!modelId) {
       ElMessage.error('无法获取模型ID')
@@ -461,4 +454,3 @@ onMounted(() => {
   color: #64748b;
 }
 </style>
-

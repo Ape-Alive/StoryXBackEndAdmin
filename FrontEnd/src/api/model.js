@@ -98,3 +98,10 @@ export function updateModelPrice(modelId, priceId, data) {
   })
 }
 
+// 删除模型价格
+export function deleteModelPrice(modelId, priceId) {
+  return request({
+    url: `/models/${modelId}/prices/${priceId}`,
+    method: 'delete'
+  })
+}

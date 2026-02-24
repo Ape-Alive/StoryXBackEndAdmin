@@ -1,22 +1,23 @@
-const express = require('express');
-const router = express.Router();
-const modelController = require('../controllers/model.controller');
-const { authenticate, authorize } = require('../middleware/auth');
-const validate = require('../middleware/validate');
+const express = require('express')
+const router = express.Router()
+const modelController = require('../controllers/model.controller')
+const { authenticate, authorize } = require('../middleware/auth')
+const validate = require('../middleware/validate')
 const {
-    getModelsValidator,
-    createModelValidator,
-    updateModelValidator,
-    batchUpdateStatusValidator,
-    batchDeleteValidator,
-    getModelPricesValidator,
-    createModelPriceValidator,
-    updateModelPriceValidator
-} = require('../validators/model.validator');
-const { ROLES } = require('../constants/roles');
+  getModelsValidator,
+  createModelValidator,
+  updateModelValidator,
+  batchUpdateStatusValidator,
+  batchDeleteValidator,
+  getModelPricesValidator,
+  createModelPriceValidator,
+  updateModelPriceValidator,
+  deleteModelPriceValidator,
+} = require('../validators/model.validator')
+const { ROLES } = require('../constants/roles')
 
 // 所有路由需要认证
-router.use(authenticate);
+router.use(authenticate)
 
 /**
  * @swagger
@@ -25,24 +26,24 @@ router.use(authenticate);
  *     summary: 获取模型列表 [管理员/终端用户]
  *     description: |
  *       获取AI模型列表，支持多条件筛选、分页和排序。
- *       
+ *
  *       **权限说明**：
  *       - **管理员角色**：super_admin、platform_admin、read_only 可访问（可查看所有模型）
  *       - **终端用户角色**：user、basic_user 可访问（仅查看，不能进行增删改操作）
- *       
+ *
  *       **筛选说明**：
  *       - 所有筛选参数都是可选的，可以组合使用
  *       - **如果不传 type 参数，将返回所有类型的模型**（llm、video、image、tts）
  *       - 支持模糊搜索的字段：name、displayName、baseUrl
  *       - 支持精确匹配的字段：type、category、providerId、isActive、requiresKey
- *       
+ *
  *       **分页说明**：
  *       - page：页码，从1开始，默认1
  *       - pageSize：每页数量，默认20，建议不超过100
- *       
+ *
  *       **排序说明**：
  *       - 默认按创建时间降序排列（最新的在前）
- *       
+ *
  *       **使用示例**：
  *       - 获取所有模型：`GET /api/models`
  *       - 仅获取 llm 类型：`GET /api/models?type=llm`
@@ -243,12 +244,12 @@ router.use(authenticate);
  */
 // 获取模型列表（管理员和终端用户都可以访问）
 router.get(
-    '/',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
-    getModelsValidator,
-    validate,
-    modelController.getModels.bind(modelController)
-);
+  '/',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
+  getModelsValidator,
+  validate,
+  modelController.getModels.bind(modelController)
+)
 
 /**
  * @swagger
@@ -257,7 +258,7 @@ router.get(
  *     summary: 获取模型详情 [管理员/终端用户]
  *     description: |
  *       获取指定模型的详细信息，包括提供商信息、价格信息等。
- *       
+ *
  *       **权限说明**：
  *       - **管理员角色**：super_admin、platform_admin、read_only 可访问
  *       - **终端用户角色**：user、basic_user 可访问（仅查看）
@@ -346,11 +347,11 @@ router.get(
  */
 // 获取模型详情（管理员和终端用户都可以访问）
 router.get(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
-    validate,
-    modelController.getModelDetail.bind(modelController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY, ROLES.USER, ROLES.BASIC_USER),
+  validate,
+  modelController.getModelDetail.bind(modelController)
+)
 
 /**
  * @swagger
@@ -421,12 +422,12 @@ router.get(
  */
 // 创建模型
 router.post(
-    '/',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    createModelValidator,
-    validate,
-    modelController.createModel.bind(modelController)
-);
+  '/',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  createModelValidator,
+  validate,
+  modelController.createModel.bind(modelController)
+)
 
 /**
  * @swagger
@@ -488,12 +489,12 @@ router.post(
  */
 // 更新模型
 router.put(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    updateModelValidator,
-    validate,
-    modelController.updateModel.bind(modelController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  updateModelValidator,
+  validate,
+  modelController.updateModel.bind(modelController)
+)
 
 /**
  * @swagger
@@ -529,12 +530,12 @@ router.put(
  */
 // 更新模型状态
 router.patch(
-    '/:id/status',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    updateModelValidator,
-    validate,
-    modelController.updateModelStatus.bind(modelController)
-);
+  '/:id/status',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  updateModelValidator,
+  validate,
+  modelController.updateModelStatus.bind(modelController)
+)
 
 /**
  * @swagger
@@ -559,11 +560,11 @@ router.patch(
  */
 // 删除模型
 router.delete(
-    '/:id',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    validate,
-    modelController.deleteModel.bind(modelController)
-);
+  '/:id',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  validate,
+  modelController.deleteModel.bind(modelController)
+)
 
 /**
  * @swagger
@@ -599,12 +600,12 @@ router.delete(
  */
 // 批量更新模型状态
 router.patch(
-    '/batch/status',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    batchUpdateStatusValidator,
-    validate,
-    modelController.batchUpdateStatus.bind(modelController)
-);
+  '/batch/status',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  batchUpdateStatusValidator,
+  validate,
+  modelController.batchUpdateStatus.bind(modelController)
+)
 
 /**
  * @swagger
@@ -635,12 +636,12 @@ router.patch(
  */
 // 批量删除模型
 router.delete(
-    '/batch',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    batchDeleteValidator,
-    validate,
-    modelController.batchDelete.bind(modelController)
-);
+  '/batch',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  batchDeleteValidator,
+  validate,
+  modelController.batchDelete.bind(modelController)
+)
 
 /**
  * @swagger
@@ -649,18 +650,18 @@ router.delete(
  *     summary: 获取模型价格列表（分页查询）
  *     description: |
  *       获取模型价格配置列表，支持多条件筛选和分页查询。
- *       
+ *
  *       **筛选说明：**
  *       - `modelId`：可选，不传则返回全部模型的价格列表
  *       - `packageId`：可选，筛选特定套餐的价格
  *       - `pricingType`：可选，筛选计价类型（token/call）
  *       - 时间筛选：支持按生效时间和过期时间范围筛选
- *       
+ *
  *       **返回数据说明：**
  *       - `maxToken`：仅在 `pricingType` 为 `token` 时有效
  *       - `inputPrice/outputPrice`：仅在 `pricingType` 为 `token` 时有值
  *       - `callPrice`：仅在 `pricingType` 为 `call` 时有值
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       # 获取所有价格
@@ -671,7 +672,7 @@ router.delete(
  *           "page": 1,
  *           "pageSize": 20
  *         }'
- *       
+ *
  *       # 获取特定模型的价格
  *       curl -X POST "http://localhost:5800/api/models/prices" \
  *         -H "Authorization: Bearer {token}" \
@@ -844,12 +845,12 @@ router.delete(
  */
 // 获取模型价格列表（POST分页查询）
 router.post(
-    '/prices',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
-    getModelPricesValidator,
-    validate,
-    modelController.getModelPrices.bind(modelController)
-);
+  '/prices',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getModelPricesValidator,
+  validate,
+  modelController.getModelPrices.bind(modelController)
+)
 
 /**
  * @swagger
@@ -858,21 +859,21 @@ router.post(
  *     summary: 创建模型价格
  *     description: |
  *       为指定模型创建价格配置。
- *       
+ *
  *       **计价类型说明：**
  *       - **token（按Token计价）**：需要设置 `inputPrice` 和 `outputPrice`，可选设置 `maxToken`
  *       - **call（按调用次数计价）**：需要设置 `callPrice`，`maxToken` 字段无效
- *       
+ *
  *       **maxToken字段说明：**
  *       - 仅在 `pricingType` 为 `token` 时有效
  *       - `null` 或空：表示不限制，预估费用计算时使用用户提供的 `estimatedTokens`
  *       - 正整数：表示该模型的最大token数，预估费用计算时会优先使用此值
  *       - 例如：`gemini-2.5-flash-image` 模型如果设置了 `maxToken=8192`，则无论用户传入多少 `estimatedTokens`，预估费用都按 `maxToken=8192` 计算
- *       
+ *
  *       **套餐价格说明：**
  *       - `packageId` 为 `null` 或空：表示默认价格，适用于所有套餐
  *       - `packageId` 有值：表示该套餐的专属价格，优先级高于默认价格
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       # 创建默认价格（按Token计价，带maxToken）
@@ -886,7 +887,7 @@ router.post(
  *           "maxToken": 8192,
  *           "effectiveAt": "2024-01-01T00:00:00Z"
  *         }'
- *       
+ *
  *       # 创建套餐专属价格（按调用次数计价）
  *       curl -X POST "http://localhost:5800/api/models/{id}/prices/create" \
  *         -H "Authorization: Bearer {token}" \
@@ -945,24 +946,24 @@ router.post(
  *                 example: 8192
  *                 description: |
  *                   最大Token数（pricingType为token时使用），用于预估费用计算
- *                   
+ *
  *                   **字段说明：**
  *                   - `null` 或空：表示不限制，使用用户提供的estimatedTokens
  *                   - 正整数：表示该模型的最大token数，预估费用计算时会优先使用此值
- *                   
+ *
  *                   **计费逻辑示例：**
  *                   假设模型 `gemini-2.5-flash-image` 的价格配置：
  *                   - `pricingType`: `token`
  *                   - `maxToken`: `8192`
  *                   - `inputPrice`: `0.001`
  *                   - `outputPrice`: `0.002`
- *                   
+ *
  *                   用户申请授权时传入 `estimatedTokens=10000`：
  *                   - 由于设置了 `maxToken=8192`，预估费用按 `maxToken` 计算（而不是10000）
  *                   - 预估输入token：`8192 * 0.5 = 4096`
  *                   - 预估输出token：`8192 * 0.5 = 4096`
  *                   - 预估费用：`0.001 * 4096 + 0.002 * 4096 = 12.288` 积分
- *                   
+ *
  *                   如果 `maxToken` 为 `null`：
  *                   - 使用用户提供的 `estimatedTokens=10000`
  *                   - 预估输入token：`10000 * 0.5 = 5000`
@@ -1064,12 +1065,12 @@ router.post(
  */
 // 创建模型价格
 router.post(
-    '/:id/prices/create',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    createModelPriceValidator,
-    validate,
-    modelController.createModelPrice.bind(modelController)
-);
+  '/:id/prices/create',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  createModelPriceValidator,
+  validate,
+  modelController.createModelPrice.bind(modelController)
+)
 
 /**
  * @swagger
@@ -1078,16 +1079,16 @@ router.post(
  *     summary: 更新模型价格
  *     description: |
  *       更新指定模型的价格配置。
- *       
+ *
  *       **更新说明：**
  *       - 所有字段都是可选的，只更新提供的字段
  *       - 更新后会自动清除相关缓存，确保价格计算使用最新配置
- *       
+ *
  *       **maxToken字段更新：**
  *       - 如果 `pricingType` 为 `token`，可以更新 `maxToken`
  *       - 设置为 `null` 表示移除限制
  *       - 设置为正整数表示设置新的最大token数
- *       
+ *
  *       **使用示例：**
  *       ```bash
  *       # 更新maxToken
@@ -1097,7 +1098,7 @@ router.post(
  *         -d '{
  *           "maxToken": 16384
  *         }'
- *       
+ *
  *       # 移除maxToken限制
  *       curl -X PUT "http://localhost:5800/api/models/{id}/prices/{priceId}" \
  *         -H "Authorization: Bearer {token}" \
@@ -1151,11 +1152,11 @@ router.post(
  *                 example: 8192
  *                 description: |
  *                   最大Token数（pricingType为token时使用），用于预估费用计算
- *                   
+ *
  *                   **字段说明：**
  *                   - `null` 或空：表示不限制，使用用户提供的estimatedTokens
  *                   - 正整数：表示该模型的最大token数，预估费用计算时会优先使用此值
- *                   
+ *
  *                   **计费逻辑：**
  *                   - 如果设置了 `maxToken`，预估费用计算时会优先使用 `maxToken`（即使 `estimatedTokens` 更大）
  *                   - 如果 `maxToken` 为 `null`，使用用户提供的 `estimatedTokens`
@@ -1259,11 +1260,80 @@ router.post(
  */
 // 更新模型价格
 router.put(
-    '/:id/prices/:priceId',
-    authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
-    updateModelPriceValidator,
-    validate,
-    modelController.updateModelPrice.bind(modelController)
-);
+  '/:id/prices/:priceId',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  updateModelPriceValidator,
+  validate,
+  modelController.updateModelPrice.bind(modelController)
+)
 
-module.exports = router;
+/**
+ * @swagger
+ * /api/models/{id}/prices/{priceId}:
+ *   delete:
+ *     summary: 删除模型价格
+ *     description: |
+ *       删除指定模型的一条价格配置。
+ *
+ *       **说明：**
+ *       - 删除后会自动清除该模型的价格缓存
+ *       - 仅超级管理员、平台管理员可操作
+ *
+ *       **使用示例：**
+ *       ```bash
+ *       curl -X DELETE "http://localhost:5800/api/models/{modelId}/prices/{priceId}" \
+ *         -H "Authorization: Bearer {token}"
+ *       ```
+ *     tags: [模型管理]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 模型ID
+ *       - in: path
+ *         name: priceId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: 价格ID
+ *     responses:
+ *       200:
+ *         description: 删除成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/Success'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           description: 已删除的价格ID
+ *                           example: "price_123456"
+ *       404:
+ *         description: 价格不存在
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               success: false
+ *               message: "Model price not found"
+ */
+// 删除模型价格
+router.delete(
+  '/:id/prices/:priceId',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  deleteModelPriceValidator,
+  validate,
+  modelController.deleteModelPrice.bind(modelController)
+)
+
+module.exports = router

@@ -297,6 +297,21 @@
             "bearerAuth": []
           }
         ]
+      },
+      "delete": {
+        "summary": "删除模型价格",
+        "deprecated": false,
+        "description": "删除指定模型的一条价格配置。删除后会自动清除该模型的价格缓存。",
+        "tags": ["模型管理"],
+        "parameters": [
+          {"name": "id", "in": "path", "description": "模型ID", "required": true, "schema": {"type": "string"}},
+          {"name": "priceId", "in": "path", "description": "价格ID", "required": true, "schema": {"type": "string"}}
+        ],
+        "responses": {
+          "200": {"description": "删除成功", "headers": {}},
+          "404": {"description": "价格不存在", "headers": {}}
+        },
+        "security": [{"bearerAuth": []}]
       }
     },
     "/api/models/{id}/prices/create": {

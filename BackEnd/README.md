@@ -76,6 +76,7 @@ BackEnd/
 ## 已实现功能模块
 
 ### ✅ 1. 认证模块
+
 - 发送注册验证码（邮箱验证码）
 - 管理员注册（除超级管理员外的所有角色，邮箱验证码注册）
 - Excel 批量导入注册（仅管理员可操作，跳过验证码验证）
@@ -84,6 +85,7 @@ BackEnd/
 - 修改密码
 
 ### ✅ 2. 用户管理模块
+
 - 用户列表查询（分页、筛选、排序）
 - 用户详情查看（包含使用统计）
 - 用户状态管理（冻结、封禁）
@@ -91,6 +93,7 @@ BackEnd/
 - 用户数据导出
 
 ### ✅ 3. 提供商管理模块（仅超级管理员）
+
 - 提供商列表查询
 - 提供商详情查看
 - 创建提供商
@@ -99,6 +102,7 @@ BackEnd/
 - 启用/禁用提供商
 
 ### ✅ 4. 模型管理模块
+
 - 模型列表查询（分页、筛选、排序）
 - 模型详情查看
 - 创建模型
@@ -108,6 +112,7 @@ BackEnd/
 - 模型价格管理
 
 ### ✅ 5. 日志与审计模块
+
 - 管理员操作日志查询
 - AI 调用日志查询
 - 日志详情查看
@@ -176,11 +181,13 @@ npm run prisma:seed
 ### 4. 运行项目
 
 开发环境：
+
 ```bash
 npm run dev
 ```
 
 生产环境：
+
 ```bash
 npm start
 ```
@@ -203,6 +210,7 @@ npm run prisma:studio
 ## API 路由
 
 ### 认证
+
 - `POST /api/auth/send-register-code` - 发送注册验证码（无需认证）
 - `POST /api/auth/register` - 管理员注册（无需认证，除超级管理员外的所有角色）
 - `POST /api/auth/batch-import-register` - Excel 批量导入注册（需要认证，仅超级管理员和平台管理员）
@@ -212,6 +220,7 @@ npm run prisma:studio
 - `POST /api/auth/change-password` - 修改密码（需要认证）
 
 ### 用户管理
+
 - `GET /api/users` - 获取用户列表（需要认证）
 - `GET /api/users/:userId` - 获取用户详情（需要认证）
 - `PATCH /api/users/:userId/status` - 更新用户状态（需要认证）
@@ -220,6 +229,7 @@ npm run prisma:studio
 - `POST /api/users/export` - 导出用户数据（需要认证）
 
 ### 提供商管理
+
 - `GET /api/providers` - 获取提供商列表（需要认证）
 - `GET /api/providers/:id` - 获取提供商详情（需要认证）
 - `POST /api/providers` - 创建提供商（仅超级管理员）
@@ -228,6 +238,7 @@ npm run prisma:studio
 - `DELETE /api/providers/:id` - 删除提供商（仅超级管理员）
 
 ### 模型管理
+
 - `GET /api/models` - 获取模型列表（需要认证）
 - `GET /api/models/:id` - 获取模型详情（需要认证）
 - `POST /api/models` - 创建模型（需要认证）
@@ -239,14 +250,17 @@ npm run prisma:studio
 - `GET /api/models/:id/prices` - 获取模型价格列表（需要认证）
 - `POST /api/models/:id/prices` - 创建模型价格（需要认证）
 - `PUT /api/models/:id/prices/:priceId` - 更新模型价格（需要认证）
+- `DELETE /api/models/:id/prices/:priceId` - 删除模型价格（需要认证）
 
 ### 日志与审计
+
 - `GET /api/logs/operation` - 获取管理员操作日志（需要认证）
 - `GET /api/logs/operation/:id` - 获取操作日志详情（需要认证）
 - `GET /api/logs/ai` - 获取 AI 调用日志（需要认证）
 - `GET /api/logs/ai/:requestId` - 获取 AI 调用日志详情（需要认证）
 
 ### API 文档
+
 - `GET /api-docs` - Swagger UI 界面（HTML）
 - `GET /api-docs.json` - API 规范 JSON（OpenAPI 3.0）
 - `GET /api/docs/spec` - API 规范 JSON（用于 ApiFix 拉取）
@@ -270,8 +284,8 @@ npm run prisma:studio
 使用统一的自定义错误类：
 
 ```javascript
-const { NotFoundError, BadRequestError } = require('../utils/errors');
-throw new NotFoundError('User not found');
+const { NotFoundError, BadRequestError } = require('../utils/errors')
+throw new NotFoundError('User not found')
 ```
 
 ### 2. 响应格式
@@ -279,9 +293,9 @@ throw new NotFoundError('User not found');
 使用统一的响应工具：
 
 ```javascript
-const ResponseHandler = require('../utils/response');
-ResponseHandler.success(res, data, 'Success');
-ResponseHandler.paginated(res, data, pagination);
+const ResponseHandler = require('../utils/response')
+ResponseHandler.success(res, data, 'Success')
+ResponseHandler.paginated(res, data, pagination)
 ```
 
 ### 3. 权限控制
@@ -289,9 +303,9 @@ ResponseHandler.paginated(res, data, pagination);
 使用中间件进行权限控制：
 
 ```javascript
-const { authenticate, authorize } = require('../middleware/auth');
-const { ROLES } = require('../constants/roles');
-router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN), controller);
+const { authenticate, authorize } = require('../middleware/auth')
+const { ROLES } = require('../constants/roles')
+router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN), controller)
 ```
 
 ### 4. 请求验证
@@ -299,12 +313,9 @@ router.get('/', authenticate, authorize(ROLES.SUPER_ADMIN), controller);
 使用 express-validator 进行请求验证：
 
 ```javascript
-const { body } = require('express-validator');
-const validate = require('../middleware/validate');
-const validator = [
-  body('email').isEmail().withMessage('Invalid email'),
-  validate
-];
+const { body } = require('express-validator')
+const validate = require('../middleware/validate')
+const validator = [body('email').isEmail().withMessage('Invalid email'), validate]
 ```
 
 ## 数据库 Schema
@@ -335,11 +346,13 @@ const validator = [
 ### Excel 格式要求
 
 1. **必需列**：
-   - `username` - 用户名（3-20个字符，只能包含字母、数字和下划线）
+
+   - `username` - 用户名（3-20 个字符，只能包含字母、数字和下划线）
    - `email` - 邮箱（有效邮箱格式）
    - `role` - 角色（platform_admin, operator, risk_control, finance, read_only）
 
 2. **可选列**：
+
    - `password` - 密码（如果为空，将使用默认密码或生成随机密码）
 
 3. **示例**：
@@ -353,6 +366,7 @@ const validator = [
 ### API 使用
 
 **JSON 格式返回**：
+
 ```bash
 POST /api/auth/batch-import-register
 Content-Type: multipart/form-data
@@ -363,6 +377,7 @@ defaultPassword: (可选) 默认密码
 ```
 
 **Excel 文件格式返回**：
+
 ```bash
 POST /api/auth/batch-import-register-file
 Content-Type: multipart/form-data
@@ -377,11 +392,13 @@ defaultPassword: (可选) 默认密码
 ## 注意事项
 
 1. **默认管理员账号**：
+
    - 用户名: `admin`
    - 密码: `admin123456`
    - 首次运行后请立即修改密码
 
 2. **生产环境配置**：
+
    - 修改 `JWT_SECRET` 为强随机字符串
    - 修改数据库连接信息
    - 配置合适的 CORS 源
@@ -389,10 +406,12 @@ defaultPassword: (可选) 默认密码
    - 配置 SMTP 服务器信息（用于邮箱验证码）
 
 3. **数据库迁移**：
+
    - 修改 `schema.prisma` 后运行 `npm run prisma:migrate`
    - 每次迁移都会生成新的迁移文件
 
 4. **操作日志**：
+
    - 所有管理员操作都会记录日志
    - 日志不可篡改，用于审计
 
