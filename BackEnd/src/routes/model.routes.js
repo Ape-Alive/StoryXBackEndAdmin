@@ -214,6 +214,10 @@ router.use(authenticate)
  *                         nullable: true
  *                         description: API配置参数（JSON字符串）
  *                         example: '{"temperature": 0.7, "max_tokens": 2000}'
+ *                       modelTag:
+ *                         type: string
+ *                         nullable: true
+ *                         description: 模型标签，逗号隔开
  *                       createdAt:
  *                         type: string
  *                         format: date-time
@@ -330,6 +334,10 @@ router.get(
  *                       type: string
  *                       nullable: true
  *                       description: API配置参数（JSON字符串）
+ *                     modelTag:
+ *                       type: string
+ *                       nullable: true
+ *                       description: 模型标签，逗号隔开
  *                     createdAt:
  *                       type: string
  *                       format: date-time
@@ -414,6 +422,10 @@ router.get(
  *                 type: string
  *                 example: '{"temperature": 0.7, "max_tokens": 2000}'
  *                 description: API配置参数（JSON字符串），存储每个模型独有的请求参数
+ *               modelTag:
+ *                 type: string
+ *                 example: chat,gpt4,vision
+ *                 description: 模型标签，逗号隔开的字符串
  *     responses:
  *       201:
  *         description: 创建成功
@@ -479,6 +491,10 @@ router.post(
  *                 type: string
  *                 example: '{"temperature": 0.7, "max_tokens": 2000}'
  *                 description: API配置参数（JSON字符串），存储每个模型独有的请求参数
+ *               modelTag:
+ *                 type: string
+ *                 example: chat,gpt4,vision
+ *                 description: 模型标签，逗号隔开的字符串
  *     responses:
  *       200:
  *         description: 更新成功

@@ -24,6 +24,16 @@ const getModelsValidator = [
 ]
 
 /**
+ * modelTag 验证规则（创建和更新共用）
+ */
+const modelTagValidator = [
+  body('modelTag')
+    .optional()
+    .isString()
+    .withMessage('Model tag must be a string (comma-separated tags)'),
+]
+
+/**
  * 创建模型验证
  */
 const createModelValidator = [
@@ -70,6 +80,7 @@ const createModelValidator = [
       return true
     })
     .withMessage('API config must be a valid JSON string'),
+  ...modelTagValidator,
 ]
 
 /**
@@ -99,6 +110,7 @@ const updateModelValidator = [
       return true
     })
     .withMessage('API config must be a valid JSON string'),
+  ...modelTagValidator,
 ]
 
 /**

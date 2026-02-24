@@ -202,6 +202,7 @@ model AIModel {
   isActive    Boolean  @default(true)
   requiresKey Boolean  @default(false) // 是否需要 API 密钥
   apiConfig   String? @db.Text // API配置参数（JSON字符串），存储每个模型独有的请求参数
+  modelTag    String?  // 模型标签，逗号隔开的字符串，如 "chat,gpt4,vision"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

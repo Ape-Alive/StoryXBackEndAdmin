@@ -141,6 +141,7 @@ class ModelRepository {
         isActive: data.isActive !== undefined ? data.isActive : true,
         requiresKey: data.requiresKey !== undefined ? data.requiresKey : false,
         apiConfig: data.apiConfig || null,
+        modelTag: data.modelTag || null,
       },
       include: {
         provider: true,
@@ -162,6 +163,7 @@ class ModelRepository {
     if (data.isActive !== undefined) updateData.isActive = data.isActive
     if (data.requiresKey !== undefined) updateData.requiresKey = data.requiresKey
     if (data.apiConfig !== undefined) updateData.apiConfig = data.apiConfig || null
+    if (data.modelTag !== undefined) updateData.modelTag = data.modelTag || null
 
     updateData.updatedAt = new Date()
 

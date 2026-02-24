@@ -40,6 +40,12 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="模型标签" min-width="140" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span class="tag-text">{{ row.modelTag || '-' }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="接口路径" min-width="200" show-overflow-tooltip>
         <template #default="{ row }">
           <span class="base-url">{{ row.baseUrl }}</span>
@@ -228,7 +234,8 @@ function handleDelete(row) {
   font-weight: 500;
 }
 
-.category-text {
+.category-text,
+.tag-text {
   font-size: 13px;
   color: #64748b;
 }

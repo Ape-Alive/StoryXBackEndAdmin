@@ -48,6 +48,26 @@
         />
       </el-form-item>
 
+      <el-form-item label="模型标签" prop="modelTag">
+        <el-select
+          v-model="modelTagArr"
+          multiple
+          filterable
+          allow-create
+          default-first-option
+          placeholder="选择或输入标签，如：chat、gpt4、vision"
+          style="width: 100%"
+        >
+          <el-option
+            v-for="tag in modelTagOptions"
+            :key="tag"
+            :label="tag"
+            :value="tag"
+          />
+        </el-select>
+        <div class="form-tip">可从下拉选择常用标签，或输入新标签后回车添加</div>
+      </el-form-item>
+
       <el-form-item label="提供商" prop="providerId">
         <el-select
           v-model="formData.providerId"
@@ -134,12 +154,17 @@ const formRef = ref(null)
 const submitting = ref(false)
 const providers = ref([])
 const providersLoading = ref(false)
+const modelTagArr = ref([])
+
+// 常用模型标签选项
+const modelTagOptions = ['llm', 'image-editor', 'tts', 'image', 'video']
 
 const formData = reactive({
   name: '',
   displayName: '',
   type: '',
   category: '',
+  modelTag: '',
   providerId: '',
   baseUrl: '',
   description: '',
@@ -202,12 +227,16 @@ async function fetchProviders() {
 watch(() => props.modelValue, (val) => {
   visible.value = val
   if (val && props.model) {
+    modelTagArr.value = props.model.modelTag
+      ? props.model.modelTag.split(',').map(t => t.trim()).filter(Boolean)
+      : []
     Object.assign(formData, {
       id: props.model.id,
       name: props.model.name || '',
       displayName: props.model.displayName || '',
       type: props.model.type || '',
       category: props.model.category || '',
+      modelTag: props.model.modelTag || '',
       providerId: props.model.providerId || '',
       baseUrl: props.model.baseUrl || '',
       description: props.model.description || '',
@@ -216,6 +245,7 @@ watch(() => props.modelValue, (val) => {
       isActive: props.model.isActive !== undefined ? props.model.isActive : true
     })
   } else if (val) {
+    modelTagArr.value = []
     // 重置表单
     Object.assign(formData, {
       id: null,
@@ -223,6 +253,7 @@ watch(() => props.modelValue, (val) => {
       displayName: '',
       type: '',
       category: '',
+      modelTag: '',
       providerId: '',
       baseUrl: '',
       description: '',
@@ -242,6 +273,7 @@ watch(visible, (val) => {
 
 function handleClose() {
   visible.value = false
+  modelTagArr.value = []
   formRef.value?.resetFields()
 }
 
@@ -249,7 +281,13 @@ function handleSubmit() {
   formRef.value?.validate((valid) => {
     if (valid) {
       submitting.value = true
-      emit('success', { ...formData })
+      const payload = {
+        ...formData,
+        modelTag: Array.isArray(modelTagArr.value)
+          ? modelTagArr.value.join(',')
+          : (modelTagArr.value || '')
+      }
+      emit('success', payload)
       submitting.value = false
     }
   })

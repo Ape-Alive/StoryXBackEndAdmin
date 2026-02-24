@@ -220,6 +220,11 @@
                     "type": "boolean",
                     "default": false,
                     "description": "是否需要API密钥"
+                  },
+                  "modelTag": {
+                    "type": "string",
+                    "description": "模型标签，逗号隔开",
+                    "example": "chat,gpt4,vision"
                   }
                 }
               }
@@ -347,6 +352,11 @@
                   "requiresKey": {
                     "type": "boolean",
                     "description": "是否需要API密钥"
+                  },
+                  "modelTag": {
+                    "type": "string",
+                    "description": "模型标签，逗号隔开",
+                    "example": "chat,gpt4,vision"
                   }
                 }
               }
