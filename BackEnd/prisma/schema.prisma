@@ -439,10 +439,12 @@ model Prompt {
   type        String   // system, system_user, user
   userId      String?  // 创建者ID（如果是用户提示词）
   systemId    String?  // 关联的system类型提示词ID（system_user和user类型使用）
-  version     Int      @default(1)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  version        Int      @default(1)
+  isActive       Boolean  @default(true)
+  isStylePrompt  Boolean  @default(false) // 是否是风格提示词（仅 system_user、user 类型使用）
+  stylePromptKey String?  // 风格提示词标识（isStylePrompt 为 true 时必填，可重复）
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   category    PromptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
   versions    PromptVersion[]

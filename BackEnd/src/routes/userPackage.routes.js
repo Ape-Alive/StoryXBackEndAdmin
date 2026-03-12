@@ -249,8 +249,9 @@ router.use(authenticate);
  *       - 只能订阅已启用（isActive=true）的套餐
  *       - 免费套餐和试用套餐可以直接订阅
  *       - 付费套餐必须通过订单流程购买，不能直接订阅（会返回400错误）
- *       - 如果套餐不可叠加（isStackable=false），且用户已有其他套餐，则不能订阅
- *       - 如果套餐可叠加（isStackable=true），用户可以同时拥有多个该套餐
+ *       - 若用户已拥有该套餐且仍在有效期内，不允许重复订阅
+ *       - 若用户购买的是不同套餐，允许订阅（用户可同时拥有多个不同套餐）
+ *       - 若套餐可叠加（isStackable=true），用户可重复订阅同一套餐
  *
  *       **重新购买（续费）规则：**
  *       - 如果用户已订阅该套餐，但套餐已过期，允许重新购买（续费）
@@ -269,7 +270,7 @@ router.use(authenticate);
  *       - 优先级用于多个套餐时的排序和选择
  *
  *       **注意事项：**
- *       - 如果用户已订阅该套餐且套餐未过期且还有积分，且套餐不可叠加，会返回409错误
+ *       - 若用户已订阅该套餐且套餐未过期，会返回409错误（不允许重复购买同一套餐）
  *       - 如果套餐已禁用，会返回404错误
  *       - 付费套餐必须通过创建订单的方式购买
  *     tags: [套餐订阅]
@@ -341,22 +342,14 @@ router.use(authenticate);
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       409:
- *         description: 已订阅该套餐且套餐未过期且还有积分，且套餐不可叠加
+ *         description: 已订阅该套餐且套餐仍在有效期内（不允许重复购买同一套餐）
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
- *             examples:
- *               activePackage:
- *                 summary: 套餐未过期且还有积分
- *                 value:
- *                   success: false
- *                   message: "User already has this package and it is still active"
- *               notStackable:
- *                 summary: 套餐不可叠加
- *                 value:
- *                   success: false
- *                   message: "User already has this package and it is not stackable"
+ *             example:
+ *               success: false
+ *               message: "User already has this package and it is still active"
  */
 router.post(
     '/subscribe',

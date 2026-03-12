@@ -168,7 +168,9 @@ class PromptRepository {
         userId: data.userId || null,
         systemId: data.systemId || null,
         version: 1,
-        isActive: data.isActive !== undefined ? data.isActive : true
+        isActive: data.isActive !== undefined ? data.isActive : true,
+        isStylePrompt: data.isStylePrompt === true,
+        stylePromptKey: data.isStylePrompt ? (data.stylePromptKey || null) : null
       },
       include: {
         category: true,
@@ -236,6 +238,12 @@ class PromptRepository {
     if (data.tags !== undefined) updateData.tags = data.tags ? JSON.stringify(data.tags) : null;
     if (data.systemId !== undefined) updateData.systemId = data.systemId;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.isStylePrompt !== undefined) {
+      updateData.isStylePrompt = data.isStylePrompt === true;
+      updateData.stylePromptKey = data.isStylePrompt ? (data.stylePromptKey || null) : null;
+    } else if (data.stylePromptKey !== undefined) {
+      updateData.stylePromptKey = data.stylePromptKey || null;
+    }
 
     updateData.version = prompt.version + 1;
     updateData.updatedAt = new Date();

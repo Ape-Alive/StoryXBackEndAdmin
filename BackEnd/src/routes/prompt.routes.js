@@ -371,6 +371,14 @@ router.get(
  *                 type: boolean
  *                 default: true
  *                 description: 是否启用
+ *               isStylePrompt:
+ *                 type: boolean
+ *                 default: false
+ *                 description: 是否是风格提示词（仅 system_user、user 类型可用，为 true 时 stylePromptKey 必填）
+ *               stylePromptKey:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 风格提示词唯一标识（isStylePrompt 为 true 时必填，全库唯一）
  *     responses:
  *       201:
  *         description: 创建成功
@@ -894,6 +902,13 @@ router.get(
  *               isActive:
  *                 type: boolean
  *                 description: 是否启用
+ *               isStylePrompt:
+ *                 type: boolean
+ *                 description: 是否是风格提示词（仅 system_user、user 类型可用）
+ *               stylePromptKey:
+ *                 type: string
+ *                 nullable: true
+ *                 description: 风格提示词唯一标识（isStylePrompt 为 true 时必填）
  *     responses:
  *       200:
  *         description: 更新成功

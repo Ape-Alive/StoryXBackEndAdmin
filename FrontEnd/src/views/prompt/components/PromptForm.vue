@@ -98,6 +98,24 @@
         <div class="form-tip">用户提示词必须关联一个系统提示词</div>
       </el-form-item>
 
+      <template v-if="formData.type === 'system_user' || formData.type === 'user'">
+        <el-form-item label="是否是风格提示词" prop="isStylePrompt">
+          <el-switch v-model="formData.isStylePrompt" />
+          <div class="form-tip">开启后需填写风格提示词唯一标识</div>
+        </el-form-item>
+        <el-form-item
+          v-if="formData.isStylePrompt"
+          label="风格提示词标识"
+          prop="stylePromptKey"
+        >
+          <el-input
+            v-model="formData.stylePromptKey"
+            placeholder="请输入唯一标识，如 scene_style_01"
+          />
+          <div class="form-tip">用于系统内部识别该风格提示词</div>
+        </el-form-item>
+      </template>
+
       <el-form-item label="标签" prop="tags">
         <el-select
           v-model="formData.tags"
@@ -105,9 +123,17 @@
           filterable
           allow-create
           default-first-option
-          placeholder="请输入标签，按回车添加"
+          placeholder="选择或输入标签"
           style="width: 100%"
-        />
+        >
+          <el-option
+            v-for="tag in tagOptions"
+            :key="tag"
+            :label="tag"
+            :value="tag"
+          />
+        </el-select>
+        <div class="form-tip">可从下拉选择常用标签，或输入新标签后回车添加</div>
       </el-form-item>
 
       <el-form-item label="状态" prop="isActive">
@@ -160,6 +186,9 @@ const submitting = ref(false)
 const categories = ref([])
 const systemPrompts = ref([])
 
+// 固定标签选项
+const tagOptions = ['sceneGeneration', 'shotImage', 'roleVideo', 'roleImage', 'scriptGeneration']
+
 const formData = reactive({
   id: null,
   functionKey: '',
@@ -169,6 +198,8 @@ const formData = reactive({
   categoryId: '',
   type: props.promptType || '',
   systemId: '',
+  isStylePrompt: false,
+  stylePromptKey: '',
   tags: [],
   isActive: true
 })
@@ -186,6 +217,13 @@ const rules = computed(() => {
   // 如果是 system_user 或 user 类型，systemId 为必填
   if (formData.type === 'system_user' || formData.type === 'user') {
     baseRules.systemId = [{ required: true, message: '请选择关联的系统提示词', trigger: 'change' }]
+    // 当是风格提示词时，stylePromptKey 必填
+    if (formData.isStylePrompt) {
+      baseRules.stylePromptKey = [
+        { required: true, message: '请输入风格提示词唯一标识', trigger: 'blur' },
+        { pattern: /^[a-zA-Z0-9_-]+$/, message: '标识只能包含字母、数字、下划线和连字符', trigger: 'blur' }
+      ]
+    }
   }
 
   return baseRules
@@ -227,6 +265,8 @@ watch(
       formData.categoryId = val.categoryId || ''
       formData.type = val.type || ''
       formData.systemId = val.systemId || ''
+      formData.isStylePrompt = val.isStylePrompt === true
+      formData.stylePromptKey = val.stylePromptKey || ''
       formData.isActive = val.isActive !== undefined ? val.isActive : true
       try {
         formData.tags = val.tags
@@ -274,6 +314,8 @@ function resetForm() {
   formData.categoryId = ''
   formData.type = props.promptType || ''
   formData.systemId = ''
+  formData.isStylePrompt = false
+  formData.stylePromptKey = ''
   formData.tags = []
   formData.isActive = true
   formRef.value?.clearValidate()
@@ -301,6 +343,10 @@ async function handleSubmit() {
           systemId: formData.systemId || null,
           tags: formData.tags,
           isActive: formData.isActive
+        }
+        if (formData.type === 'system_user' || formData.type === 'user') {
+          data.isStylePrompt = formData.isStylePrompt
+          data.stylePromptKey = formData.isStylePrompt ? (formData.stylePromptKey?.trim() || null) : null
         }
 
         emit('success', data)

@@ -48,6 +48,19 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="风格提示词" width="120" align="center">
+        <template #default="{ row }">
+          <template v-if="row.type === 'system_user' || row.type === 'user'">
+            <el-tag v-if="row.isStylePrompt" type="success" size="small">是</el-tag>
+            <el-tag v-else type="info" size="small">否</el-tag>
+            <div v-if="row.isStylePrompt && row.stylePromptKey" class="style-key-text">
+              {{ row.stylePromptKey }}
+            </div>
+          </template>
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="版本" width="100" align="center">
         <template #default="{ row }">
           <el-tag type="info" size="small">v{{ row.version }}</el-tag>
@@ -297,6 +310,12 @@ function handleVersions(row) {
 .version-count {
   font-size: 11px;
   color: #94a3b8;
+  margin-top: 4px;
+}
+
+.style-key-text {
+  font-size: 12px;
+  color: #64748b;
   margin-top: 4px;
 }
 

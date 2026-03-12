@@ -51,6 +51,14 @@
             </el-button>
           </div>
         </el-descriptions-item>
+        <el-descriptions-item
+          v-if="(prompt.type === 'system_user' || prompt.type === 'user') && prompt.isStylePrompt"
+          label="风格提示词"
+          :span="2"
+        >
+          <el-tag type="success" size="small">是</el-tag>
+          <span v-if="prompt.stylePromptKey" style="margin-left: 8px">标识：{{ prompt.stylePromptKey }}</span>
+        </el-descriptions-item>
         <el-descriptions-item v-if="prompt.children && prompt.children.length > 0" label="关联子提示词" :span="2">
           <div class="children-list">
             <el-tag

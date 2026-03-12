@@ -839,6 +839,13 @@ router.get(
  * /api/packages/user-packages/assign:
  *   post:
  *     summary: 分配套餐给用户（管理员）
+ *     description: |
+ *       管理员将套餐分配给用户。
+ *
+ *       **分配规则：**
+ *       - 若用户已拥有该套餐且仍在有效期内，不允许重复分配
+ *       - 若用户已拥有该套餐但已过期，允许续费（更新现有记录）
+ *       - 若用户购买的是不同套餐，允许分配（用户可同时拥有多个不同套餐）
  *     tags: [套餐管理]
  *     security:
  *       - bearerAuth: []
@@ -872,7 +879,7 @@ router.get(
  *       404:
  *         description: 用户或套餐不存在
  *       409:
- *         description: 用户已拥有该套餐
+ *         description: 用户已拥有该套餐且套餐仍在有效期内
  */
 router.post(
     '/user-packages/assign',

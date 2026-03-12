@@ -215,13 +215,8 @@ class UserPackageService {
       }
     }
 
-    // 如果套餐不可叠加，检查用户是否已有套餐
-    if (!pkg.isStackable) {
-      const userPackages = await userPackageRepository.findActiveUserPackages(data.userId)
-      if (userPackages.length > 0) {
-        throw new ConflictError('Package is not stackable and user already has a package')
-      }
-    }
+    // 如果套餐不可叠加，检查用户是否已有【同一套餐】且未过期（上面已通过 findByUserAndPackage 排除，此处无需再检）
+    // 允许用户购买不同的套餐，仅禁止重复购买同一套餐（有效期内）
 
     // 使用套餐的默认时长
     if (pkg.duration && pkg.durationUnit && !data.expiresAt && !data.packageDuration) {

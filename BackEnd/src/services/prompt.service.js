@@ -185,6 +185,20 @@ class PromptService {
       }
     }
 
+    // 验证风格提示词字段：仅 system_user、user 类型可使用
+    if (data.type === 'system_user' || data.type === 'user') {
+      if (data.isStylePrompt === true) {
+        if (!data.stylePromptKey || !String(data.stylePromptKey).trim()) {
+          throw new BadRequestError('风格提示词必须填写标识（stylePromptKey）');
+        }
+      } else {
+        data.stylePromptKey = null;
+      }
+    } else {
+      data.isStylePrompt = false;
+      data.stylePromptKey = null;
+    }
+
     // 设置 userId：只有 user 类型需要设置 userId
     const promptData = {
       ...data,
@@ -276,6 +290,22 @@ class PromptService {
           throw new BadRequestError('Only system_user and user types can have systemId');
         }
       }
+    }
+
+    // 验证风格提示词字段：仅 system_user、user 类型可使用
+    if (prompt.type === 'system_user' || prompt.type === 'user') {
+      const willBeStylePrompt = data.isStylePrompt !== undefined ? data.isStylePrompt === true : prompt.isStylePrompt;
+      if (willBeStylePrompt) {
+        const newStyleKey = data.stylePromptKey !== undefined ? data.stylePromptKey : prompt.stylePromptKey;
+        if (!newStyleKey || !String(newStyleKey).trim()) {
+          throw new BadRequestError('风格提示词必须填写标识（stylePromptKey）');
+        }
+      } else if (data.isStylePrompt !== undefined) {
+        data.stylePromptKey = null;
+      }
+    } else if (data.isStylePrompt !== undefined || data.stylePromptKey !== undefined) {
+      data.isStylePrompt = false;
+      data.stylePromptKey = null;
     }
 
     const updated = await promptRepository.update(id, data, adminId || userId);
