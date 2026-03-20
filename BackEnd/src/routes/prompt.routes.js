@@ -436,7 +436,13 @@ router.get(
 router.post(
     '/',
     [
-        body('functionKey').notEmpty().withMessage('Function key is required'),
+        body('functionKey')
+            .custom(value => {
+                if (typeof value === 'string') return value.trim().length > 0;
+                if (Array.isArray(value)) return value.length > 0 && value.every(v => typeof v === 'string' && v.trim().length > 0);
+                return false;
+            })
+            .withMessage('Function key is required'),
         body('title').notEmpty().withMessage('Title is required'),
         body('content').notEmpty().withMessage('Content is required'),
         body('categoryId').notEmpty().withMessage('Category ID is required'),

@@ -133,13 +133,32 @@ class PromptService {
    * @param {String} userRole - 用户角色
    */
   async createPrompt(data, userId = null, adminId = null, ipAddress = null, userRole = null) {
-    // 验证 functionKey 是否已存在
-    if (!data.functionKey) {
+    const prisma = require('../config/database');
+
+    const normalizeStringArray = value => {
+      if (Array.isArray(value)) {
+        return value.map(v => String(v).trim()).filter(Boolean);
+      }
+      if (value === undefined || value === null) return [];
+      const s = String(value).trim();
+      return s ? [s] : [];
+    };
+
+    const normalizeIdArray = value => {
+      if (Array.isArray(value)) {
+        return value.map(v => (v === null || v === undefined ? '' : String(v).trim())).filter(Boolean);
+      }
+      if (value === undefined || value === null) return [];
+      const s = String(value).trim();
+      return s ? [s] : [];
+    };
+
+    const functionKeys = normalizeStringArray(data.functionKey);
+    const isFunctionKeyArray = Array.isArray(data.functionKey);
+    const isSystemIdArray = Array.isArray(data.systemId);
+
+    if (functionKeys.length === 0) {
       throw new BadRequestError('Function key is required');
-    }
-    const existingByFunctionKey = await promptRepository.findByFunctionKey(data.functionKey);
-    if (existingByFunctionKey) {
-      throw new ConflictError('Function key already exists');
     }
 
     // 验证分类是否存在
@@ -170,18 +189,50 @@ class PromptService {
       throw new ForbiddenError('Only admin can create system_user prompts');
     }
 
+    // 批量创建规则：仅当 isStylePrompt=true 时允许 functionKey[]/systemId[] 按索引配对批量创建
+    const wantsBatch = isFunctionKeyArray || isSystemIdArray;
+    if (wantsBatch) {
+      if (data.isStylePrompt !== true) {
+        throw new BadRequestError('Batch create only supported when isStylePrompt is true');
+      }
+      if (!isFunctionKeyArray || !isSystemIdArray) {
+        throw new BadRequestError('When batch creating style prompts, functionKey and systemId must both be arrays');
+      }
+    }
+
     // 验证 systemId：如果提供了 systemId，必须是 system 类型的提示词
-    if (data.systemId) {
-      const systemPrompt = await promptRepository.findById(data.systemId);
-      if (!systemPrompt) {
-        throw new NotFoundError('System prompt not found');
+    // 同时支持 stylePrompt 批量配对：systemId[] 与 functionKey[] 长度必须一致
+    let systemIds = [];
+    if (data.systemId !== undefined && data.systemId !== null && data.systemId !== '') {
+      systemIds = normalizeIdArray(data.systemId);
+    }
+
+    if (data.isStylePrompt === true && wantsBatch) {
+      if (systemIds.length !== functionKeys.length) {
+        throw new BadRequestError('functionKey and systemId arrays must have the same length');
       }
-      if (systemPrompt.type !== 'system') {
+    }
+
+    // system_user 和 user 类型可以关联 system
+    if ((systemIds.length > 0 || data.systemId) && data.type !== 'system_user' && data.type !== 'user') {
+      throw new BadRequestError('Only system_user and user types can have systemId');
+    }
+
+    if (systemIds.length > 0) {
+      const uniqueSystemIds = Array.from(new Set(systemIds));
+      const systemPrompts = await prisma.prompt.findMany({
+        where: { id: { in: uniqueSystemIds } },
+        select: { id: true, type: true }
+      });
+      const found = new Set(systemPrompts.map(p => p.id));
+      for (const sid of uniqueSystemIds) {
+        if (!found.has(sid)) {
+          throw new NotFoundError('System prompt not found');
+        }
+      }
+      const notSystem = systemPrompts.find(p => p.type !== 'system');
+      if (notSystem) {
         throw new BadRequestError('systemId must point to a system type prompt');
-      }
-      // system_user 和 user 类型可以关联 system
-      if (data.type !== 'system_user' && data.type !== 'user') {
-        throw new BadRequestError('Only system_user and user types can have systemId');
       }
     }
 
@@ -199,40 +250,92 @@ class PromptService {
       data.stylePromptKey = null;
     }
 
-    // 设置 userId：只有 user 类型需要设置 userId
-    const promptData = {
-      ...data,
-      userId: data.type === 'user' ? userId : null,
-      systemId: (data.type === 'system_user' || data.type === 'user') ? data.systemId : null
-    };
-
-    const prompt = await promptRepository.create(promptData);
-
-    // 创建初始版本
-    const prisma = require('../config/database');
-    await prisma.promptVersion.create({
-      data: {
-        promptId: prompt.id,
-        version: 1,
-        content: prompt.content,
-        updatedBy: adminId || userId || null
-      }
-    });
-
-    // 记录操作日志
-    if (isAdmin) {
-      const logService = require('./log.service');
-      await logService.logAdminAction({
-        adminId,
-        action: 'CREATE_PROMPT',
-        targetType: 'prompt',
-        targetId: prompt.id,
-        details: data,
-        ipAddress
-      });
+    // 防止批次内 functionKey 重复
+    const uniqueFunctionKeys = new Set(functionKeys);
+    if (uniqueFunctionKeys.size !== functionKeys.length) {
+      throw new BadRequestError('functionKey array contains duplicates');
     }
 
-    return prompt;
+    // 验证 functionKey 是否已存在（单条/批量都要检查）
+    const existing = await prisma.prompt.findMany({
+      where: { functionKey: { in: Array.from(uniqueFunctionKeys) } },
+      select: { functionKey: true }
+    });
+    if (existing.length > 0) {
+      throw new ConflictError('Function key already exists');
+    }
+
+    const updatedBy = adminId || userId || null;
+
+    // 批量 or 单条创建（事务保证一致性，同时写入初始版本）
+    const created = await prisma.$transaction(async tx => {
+      const results = [];
+
+      const count = wantsBatch ? functionKeys.length : 1;
+      for (let i = 0; i < count; i++) {
+        const functionKey = wantsBatch ? functionKeys[i] : functionKeys[0];
+        const systemId =
+          data.type === 'system_user' || data.type === 'user'
+            ? wantsBatch
+              ? systemIds[i]
+              : (data.systemId || null)
+            : null;
+
+        const prompt = await tx.prompt.create({
+          data: {
+            functionKey,
+            title: data.title,
+            content: data.content,
+            description: data.description || null,
+            categoryId: data.categoryId,
+            tags: data.tags ? JSON.stringify(data.tags) : null,
+            type: data.type,
+            userId: data.type === 'user' ? userId : null,
+            systemId,
+            version: 1,
+            isActive: data.isActive !== undefined ? data.isActive : true,
+            isStylePrompt: data.isStylePrompt === true,
+            stylePromptKey: data.isStylePrompt ? (data.stylePromptKey || null) : null
+          },
+          include: {
+            category: true,
+            system: {
+              select: { id: true, title: true, type: true }
+            }
+          }
+        });
+
+        await tx.promptVersion.create({
+          data: {
+            promptId: prompt.id,
+            version: 1,
+            content: prompt.content,
+            updatedBy
+          }
+        });
+
+        results.push(prompt);
+      }
+
+      return results;
+    });
+
+    // 记录操作日志（管理员）
+    if (isAdmin) {
+      const logService = require('./log.service');
+      for (const p of created) {
+        await logService.logAdminAction({
+          adminId,
+          action: 'CREATE_PROMPT',
+          targetType: 'prompt',
+          targetId: p.id,
+          details: { ...data, functionKey: p.functionKey, systemId: p.systemId },
+          ipAddress
+        });
+      }
+    }
+
+    return wantsBatch ? created : created[0];
   }
 
   /**

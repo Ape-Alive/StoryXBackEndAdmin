@@ -12,7 +12,7 @@
       label-width="120px"
       label-position="right"
     >
-      <el-form-item label="功能键" prop="functionKey">
+      <el-form-item v-if="!isBatchStyleCreate" label="功能键" prop="functionKey">
         <el-input
           v-model="formData.functionKey"
           placeholder="请输入功能键（唯一标识，如 code_generator）"
@@ -24,6 +24,55 @@
       <el-form-item label="标题" prop="title">
         <el-input v-model="formData.title" placeholder="请输入提示词标题" />
       </el-form-item>
+
+      <template v-if="formData.type === 'system_user' || formData.type === 'user'">
+        <el-form-item label="是否是风格提示词" prop="isStylePrompt">
+          <el-switch v-model="formData.isStylePrompt" />
+          <div class="form-tip">开启后需填写风格提示词唯一标识</div>
+        </el-form-item>
+        <el-form-item v-if="formData.isStylePrompt" label="风格提示词标识" prop="stylePromptKey">
+          <el-input
+            v-model="formData.stylePromptKey"
+            placeholder="请输入唯一标识，如 scene_style_01"
+          />
+          <div class="form-tip">用于系统内部识别该风格提示词</div>
+        </el-form-item>
+
+        <el-form-item v-if="isBatchStyleCreate" label="批量关联" prop="stylePromptPairs">
+          <div class="pairs">
+            <div v-for="(pair, idx) in formData.stylePromptPairs" :key="idx" class="pair-row">
+              <el-input
+                v-model="pair.functionKey"
+                placeholder="功能键（唯一标识）"
+                class="pair-fk"
+              />
+              <el-select
+                v-model="pair.systemId"
+                placeholder="关联系统提示词"
+                filterable
+                class="pair-sid"
+              >
+                <el-option
+                  v-for="prompt in systemPrompts"
+                  :key="prompt.id"
+                  :label="prompt.title"
+                  :value="prompt.id"
+                />
+              </el-select>
+              <el-button
+                type="danger"
+                link
+                :disabled="formData.stylePromptPairs.length <= 1"
+                @click="removePair(idx)"
+              >
+                删除
+              </el-button>
+            </div>
+            <el-button type="primary" link @click="addPair">+ 添加一行</el-button>
+            <div class="form-tip">按行一一配对：第 N 行的功能键会关联第 N 行选择的系统提示词</div>
+          </div>
+        </el-form-item>
+      </template>
 
       <el-form-item label="内容" prop="content">
         <el-input
@@ -78,7 +127,7 @@
       </el-form-item>
 
       <el-form-item
-        v-if="formData.type === 'system_user' || formData.type === 'user'"
+        v-if="(formData.type === 'system_user' || formData.type === 'user') && !isBatchStyleCreate"
         label="关联系统提示词"
         prop="systemId"
       >
@@ -98,24 +147,6 @@
         <div class="form-tip">用户提示词必须关联一个系统提示词</div>
       </el-form-item>
 
-      <template v-if="formData.type === 'system_user' || formData.type === 'user'">
-        <el-form-item label="是否是风格提示词" prop="isStylePrompt">
-          <el-switch v-model="formData.isStylePrompt" />
-          <div class="form-tip">开启后需填写风格提示词唯一标识</div>
-        </el-form-item>
-        <el-form-item
-          v-if="formData.isStylePrompt"
-          label="风格提示词标识"
-          prop="stylePromptKey"
-        >
-          <el-input
-            v-model="formData.stylePromptKey"
-            placeholder="请输入唯一标识，如 scene_style_01"
-          />
-          <div class="form-tip">用于系统内部识别该风格提示词</div>
-        </el-form-item>
-      </template>
-
       <el-form-item label="标签" prop="tags">
         <el-select
           v-model="formData.tags"
@@ -126,12 +157,7 @@
           placeholder="选择或输入标签"
           style="width: 100%"
         >
-          <el-option
-            v-for="tag in tagOptions"
-            :key="tag"
-            :label="tag"
-            :value="tag"
-          />
+          <el-option v-for="tag in tagOptions" :key="tag" :label="tag" :value="tag" />
         </el-select>
         <div class="form-tip">可从下拉选择常用标签，或输入新标签后回车添加</div>
       </el-form-item>
@@ -187,7 +213,14 @@ const categories = ref([])
 const systemPrompts = ref([])
 
 // 固定标签选项
-const tagOptions = ['sceneGeneration', 'shotImage', 'roleVideo', 'roleImage', 'scriptGeneration']
+const tagOptions = [
+  'sceneGeneration',
+  'shotImage',
+  'shotPrompt',
+  'roleVideo',
+  'roleImage',
+  'scriptGeneration'
+]
 
 const formData = reactive({
   id: null,
@@ -200,14 +233,33 @@ const formData = reactive({
   systemId: '',
   isStylePrompt: false,
   stylePromptKey: '',
+  stylePromptPairs: [{ functionKey: '', systemId: '' }],
   tags: [],
   isActive: true
 })
 
+const isBatchStyleCreate = computed(() => {
+  return (
+    !formData.id &&
+    (formData.type === 'system_user' || formData.type === 'user') &&
+    formData.isStylePrompt === true
+  )
+})
+
+function addPair() {
+  formData.stylePromptPairs.push({ functionKey: '', systemId: '' })
+}
+
+function removePair(index) {
+  formData.stylePromptPairs.splice(index, 1)
+}
+
 // 动态验证规则
 const rules = computed(() => {
   const baseRules = {
-    functionKey: [{ required: true, message: '请输入功能键', trigger: 'blur' }],
+    functionKey: isBatchStyleCreate.value
+      ? []
+      : [{ required: true, message: '请输入功能键', trigger: 'blur' }],
     title: [{ required: true, message: '请输入标题', trigger: 'blur' }],
     content: [{ required: true, message: '请输入内容', trigger: 'blur' }],
     categoryId: [{ required: true, message: '请选择分类', trigger: 'change' }],
@@ -216,14 +268,49 @@ const rules = computed(() => {
 
   // 如果是 system_user 或 user 类型，systemId 为必填
   if (formData.type === 'system_user' || formData.type === 'user') {
-    baseRules.systemId = [{ required: true, message: '请选择关联的系统提示词', trigger: 'change' }]
+    if (!isBatchStyleCreate.value) {
+      baseRules.systemId = [
+        { required: true, message: '请选择关联的系统提示词', trigger: 'change' }
+      ]
+    }
     // 当是风格提示词时，stylePromptKey 必填
     if (formData.isStylePrompt) {
       baseRules.stylePromptKey = [
         { required: true, message: '请输入风格提示词唯一标识', trigger: 'blur' },
-        { pattern: /^[a-zA-Z0-9_-]+$/, message: '标识只能包含字母、数字、下划线和连字符', trigger: 'blur' }
+        {
+          pattern: /^[a-zA-Z0-9_-]+$/,
+          message: '标识只能包含字母、数字、下划线和连字符',
+          trigger: 'blur'
+        }
       ]
     }
+  }
+
+  if (isBatchStyleCreate.value) {
+    baseRules.stylePromptPairs = [
+      {
+        trigger: 'change',
+        validator: (_rule, value, callback) => {
+          const pairs = Array.isArray(value) ? value : []
+          if (pairs.length === 0) return callback(new Error('请至少添加一行关联'))
+
+          const functionKeys = pairs.map(p => String(p?.functionKey || '').trim()).filter(Boolean)
+          const systemIds = pairs.map(p => String(p?.systemId || '').trim()).filter(Boolean)
+
+          if (functionKeys.length !== pairs.length) {
+            return callback(new Error('请填写每一行的功能键'))
+          }
+          if (systemIds.length !== pairs.length) {
+            return callback(new Error('请为每一行选择关联系统提示词'))
+          }
+
+          const unique = new Set(functionKeys)
+          if (unique.size !== functionKeys.length) return callback(new Error('功能键不能重复'))
+
+          return callback()
+        }
+      }
+    ]
   }
 
   return baseRules
@@ -267,6 +354,9 @@ watch(
       formData.systemId = val.systemId || ''
       formData.isStylePrompt = val.isStylePrompt === true
       formData.stylePromptKey = val.stylePromptKey || ''
+      formData.stylePromptPairs = [
+        { functionKey: val.functionKey || '', systemId: val.systemId || '' }
+      ]
       formData.isActive = val.isActive !== undefined ? val.isActive : true
       try {
         formData.tags = val.tags
@@ -316,6 +406,7 @@ function resetForm() {
   formData.systemId = ''
   formData.isStylePrompt = false
   formData.stylePromptKey = ''
+  formData.stylePromptPairs = [{ functionKey: '', systemId: '' }]
   formData.tags = []
   formData.isActive = true
   formRef.value?.clearValidate()
@@ -333,20 +424,30 @@ async function handleSubmit() {
     if (valid) {
       submitting.value = true
       try {
+        let functionKey = formData.functionKey
+        let systemId = formData.systemId || null
+
+        if (isBatchStyleCreate.value) {
+          functionKey = formData.stylePromptPairs.map(p => String(p.functionKey || '').trim())
+          systemId = formData.stylePromptPairs.map(p => p.systemId)
+        }
+
         const data = {
-          functionKey: formData.functionKey,
+          functionKey,
           title: formData.title,
           content: formData.content,
           description: formData.description || null,
           categoryId: formData.categoryId,
           type: formData.type,
-          systemId: formData.systemId || null,
+          systemId,
           tags: formData.tags,
           isActive: formData.isActive
         }
         if (formData.type === 'system_user' || formData.type === 'user') {
           data.isStylePrompt = formData.isStylePrompt
-          data.stylePromptKey = formData.isStylePrompt ? (formData.stylePromptKey?.trim() || null) : null
+          data.stylePromptKey = formData.isStylePrompt
+            ? formData.stylePromptKey?.trim() || null
+            : null
         }
 
         emit('success', data)
@@ -382,5 +483,24 @@ onMounted(() => {
   font-size: 12px;
   color: #94a3b8;
   margin-top: 4px;
+}
+
+.pairs {
+  width: 100%;
+}
+
+.pair-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.pair-fk {
+  flex: 0 0 240px;
+}
+
+.pair-sid {
+  flex: 1;
 }
 </style>
