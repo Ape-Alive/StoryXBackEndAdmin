@@ -21,7 +21,7 @@
         placeholder="请选择模型（不选择则查看全部）"
         filterable
         clearable
-        style="width: 400px"
+        class="model-select-wide"
         @change="handleModelChange"
         :loading="modelsLoading"
       >
@@ -29,15 +29,32 @@
         <el-option
           v-for="model in models"
           :key="model.id"
-          :label="model.displayName || model.name"
+          :label="modelOptionFilterLabel(model)"
           :value="model.id"
         >
-          <div style="display: flex; justify-content: space-between; align-items: center">
-            <span>{{ model.displayName || model.name }}</span>
+          <div class="model-option-row">
+            <span class="model-option-name" :title="model.displayName || model.name">{{
+              model.displayName || model.name
+            }}</span>
+            <div v-if="model.provider" class="model-option-provider">
+              <img
+                v-if="model.provider.logoUrl"
+                :src="model.provider.logoUrl"
+                class="provider-logo-img"
+                alt=""
+              />
+              <span v-else class="provider-logo-fallback">{{
+                providerInitial(model.provider)
+              }}</span>
+              <span class="provider-name-text" :title="providerDisplayName(model.provider)">{{
+                providerDisplayName(model.provider)
+              }}</span>
+            </div>
+            <span v-else class="model-option-provider model-option-provider--empty">—</span>
             <el-tag
               :type="model.isActive ? 'success' : 'info'"
               size="small"
-              style="margin-left: 8px"
+              class="model-option-tag"
             >
               {{ model.isActive ? '已启用' : '已禁用' }}
             </el-tag>
@@ -46,6 +63,21 @@
       </el-select>
       <div v-if="selectedModelId" class="selected-model-info">
         <span class="info-label">当前模型：</span>
+        <span v-if="selectedModelWithProvider?.provider" class="selected-provider-inline">
+          <img
+            v-if="selectedModelWithProvider.provider.logoUrl"
+            :src="selectedModelWithProvider.provider.logoUrl"
+            class="selected-provider-logo"
+            alt=""
+          />
+          <span v-else class="selected-provider-logo-fallback">{{
+            providerInitial(selectedModelWithProvider.provider)
+          }}</span>
+          <span class="selected-provider-name">{{
+            providerDisplayName(selectedModelWithProvider.provider)
+          }}</span>
+          <span class="selected-model-sep">·</span>
+        </span>
         <span class="info-value">{{ selectedModelName }}</span>
       </div>
       <div v-else class="selected-model-info">
@@ -129,8 +161,6 @@ import {
   updateModelPrice,
   deleteModelPrice
 } from '@/api/model'
-import { getPackages } from '@/api/package'
-
 // 数据
 const loading = ref(false)
 const modelsLoading = ref(false)
@@ -168,6 +198,26 @@ const selectedModelName = computed(() => {
   const model = models.value.find(m => m.id === selectedModelId.value)
   return model ? model.displayName || model.name : ''
 })
+
+const selectedModelWithProvider = computed(() => {
+  return models.value.find(m => m.id === selectedModelId.value) || null
+})
+
+function providerDisplayName(provider) {
+  if (!provider) return ''
+  return provider.displayName || provider.name || ''
+}
+
+function providerInitial(provider) {
+  const n = providerDisplayName(provider)
+  return n ? n.trim().charAt(0).toUpperCase() : '?'
+}
+
+function modelOptionFilterLabel(model) {
+  const m = model.displayName || model.name
+  const p = model.provider ? providerDisplayName(model.provider) : ''
+  return p ? `${m} ${p}` : m
+}
 
 // 统计信息
 const statistics = computed(() => {
@@ -452,5 +502,121 @@ onMounted(() => {
   gap: 8px;
   font-size: 14px;
   color: #64748b;
+}
+
+.model-select-wide {
+  width: 520px;
+  max-width: 100%;
+}
+
+.model-option-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  padding-right: 4px;
+}
+
+.model-option-name {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  color: #0f172a;
+}
+
+.model-option-provider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 1 42%;
+  min-width: 0;
+  justify-content: center;
+}
+
+.model-option-provider--empty {
+  color: #94a3b8;
+  font-size: 13px;
+  justify-content: center;
+}
+
+.provider-logo-img {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #f1f5f9;
+}
+
+.provider-logo-fallback {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.provider-name-text {
+  min-width: 0;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.model-option-tag {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.selected-provider-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 4px;
+}
+
+.selected-provider-logo {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: cover;
+  vertical-align: middle;
+}
+
+.selected-provider-logo-fallback {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.selected-provider-name {
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.selected-model-sep {
+  margin: 0 4px;
+  color: #94a3b8;
 }
 </style>
