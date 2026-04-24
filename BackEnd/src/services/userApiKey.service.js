@@ -1,6 +1,6 @@
 const userApiKeyRepository = require('../repositories/userApiKey.repository')
 const apiKeyCreationService = require('./apiKeyCreation.service')
-const { encryptApiKey } = require('../utils/crypto')
+const { encryptApiKey, decryptApiKey } = require('../utils/crypto')
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors')
 const prisma = require('../config/database')
 
@@ -299,7 +299,127 @@ class UserApiKeyService {
    * 获取提供商的API Key列表（管理员）
    */
   async getProviderApiKeys(providerId, filters = {}) {
-    return await userApiKeyRepository.findByProvider(providerId, filters)
+    const voiceProfileRepository = require('../repositories/voiceProfile.repository')
+    const items = await userApiKeyRepository.findByProvider(providerId, filters)
+    return Promise.all(
+      items.map(async (k) => {
+        const credits = Number(k.credits) || 0
+        const usedCredits = Number(k.usedCredits) || 0
+        const remainingCredits = credits <= 0 ? null : Math.max(0, credits - usedCredits)
+        let voiceCount = 0
+        try {
+          voiceCount = await voiceProfileRepository.countClonedVoicesByUserApiKeyId(k.id)
+        } catch {
+          voiceCount = 0
+        }
+        return {
+          ...k,
+          usedCredits,
+          remainingCredits,
+          voiceCount,
+        }
+      })
+    )
+  }
+
+  /**
+   * 通过「音色克隆」写入 meta.userApiKeyId 关联的音色列表（管理员）
+   */
+  async getClonedVoiceProfilesForProviderApiKey(providerId, apiKeyId, pagination = {}) {
+    const voiceProfileRepository = require('../repositories/voiceProfile.repository')
+
+    if (!apiKeyId || typeof apiKeyId !== 'string' || !/^[a-z0-9]+$/i.test(apiKeyId)) {
+      throw new BadRequestError('Invalid API Key ID')
+    }
+
+    const apiKey = await userApiKeyRepository.findById(apiKeyId)
+    if (!apiKey) throw new NotFoundError('API Key not found')
+    if (apiKey.providerId !== providerId) {
+      throw new BadRequestError('API Key does not belong to this provider')
+    }
+
+    const page = Math.max(1, parseInt(pagination.page, 10) || 1)
+    const pageSize = Math.min(100, Math.max(1, parseInt(pagination.pageSize, 10) || 20))
+
+    const { data, total } = await voiceProfileRepository.findClonedVoicesByUserApiKeyId(apiKeyId, {
+      page,
+      pageSize,
+    })
+
+    const items = data.map((vp) => ({
+      id: vp.id,
+      voiceId: vp.voiceId,
+      name: vp.name,
+      description: vp.description,
+      scope: vp.scope,
+      isActive: vp.isActive,
+      isModelLocked: vp.isModelLocked,
+      createdAt: vp.createdAt,
+      models: (vp.models || []).map((m) => ({
+        modelId: m.modelId,
+        modelName: m.model?.name,
+        displayName: m.model?.displayName,
+      })),
+    }))
+
+    return { data: items, total, page, pageSize }
+  }
+
+  /**
+   * 解密提供商下系统级 API Key（仅管理员用于上传工具等场景；不落日志）
+   */
+  async getDecryptedTokenForProviderApiKey(providerId, apiKeyId) {
+    const apiKey = await userApiKeyRepository.findById(apiKeyId)
+    if (!apiKey) throw new NotFoundError('API Key not found')
+    if (apiKey.providerId !== providerId) {
+      throw new BadRequestError('API Key does not belong to this provider')
+    }
+    if (apiKey.userId != null) {
+      throw new ForbiddenError('Cannot export user-owned API key')
+    }
+    if (apiKey.status !== 'active') {
+      throw new BadRequestError('API Key is not active')
+    }
+
+    let plain
+    try {
+      plain = decryptApiKey(apiKey.apiKey)
+    } catch {
+      throw new BadRequestError('Failed to decrypt API key')
+    }
+    if (!plain) throw new BadRequestError('Invalid API key record')
+
+    return { token: plain }
+  }
+
+  /**
+   * 调整提供商API Key额度（管理员）
+   * - credits 表示总额度；usedCredits 表示已消耗；remaining=credits-usedCredits
+   */
+  async adjustProviderApiKeyCredits(providerId, apiKeyId, credits, adminId) {
+    const apiKey = await userApiKeyRepository.findById(apiKeyId)
+    if (!apiKey) throw new NotFoundError('API Key not found')
+    if (apiKey.providerId !== providerId) throw new BadRequestError('API Key does not belong to this provider')
+    if (apiKey.userId !== null) throw new BadRequestError('Cannot adjust user-owned API Key')
+
+    const newCredits = Number(credits)
+    if (Number.isNaN(newCredits) || newCredits < 0) {
+      throw new BadRequestError('Credits must be a non-negative number')
+    }
+
+    const usedCredits = Number(apiKey.usedCredits) || 0
+    if (newCredits > 0 && newCredits < usedCredits) {
+      throw new BadRequestError('Credits cannot be less than usedCredits')
+    }
+
+    const updated = await prisma.userApiKey.update({
+      where: { id: apiKeyId },
+      data: {
+        credits: newCredits
+      }
+    })
+
+    return updated
   }
 
   /**
@@ -318,7 +438,7 @@ class UserApiKeyService {
     // 加密API Key
     const encryptedKey = encryptApiKey(data.apiKey)
 
-    // 使用事务创建API Key并更新提供商额度
+    // 使用事务创建API Key并更新提供商 apiKeys 数组（提供商额度由后端汇总计算，不再持久化维护）
     const result = await prisma.$transaction(async (tx) => {
       // 创建API Key记录
       const userApiKey = await tx.userApiKey.create({
@@ -330,8 +450,10 @@ class UserApiKeyService {
           name: data.name,
           type: 'provider_associated', // 管理员手动添加的API Key类型
           credits: data.credits || 0,
+          usedCredits: 0,
           expireTime: data.expireTime || 0,
           status: 'active',
+          voiceLimit: data.voiceLimit || 0,
           createdBy: adminId,
         },
       })
@@ -347,16 +469,10 @@ class UserApiKeyService {
       }
       apiKeyIds.push(userApiKey.id)
 
-      // 更新提供商额度
-      const currentQuota = provider.quota ? parseFloat(provider.quota) : 0
-      const creditsToAdd = data.credits ? parseFloat(data.credits) : 0
-      const newQuota = currentQuota + creditsToAdd
-
       await tx.aIProvider.update({
         where: { id: providerId },
         data: {
           apiKeys: JSON.stringify(apiKeyIds),
-          quota: newQuota,
         },
       })
 
@@ -393,7 +509,7 @@ class UserApiKeyService {
       throw new NotFoundError('Provider not found')
     }
 
-    // 使用事务删除API Key并更新提供商额度
+    // 使用事务删除API Key并更新提供商 apiKeys 数组（提供商额度由后端汇总计算，不再持久化维护）
     await prisma.$transaction(async (tx) => {
       // 删除API Key
       await tx.userApiKey.delete({
@@ -411,16 +527,10 @@ class UserApiKeyService {
       }
       apiKeyIds = apiKeyIds.filter((id) => id !== apiKeyId)
 
-      // 更新提供商额度（扣除该API Key的credits）
-      const currentQuota = provider.quota ? parseFloat(provider.quota) : 0
-      const creditsToRemove = parseFloat(apiKey.credits) || 0
-      const newQuota = Math.max(0, currentQuota - creditsToRemove)
-
       await tx.aIProvider.update({
         where: { id: providerId },
         data: {
           apiKeys: JSON.stringify(apiKeyIds),
-          quota: newQuota,
         },
       })
     })

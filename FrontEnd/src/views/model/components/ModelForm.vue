@@ -41,6 +41,13 @@
         </el-select>
       </el-form-item>
 
+      <el-form-item v-if="formData.type === 'tts'" label="语音指令">
+        <el-switch v-model="formData.supportsVoiceCommand" />
+        <div class="form-tip">
+          默认不支持。开启后，会将<strong>已绑定该 TTS 模型</strong>的全部音色的「支持语音指令」设为开启。
+        </div>
+      </el-form-item>
+
       <el-form-item label="模型分类">
         <el-input
           v-model="formData.category"
@@ -163,6 +170,7 @@ const formData = reactive({
   name: '',
   displayName: '',
   type: '',
+  supportsVoiceCommand: false,
   category: '',
   modelTag: '',
   providerId: '',
@@ -235,6 +243,7 @@ watch(() => props.modelValue, (val) => {
       name: props.model.name || '',
       displayName: props.model.displayName || '',
       type: props.model.type || '',
+      supportsVoiceCommand: props.model.supportsVoiceCommand === true,
       category: props.model.category || '',
       modelTag: props.model.modelTag || '',
       providerId: props.model.providerId || '',
@@ -252,6 +261,7 @@ watch(() => props.modelValue, (val) => {
       name: '',
       displayName: '',
       type: '',
+      supportsVoiceCommand: false,
       category: '',
       modelTag: '',
       providerId: '',
@@ -263,6 +273,15 @@ watch(() => props.modelValue, (val) => {
     })
   }
 })
+
+watch(
+  () => formData.type,
+  (t) => {
+    if (t !== 'tts') {
+      formData.supportsVoiceCommand = false
+    }
+  }
+)
 
 watch(visible, (val) => {
   emit('update:modelValue', val)

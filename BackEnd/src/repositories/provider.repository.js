@@ -52,6 +52,15 @@ class ProviderRepository {
             select: {
               models: true
             }
+          },
+          userApiKeys: {
+            where: {
+              status: 'active'
+            },
+            select: {
+              credits: true,
+              usedCredits: true
+            }
           }
         }
       }),
@@ -63,8 +72,27 @@ class ProviderRepository {
       modelCount: item._count.models
     }));
 
+    // 提供商额度：由 API Key 额度汇总计算
+    // - 若系统级 API Key 全是无限制（credits=0），返回 quotaIsUnlimited=true，前端展示“无限制”
+    // - 若存在有限额度 key（credits>0），quota 为有限额度 key 的剩余额度之和（credits-usedCredits）
+    const withQuota = formattedData.map((item) => {
+      const keys = item.userApiKeys || [];
+      const limitedKeys = keys.filter((k) => Number(k.credits) > 0);
+      const unlimitedKeys = keys.filter((k) => Number(k.credits) <= 0);
+      const quotaIsUnlimited = unlimitedKeys.length > 0 && limitedKeys.length === 0;
+
+      const quota = limitedKeys.reduce((sum, k) => {
+        const credits = Number(k.credits) || 0;
+        const used = Number(k.usedCredits) || 0;
+        const remaining = Math.max(0, credits - used);
+        return sum + remaining;
+      }, 0);
+      const { userApiKeys, ...rest } = item;
+      return { ...rest, quota: quotaIsUnlimited ? null : quota, quotaIsUnlimited };
+    });
+
     return {
-      data: formattedData,
+      data: withQuota,
       total,
       page,
       pageSize
@@ -81,6 +109,15 @@ class ProviderRepository {
         _count: {
           select: {
             models: true
+          }
+        },
+        userApiKeys: {
+          where: {
+            status: 'active'
+          },
+          select: {
+            credits: true,
+            usedCredits: true
           }
         }
       }
@@ -108,12 +145,15 @@ class ProviderRepository {
         website: data.website,
         logoUrl: data.logoUrl,
         description: data.description,
-        quota: data.quota !== undefined ? data.quota : null,
+        quota: null,
         quotaUnit: data.quotaUnit || null,
         mainAccountToken: data.mainAccountToken || null,
         supportsApiKeyCreation: data.supportsApiKeyCreation !== undefined ? data.supportsApiKeyCreation : false,
         apiKeyCreationConfig: data.apiKeyCreationConfig || null,
         apiKeys: data.apiKeys || null,
+        apiKeyLowBalanceThreshold:
+          data.apiKeyLowBalanceThreshold !== undefined ? data.apiKeyLowBalanceThreshold : 1000,
+        voiceCloneApis: data.voiceCloneApis || null,
         isActive: data.isActive !== undefined ? data.isActive : true
       }
     });
@@ -130,12 +170,16 @@ class ProviderRepository {
     if (data.website !== undefined) updateData.website = data.website;
     if (data.logoUrl !== undefined) updateData.logoUrl = data.logoUrl;
     if (data.description !== undefined) updateData.description = data.description;
-    if (data.quota !== undefined) updateData.quota = data.quota;
+    // quota 字段由后端根据 API Key 汇总计算，不允许通过更新接口单独设置
     if (data.quotaUnit !== undefined) updateData.quotaUnit = data.quotaUnit;
     if (data.mainAccountToken !== undefined) updateData.mainAccountToken = data.mainAccountToken;
     if (data.supportsApiKeyCreation !== undefined) updateData.supportsApiKeyCreation = data.supportsApiKeyCreation;
     if (data.apiKeyCreationConfig !== undefined) updateData.apiKeyCreationConfig = data.apiKeyCreationConfig;
     if (data.apiKeys !== undefined) updateData.apiKeys = data.apiKeys;
+    if (data.apiKeyLowBalanceThreshold !== undefined) {
+      updateData.apiKeyLowBalanceThreshold = data.apiKeyLowBalanceThreshold;
+    }
+    if (data.voiceCloneApis !== undefined) updateData.voiceCloneApis = data.voiceCloneApis || null;
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     updateData.updatedAt = new Date();

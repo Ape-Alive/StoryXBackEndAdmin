@@ -67,10 +67,6 @@ const createProviderValidator = [
     .optional()
     .isBoolean()
     .withMessage('isActive must be a boolean'),
-  body('quota')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Quota must be a non-negative number'),
   body('quotaUnit')
     .optional()
     .isIn(['points'])
@@ -129,14 +125,18 @@ const updateProviderValidator = [
     .optional()
     .isBoolean()
     .withMessage('isActive must be a boolean'),
-  body('quota')
-    .optional()
-    .isFloat({ min: 0 })
-    .withMessage('Quota must be a non-negative number'),
   body('quotaUnit')
     .optional()
     .isIn(['points'])
     .withMessage('Quota unit must be points (积分)'),
+  body('apiKeyLowBalanceThreshold')
+    .optional({ nullable: true })
+    .isFloat({ min: 0 })
+    .withMessage('apiKeyLowBalanceThreshold must be a non-negative number'),
+  body('voiceCloneApis')
+    .optional({ nullable: true })
+    .custom((v) => v === null || typeof v === 'string')
+    .withMessage('voiceCloneApis must be a JSON string or null'),
   body('supportsApiKeyCreation')
     .optional()
     .isBoolean()

@@ -12,15 +12,19 @@ class UserApiController {
   async requestAuthorization(req, res, next) {
     try {
       const userId = req.user.id;
-      const { modelId, deviceFingerprint, estimatedTokens = 0 } = req.body;
+      const { modelId, userApiKeyId, deviceFingerprint, estimatedTokens = 0, estimatedChars } = req.body;
       const ipAddress = req.ip;
+
+      // char 计价兼容：若传入 estimatedChars，则用它作为预估量（传给计费计算器）
+      const normalizedEstimated = estimatedChars !== undefined ? estimatedChars : estimatedTokens;
 
       const result = await authorizationService.requestAuthorization(
         userId,
         modelId,
         deviceFingerprint,
-        estimatedTokens,
-        ipAddress
+        normalizedEstimated,
+        ipAddress,
+        userApiKeyId
       );
 
       return ResponseHandler.success(res, result, 'Authorization requested successfully');
@@ -40,18 +44,39 @@ class UserApiController {
         inputTokens = 0,
         outputTokens = 0,
         totalTokens = 0,
+        usedChars,
+        inputChars,
+        outputChars,
+        totalChars,
         status,
         errorMessage = null,
         duration = null,
         responseTime = null
       } = req.body;
 
+      // char 计价推荐：usedChars 单字段；兼容旧 inputChars/outputChars/totalChars；token 计价仍用 inputTokens/outputTokens
+      // priceCalculator.calculateActualCost 的签名为 (inputTokens, outputTokens)，在 pricingType=char 时会把它们当作 chars
+      let normalizedInput = inputTokens
+      let normalizedOutput = outputTokens
+      let normalizedTotal = totalTokens
+
+      if (usedChars !== undefined) {
+        normalizedInput = usedChars
+        normalizedOutput = 0
+        normalizedTotal = usedChars
+      } else {
+        normalizedInput = inputChars !== undefined ? inputChars : inputTokens
+        normalizedOutput = outputChars !== undefined ? outputChars : outputTokens
+        normalizedTotal =
+          totalChars !== undefined ? totalChars : totalTokens || normalizedInput + normalizedOutput
+      }
+
       const result = await aiCallService.reportCall(
         callToken,
         requestId,
-        inputTokens,
-        outputTokens,
-        totalTokens,
+        normalizedInput,
+        normalizedOutput,
+        normalizedTotal,
         status,
         errorMessage,
         duration,

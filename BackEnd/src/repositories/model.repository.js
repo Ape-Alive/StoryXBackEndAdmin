@@ -140,6 +140,8 @@ class ModelRepository {
         description: data.description,
         isActive: data.isActive !== undefined ? data.isActive : true,
         requiresKey: data.requiresKey !== undefined ? data.requiresKey : false,
+        supportsVoiceCommand:
+          data.type === 'tts' ? data.supportsVoiceCommand === true : false,
         apiConfig: data.apiConfig || null,
         modelTag: data.modelTag || null,
       },
@@ -156,12 +158,20 @@ class ModelRepository {
     const updateData = {}
 
     if (data.displayName !== undefined) updateData.displayName = data.displayName
-    if (data.type !== undefined) updateData.type = data.type
+    if (data.type !== undefined) {
+      updateData.type = data.type
+      if (data.type !== 'tts') {
+        updateData.supportsVoiceCommand = false
+      }
+    }
     if (data.category !== undefined) updateData.category = data.category
     if (data.baseUrl !== undefined) updateData.baseUrl = data.baseUrl
     if (data.description !== undefined) updateData.description = data.description
     if (data.isActive !== undefined) updateData.isActive = data.isActive
     if (data.requiresKey !== undefined) updateData.requiresKey = data.requiresKey
+    if (data.supportsVoiceCommand !== undefined) {
+      updateData.supportsVoiceCommand = data.supportsVoiceCommand === true
+    }
     if (data.apiConfig !== undefined) updateData.apiConfig = data.apiConfig || null
     if (data.modelTag !== undefined) updateData.modelTag = data.modelTag || null
 
@@ -299,11 +309,18 @@ class ModelRepository {
         inputPrice: data.inputPrice || 0,
         outputPrice: data.outputPrice || 0,
         callPrice: data.callPrice || 0,
+        charPrice: data.charPrice || 0,
         maxToken:
           data.maxToken !== undefined
             ? data.maxToken === null || data.maxToken === ''
               ? null
               : parseInt(data.maxToken)
+            : null,
+        maxChars:
+          data.maxChars !== undefined
+            ? data.maxChars === null || data.maxChars === ''
+              ? null
+              : parseInt(data.maxChars)
             : null,
         effectiveAt: data.effectiveAt ? new Date(data.effectiveAt) : new Date(),
         expiredAt: data.expiredAt ? new Date(data.expiredAt) : null,
@@ -321,8 +338,12 @@ class ModelRepository {
     if (data.inputPrice !== undefined) updateData.inputPrice = data.inputPrice
     if (data.outputPrice !== undefined) updateData.outputPrice = data.outputPrice
     if (data.callPrice !== undefined) updateData.callPrice = data.callPrice
+    if (data.charPrice !== undefined) updateData.charPrice = data.charPrice
     if (data.maxToken !== undefined) {
       updateData.maxToken = data.maxToken === null || data.maxToken === '' ? null : parseInt(data.maxToken)
+    }
+    if (data.maxChars !== undefined) {
+      updateData.maxChars = data.maxChars === null || data.maxChars === '' ? null : parseInt(data.maxChars)
     }
     if (data.effectiveAt !== undefined) updateData.effectiveAt = new Date(data.effectiveAt)
     if (data.expiredAt !== undefined) updateData.expiredAt = data.expiredAt ? new Date(data.expiredAt) : null

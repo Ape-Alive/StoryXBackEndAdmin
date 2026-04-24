@@ -335,6 +335,97 @@ const options = {
               }
             }
           }
+        },
+        VoiceProfileListAIModel: {
+          type: 'object',
+          description: '音色关联的模型（列表接口 findMany include）',
+          properties: {
+            id: { type: 'string', description: '模型ID' },
+            name: { type: 'string', description: '模型内部名' },
+            displayName: { type: 'string', nullable: true, description: '展示名' },
+            provider: {
+              type: 'object',
+              nullable: true,
+              description: '提供商摘要',
+              properties: {
+                id: { type: 'string' },
+                name: { type: 'string' },
+                displayName: { type: 'string', nullable: true }
+              }
+            }
+          }
+        },
+        VoiceProfileModelBinding: {
+          type: 'object',
+          description: 'VoiceProfile ↔ AIModel 多对多中间行',
+          properties: {
+            voiceProfileId: { type: 'string' },
+            modelId: { type: 'string' },
+            createdAt: { type: 'string', format: 'date-time' },
+            model: { $ref: '#/components/schemas/VoiceProfileListAIModel' }
+          }
+        },
+        VoiceProfileListItem: {
+          type: 'object',
+          description: '单条音色记录（列表项）',
+          properties: {
+            id: { type: 'string', description: '记录 UUID' },
+            voiceId: { type: 'string', description: '业务/第三方音色ID（唯一）' },
+            scope: { type: 'string', enum: ['system', 'user'], description: 'system=系统音色；user=用户音色' },
+            userId: { type: 'string', nullable: true, description: 'scope=user 时为用户ID；system 为 null' },
+            sampleUrl: { type: 'string', nullable: true },
+            avatarUrl: { type: 'string', nullable: true, description: '音色头像资源 URL（可选）' },
+            name: { type: 'string', nullable: true },
+            description: { type: 'string', nullable: true },
+            meta: { type: 'string', nullable: true, description: '扩展 JSON 字符串（如克隆来源等）' },
+            supportsVoiceCommand: { type: 'boolean', description: '是否支持语音指令', example: false },
+            tags: {
+              type: 'array',
+              nullable: true,
+              description:
+                '标签（JSON数组）。至少包含：age（年龄范围）、gender（male/female）、trait（特征词，可多个）',
+              items: {
+                type: 'object',
+                properties: {
+                  type: { type: 'string', example: 'trait' },
+                  value: { type: 'string', example: '温柔' }
+                }
+              }
+            },
+            isModelLocked: { type: 'boolean', description: '克隆生成后锁定模型绑定' },
+            isActive: { type: 'boolean' },
+            createdAt: { type: 'string', format: 'date-time' },
+            updatedAt: { type: 'string', format: 'date-time' },
+            user: {
+              type: 'object',
+              nullable: true,
+              description: '所属用户（列表里可能带出）',
+              properties: {
+                id: { type: 'string' },
+                email: { type: 'string', nullable: true },
+                phone: { type: 'string', nullable: true }
+              }
+            },
+            models: {
+              type: 'array',
+              description: '绑定的模型列表；空数组表示公共音色',
+              items: { $ref: '#/components/schemas/VoiceProfileModelBinding' }
+            }
+          }
+        },
+        VoiceProfilesListResponse: {
+          type: 'object',
+          description:
+            'GET /api/voice-profiles 成功响应体（与 ResponseHandler.paginated 一致：顶层含 pagination 对象）',
+          properties: {
+            success: { type: 'boolean', example: true },
+            message: { type: 'string', example: 'Success' },
+            data: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/VoiceProfileListItem' }
+            },
+            pagination: { $ref: '#/components/schemas/Pagination' }
+          }
         }
       }
     },
@@ -382,6 +473,10 @@ const options = {
       {
         name: 'API 文档',
         description: 'API 文档相关接口'
+      },
+      {
+        name: '语音管理-音色',
+        description: '音色库 / VoiceProfile 管理接口'
       }
     ]
   },

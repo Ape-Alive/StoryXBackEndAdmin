@@ -218,6 +218,30 @@ class PriceCalculatorService {
         maxToken: null,
         usedMaxToken: false
       };
+    } else if (price.pricingType === 'char') {
+      // 按字符计价
+      let estimatedChars = 0;
+      let usedMaxChars = false;
+
+      if (price.maxChars !== null && price.maxChars > 0) {
+        estimatedChars = price.maxChars;
+        usedMaxChars = true;
+      } else if (estimatedTokens > 0) {
+        // 兼容现有调用方参数：estimatedTokens 在 char 计价下视为 estimatedChars
+        estimatedChars = estimatedTokens;
+      } else {
+        estimatedChars = 1;
+      }
+
+      const cost = parseFloat(price.charPrice) * estimatedChars;
+
+      return {
+        cost: Math.max(cost, 0),
+        price,
+        estimatedChars,
+        maxChars: price.maxChars,
+        usedMaxChars,
+      };
     } else {
       throw new BadRequestError('Invalid pricing type');
     }
@@ -248,6 +272,20 @@ class PriceCalculatorService {
         price,
         inputTokens,
         outputTokens
+      };
+    } else if (price.pricingType === 'char') {
+      // 按字符计价：兼容现有签名，把 inputTokens/outputTokens 视为 inputChars/outputChars
+      const inputChars = Number(inputTokens) || 0;
+      const outputChars = Number(outputTokens) || 0;
+      const totalChars = inputChars + outputChars;
+      const cost = parseFloat(price.charPrice) * totalChars;
+
+      return {
+        cost: Math.max(cost, 0),
+        price,
+        inputChars,
+        outputChars,
+        totalChars,
       };
     } else {
       throw new BadRequestError('Invalid pricing type');

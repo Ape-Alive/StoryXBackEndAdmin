@@ -20,6 +20,20 @@ class ProviderService {
     if (!provider) {
       throw new NotFoundError('Provider not found');
     }
+    // quota 由 API Key 汇总计算
+    if (provider.userApiKeys) {
+      const keys = provider.userApiKeys || []
+      const limitedKeys = keys.filter((k) => Number(k.credits) > 0)
+      const unlimitedKeys = keys.filter((k) => Number(k.credits) <= 0)
+      const quotaIsUnlimited = unlimitedKeys.length > 0 && limitedKeys.length === 0
+      const quota = limitedKeys.reduce((sum, k) => {
+        const credits = Number(k.credits) || 0
+        const used = Number(k.usedCredits) || 0
+        return sum + Math.max(0, credits - used)
+      }, 0)
+      const { userApiKeys, ...rest } = provider;
+      return { ...rest, quota: quotaIsUnlimited ? null : quota, quotaIsUnlimited };
+    }
     return provider;
   }
 

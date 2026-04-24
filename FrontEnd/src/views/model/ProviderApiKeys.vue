@@ -8,9 +8,7 @@
           管理提供商 "{{ providerInfo.displayName || providerInfo.name }}" 的关联API Key
         </p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="handleAdd">
-        新增API Key
-      </el-button>
+      <el-button type="primary" :icon="Plus" @click="handleAdd">新增API Key</el-button>
     </div>
 
     <!-- 提供商信息卡片 -->
@@ -25,7 +23,13 @@
       </div>
       <div class="info-item">
         <span class="label">总额度：</span>
-        <span class="value">{{ formatNumber(providerInfo.quota) }} {{ getQuotaUnitLabel(providerInfo.quotaUnit) }}</span>
+        <span class="value">
+          <span v-if="providerInfo.quotaIsUnlimited" class="quota-unlimited">无限制</span>
+          <template v-else>
+            {{ formatNumber(providerInfo.quota) }}
+            {{ getQuotaUnitLabel(providerInfo.quotaUnit) }}
+          </template>
+        </span>
       </div>
       <div class="info-item">
         <span class="label">支持API Key创建：</span>
@@ -71,12 +75,44 @@
           </template>
         </el-table-column>
 
+        <el-table-column label="消耗额度" width="120" align="right">
+          <template #default="{ row }">
+            <span v-if="parseFloat(row.credits) === 0" class="text-muted">-</span>
+            <span v-else class="quota-value">{{ formatNumber(row.usedCredits || 0) }}</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="剩余额度" width="120" align="right">
+          <template #default="{ row }">
+            <span v-if="parseFloat(row.credits) === 0" class="quota-unlimited">无限制</span>
+            <span v-else class="quota-value">{{ formatNumber(row.remainingCredits || 0) }}</span>
+          </template>
+        </el-table-column>
+
         <el-table-column label="过期时间" width="160" align="center">
           <template #default="{ row }">
             <span v-if="row.expireTime && parseFloat(row.expireTime) > 0" class="expire-time">
               {{ formatDateTime(row.expireTime) }}
             </span>
             <span v-else class="text-muted">永不过期</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="音色上限" min-width="200" align="center">
+          <template #default="{ row }">
+            <div class="voice-limit-cell">
+              <template v-if="row.voiceLimit && parseInt(row.voiceLimit) > 0">
+                <span class="quota-value">{{ parseInt(row.voiceLimit) }}</span>
+              </template>
+              <template v-else>
+                <span class="text-muted">不限制</span>
+              </template>
+              <span class="voice-used-inline">
+                （<span class="voice-used-link" @click="openClonedVoicesDialog(row)"
+                  >已用 {{ row.voiceCount ?? 0 }}</span
+                >）
+              </span>
+            </div>
           </template>
         </el-table-column>
 
@@ -94,7 +130,7 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="操作" width="120" align="center" fixed="right">
+        <el-table-column label="操作" width="170" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
               <el-button
@@ -106,6 +142,15 @@
                 :disabled="row.status !== 'active'"
                 title="编辑"
               />
+              <el-button
+                type="warning"
+                circle
+                size="small"
+                @click="handleAdjustCredits(row)"
+                title="调整额度"
+              >
+                调
+              </el-button>
               <el-button
                 type="danger"
                 :icon="Delete"
@@ -123,7 +168,9 @@
     <!-- 分页器 -->
     <div class="pagination-wrapper" v-if="pagination.total > 0">
       <div class="pagination-info">
-        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{ paginationRange.end }}
+        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{
+          paginationRange.end
+        }}
       </div>
       <el-pagination
         :current-page="pagination.page"
@@ -171,17 +218,11 @@
         </el-form-item>
 
         <el-form-item label="API Key名称" prop="name">
-          <el-input
-            v-model="formData.name"
-            placeholder="请输入API Key名称"
-          />
+          <el-input v-model="formData.name" placeholder="请输入API Key名称" />
         </el-form-item>
 
         <el-form-item label="API Key ID">
-          <el-input
-            v-model="formData.apiKeyId"
-            placeholder="第三方返回的ID（可选）"
-          />
+          <el-input v-model="formData.apiKeyId" placeholder="第三方返回的ID（可选）" />
         </el-form-item>
 
         <el-form-item label="额度（积分）">
@@ -194,6 +235,18 @@
             style="width: 100%"
           />
           <div class="form-tip">0表示无限制，大于0表示该API Key的额度限制</div>
+        </el-form-item>
+
+        <el-form-item label="音色上限">
+          <el-input-number
+            v-model="formData.voiceLimit"
+            :min="0"
+            :step="10"
+            :precision="0"
+            placeholder="0表示不限制"
+            style="width: 100%"
+          />
+          <div class="form-tip">0表示不限制，例如：100 表示最多可关联 100 个音色</div>
         </el-form-item>
 
         <el-form-item label="过期时间">
@@ -215,23 +268,96 @@
         <el-button type="primary" @click="handleSubmit" :loading="saving"> 确定 </el-button>
       </template>
     </el-dialog>
+
+    <!-- 克隆关联音色 -->
+    <el-dialog
+      v-model="clonedVoicesVisible"
+      :title="`克隆音色 — ${clonedVoicesKeyName}`"
+      width="720px"
+      destroy-on-close
+      @closed="onClonedVoicesDialogClosed"
+    >
+      <el-table
+        :data="clonedVoicesList"
+        v-loading="clonedVoicesLoading"
+        style="width: 100%"
+        max-height="420"
+      >
+        <el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip />
+        <el-table-column prop="voiceId" label="音色ID" min-width="200" show-overflow-tooltip />
+        <el-table-column label="关联模型" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ formatClonedVoiceModels(row.models) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="88" align="center">
+          <template #default="{ row }">
+            <el-tag :type="row.isActive ? 'success' : 'info'" size="small">
+              {{ row.isActive ? '启用' : '停用' }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="创建时间" width="168" align="center">
+          <template #default="{ row }">
+            {{ formatDateTime(row.createdAt) }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <div v-if="clonedVoicesTotal > clonedVoicesPageSize" class="cloned-voices-pagination">
+        <el-pagination
+          layout="prev, pager, next"
+          :total="clonedVoicesTotal"
+          :page-size="clonedVoicesPageSize"
+          :current-page="clonedVoicesPage"
+          @current-change="handleClonedVoicesPageChange"
+        />
+      </div>
+      <template #footer>
+        <el-button type="primary" @click="clonedVoicesVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 调整额度对话框 -->
+    <el-dialog v-model="adjustVisible" title="调整API Key额度" width="520px" destroy-on-close>
+      <el-form label-width="120px" label-position="left">
+        <el-form-item label="API Key名称">
+          <el-input :model-value="currentAdjustRow?.name || ''" disabled />
+        </el-form-item>
+        <el-form-item label="总额度（积分）">
+          <el-input-number
+            v-model="adjustCredits"
+            :min="0"
+            :step="100"
+            :precision="0"
+            placeholder="0表示无限制"
+            style="width: 100%"
+          />
+          <div class="form-tip">注意：总额度不能小于已消耗额度</div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="adjustVisible = false">取消</el-button>
+        <el-button type="primary" :loading="adjusting" @click="submitAdjustCredits">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { getProviderById } from '@/api/provider'
 import {
   getProviderApiKeys,
   addProviderApiKey,
-  deleteProviderApiKey
+  deleteProviderApiKey,
+  adjustProviderApiKeyCredits,
+  getProviderApiKeyClonedVoices
 } from '@/api/providerApiKey'
 
 const route = useRoute()
-const router = useRouter()
 
 const providerId = computed(() => route.params.id)
 
@@ -243,6 +369,19 @@ const formVisible = ref(false)
 const saving = ref(false)
 const currentApiKey = ref(null)
 const formRef = ref()
+const adjustVisible = ref(false)
+const currentAdjustRow = ref(null)
+const adjustCredits = ref(0)
+const adjusting = ref(false)
+
+const clonedVoicesVisible = ref(false)
+const clonedVoicesLoading = ref(false)
+const clonedVoicesList = ref([])
+const clonedVoicesKeyId = ref('')
+const clonedVoicesKeyName = ref('')
+const clonedVoicesTotal = ref(0)
+const clonedVoicesPage = ref(1)
+const clonedVoicesPageSize = ref(20)
 
 // 分页
 const pagination = reactive({
@@ -263,13 +402,12 @@ const formData = reactive({
   name: '',
   apiKeyId: '',
   credits: 0,
+  voiceLimit: 0,
   expireTime: null
 })
 
 const rules = {
-  apiKey: [
-    { required: true, message: '请输入API Key', trigger: 'blur' }
-  ],
+  apiKey: [{ required: true, message: '请输入API Key', trigger: 'blur' }],
   name: [
     { required: true, message: '请输入API Key名称', trigger: 'blur' },
     { max: 255, message: '名称长度不能超过255个字符', trigger: 'blur' }
@@ -289,6 +427,58 @@ async function fetchProviderInfo() {
 }
 
 // 获取API Key列表
+function formatClonedVoiceModels(models) {
+  if (!Array.isArray(models) || !models.length) return '-'
+  return models
+    .map(m => m.displayName || m.modelName || m.modelId)
+    .filter(Boolean)
+    .join('、')
+}
+
+async function fetchClonedVoicesPage() {
+  if (!clonedVoicesKeyId.value) return
+  clonedVoicesLoading.value = true
+  try {
+    const res = await getProviderApiKeyClonedVoices(providerId.value, clonedVoicesKeyId.value, {
+      page: clonedVoicesPage.value,
+      pageSize: clonedVoicesPageSize.value
+    })
+    if (res.success) {
+      clonedVoicesList.value = res.data || []
+      if (res.pagination) {
+        clonedVoicesTotal.value = res.pagination.total || 0
+      } else {
+        clonedVoicesTotal.value = clonedVoicesList.value.length
+      }
+    }
+  } catch {
+    clonedVoicesList.value = []
+  } finally {
+    clonedVoicesLoading.value = false
+  }
+}
+
+function openClonedVoicesDialog(row) {
+  clonedVoicesKeyId.value = row.id
+  clonedVoicesKeyName.value = row.name || row.id
+  clonedVoicesPage.value = 1
+  clonedVoicesVisible.value = true
+  fetchClonedVoicesPage()
+}
+
+function handleClonedVoicesPageChange(p) {
+  clonedVoicesPage.value = p
+  fetchClonedVoicesPage()
+}
+
+function onClonedVoicesDialogClosed() {
+  clonedVoicesKeyId.value = ''
+  clonedVoicesKeyName.value = ''
+  clonedVoicesList.value = []
+  clonedVoicesTotal.value = 0
+  clonedVoicesPage.value = 1
+}
+
 async function fetchData() {
   loading.value = true
   try {
@@ -315,6 +505,35 @@ async function fetchData() {
   }
 }
 
+function handleAdjustCredits(row) {
+  currentAdjustRow.value = row
+  adjustCredits.value =
+    row?.credits !== undefined && row?.credits !== null ? parseFloat(row.credits) : 0
+  adjustVisible.value = true
+}
+
+async function submitAdjustCredits() {
+  if (!currentAdjustRow.value) return
+  adjusting.value = true
+  try {
+    const response = await adjustProviderApiKeyCredits(
+      providerId.value,
+      currentAdjustRow.value.id,
+      {
+        credits: adjustCredits.value
+      }
+    )
+    if (response.success) {
+      ElMessage.success('额度已更新')
+      adjustVisible.value = false
+      fetchData()
+      fetchProviderInfo()
+    }
+  } finally {
+    adjusting.value = false
+  }
+}
+
 // 分页变化
 function handlePageChange(page) {
   pagination.page = page
@@ -336,6 +555,7 @@ function handleAdd() {
     name: '',
     apiKeyId: '',
     credits: 0,
+    voiceLimit: 0,
     expireTime: null
   })
   formVisible.value = true
@@ -349,9 +569,11 @@ function handleEdit(row) {
     name: row.name || '',
     apiKeyId: row.apiKeyId || '',
     credits: parseFloat(row.credits) || 0,
-    expireTime: row.expireTime && parseFloat(row.expireTime) > 0
-      ? formatTimestampToDateTime(row.expireTime)
-      : null
+    voiceLimit: parseInt(row.voiceLimit) || 0,
+    expireTime:
+      row.expireTime && parseFloat(row.expireTime) > 0
+        ? formatTimestampToDateTime(row.expireTime)
+        : null
   })
   formVisible.value = true
 }
@@ -384,7 +606,7 @@ function handleDelete(row) {
 
 // 提交表单
 function handleSubmit() {
-  formRef.value?.validate(async (valid) => {
+  formRef.value?.validate(async valid => {
     if (!valid) return
 
     saving.value = true
@@ -394,6 +616,7 @@ function handleSubmit() {
         name: formData.name,
         apiKeyId: formData.apiKeyId || null,
         credits: formData.credits || 0,
+        voiceLimit: formData.voiceLimit || 0,
         expireTime: formData.expireTime || null
       }
 
@@ -436,7 +659,7 @@ function formatNumber(value) {
 
 function formatDateTime(value) {
   if (!value) return '-'
-  
+
   // 如果已经是 Date 对象，直接格式化
   if (value instanceof Date) {
     if (isNaN(value.getTime())) {
@@ -451,7 +674,7 @@ function formatDateTime(value) {
       second: '2-digit'
     })
   }
-  
+
   // 如果是 ISO 字符串格式（如 "2024-01-01T00:00:00.000Z"），直接解析
   if (typeof value === 'string' && value.includes('T') && value.includes('Z')) {
     const date = new Date(value)
@@ -467,7 +690,7 @@ function formatDateTime(value) {
       second: '2-digit'
     })
   }
-  
+
   // 处理时间戳（可能是数字或字符串）
   let timestamp = value
   if (typeof value === 'string') {
@@ -491,23 +714,24 @@ function formatDateTime(value) {
       })
     }
   }
-  
+
   // 转换为数字
   const timestampNum = typeof timestamp === 'number' ? timestamp : parseFloat(timestamp)
   if (isNaN(timestampNum) || timestampNum <= 0) {
     return 'Invalid Date'
   }
-  
+
   // 判断时间戳长度：秒级时间戳通常是 10 位（小于 10000000000），毫秒级是 13 位
   // expireTime 在数据库中存储的是秒级时间戳，但 createdAt 是 Date 对象
-  const date = timestampNum < 10000000000 
-    ? new Date(timestampNum * 1000)  // 秒级时间戳，转换为毫秒
-    : new Date(timestampNum)          // 毫秒级时间戳
-  
+  const date =
+    timestampNum < 10000000000
+      ? new Date(timestampNum * 1000) // 秒级时间戳，转换为毫秒
+      : new Date(timestampNum) // 毫秒级时间戳
+
   if (isNaN(date.getTime())) {
     return 'Invalid Date'
   }
-  
+
   return date.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
@@ -716,5 +940,35 @@ onMounted(() => {
   font-size: 12px;
   color: #94a3b8;
   margin-top: 4px;
+}
+
+.voice-limit-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  line-height: 1.4;
+}
+
+.voice-used-inline {
+  font-size: 13px;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.voice-used-link {
+  color: var(--el-color-primary);
+  cursor: pointer;
+}
+
+.voice-used-link:hover {
+  opacity: 0.85;
+}
+
+.cloned-voices-pagination {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
 }
 </style>

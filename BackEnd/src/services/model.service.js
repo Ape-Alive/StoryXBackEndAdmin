@@ -2,6 +2,15 @@ const modelRepository = require('../repositories/model.repository')
 const { NotFoundError, ConflictError, BadRequestError } = require('../utils/errors')
 const { MODEL_TYPE } = require('../constants/modelType')
 
+async function syncVoiceProfilesSupportsVoiceCommandForModel(model) {
+  const prisma = require('../config/database')
+  const enabled = model.type === MODEL_TYPE.TTS && model.supportsVoiceCommand === true
+  await prisma.voiceProfile.updateMany({
+    where: { models: { some: { modelId: model.id } } },
+    data: { supportsVoiceCommand: enabled },
+  })
+}
+
 /**
  * 模型业务逻辑层
  */
@@ -50,6 +59,8 @@ class ModelService {
 
     const model = await modelRepository.create(data)
 
+    await syncVoiceProfilesSupportsVoiceCommandForModel(model)
+
     // 记录操作日志
     if (adminId) {
       const logService = require('./log.service')
@@ -89,6 +100,10 @@ class ModelService {
     }
 
     const updated = await modelRepository.update(id, data)
+
+    if (data.type !== undefined || data.supportsVoiceCommand !== undefined) {
+      await syncVoiceProfilesSupportsVoiceCommandForModel(updated)
+    }
 
     // 记录操作日志
     if (adminId) {

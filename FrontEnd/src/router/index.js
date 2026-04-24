@@ -57,6 +57,20 @@ const routes = [
     ]
   },
   {
+    path: '/voice',
+    name: 'Voice',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { title: '语音管理', requiresAuth: true },
+    children: [
+      {
+        path: '/voice/profiles',
+        name: 'VoiceProfiles',
+        component: () => import('@/views/voice/VoiceProfileList.vue'),
+        meta: { title: '音色库', requiresAuth: true }
+      }
+    ]
+  },
+  {
     path: '/system-user',
     name: 'SystemUser',
     component: () => import('@/layouts/MainLayout.vue'),

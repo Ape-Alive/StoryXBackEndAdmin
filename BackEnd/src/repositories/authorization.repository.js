@@ -161,6 +161,7 @@ class AuthorizationRepository {
         ipAddress: data.ipAddress,
         frozenQuota: data.frozenQuota,
         callToken: data.callToken,
+        userApiKeyId: data.userApiKeyId || null,
         status: data.status || 'active',
         expiresAt: data.expiresAt
       },

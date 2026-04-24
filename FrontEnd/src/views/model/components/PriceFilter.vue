@@ -10,6 +10,7 @@
     >
       <el-option label="按Token计价" value="token" />
       <el-option label="按调用次数计价" value="call" />
+      <el-option label="按字符计价" value="char" />
     </el-select>
     <el-select
       :model-value="packageId"

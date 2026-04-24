@@ -11,7 +11,12 @@ const {
   getProviderDetailValidator,
   updateProviderStatusValidator,
 } = require('../validators/provider.validator')
-const { addProviderApiKeyValidator } = require('../validators/userApiKey.validator')
+const {
+  addProviderApiKeyValidator,
+  adjustProviderApiKeyCreditsValidator,
+  getProviderApiKeyClonedVoicesValidator,
+  postProviderApiKeyDecryptedTokenValidator,
+} = require('../validators/userApiKey.validator')
 const { ROLES } = require('../constants/roles')
 
 // 所有路由需要认证
@@ -1112,7 +1117,7 @@ router.get(
  *                 summary: 额度更新失败
  *                 value:
  *                   success: false
- *                   message: "Failed to update provider quota"
+ *                   message: "Failed to update provider apiKeys"
  */
 router.post(
   '/:id/api-keys',
@@ -1242,6 +1247,79 @@ router.delete(
   getProviderDetailValidator,
   validate,
   providerApiKeyController.deleteProviderApiKey.bind(providerApiKeyController)
+)
+
+/**
+ * 调整提供商关联API Key额度（总额度）
+ */
+router.patch(
+  '/:id/api-keys/:apiKeyId/credits',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  getProviderDetailValidator,
+  adjustProviderApiKeyCreditsValidator,
+  validate,
+  providerApiKeyController.adjustProviderApiKeyCredits.bind(providerApiKeyController)
+)
+
+/**
+ * @swagger
+ * /api/providers/{id}/api-keys/{apiKeyId}/cloned-voices:
+ *   get:
+ *     summary: 查询该提供商 API Key 在「音色克隆」中关联的音色列表 [管理员]
+ *     tags: [提供商API Key管理]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: apiKeyId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: pageSize
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           maximum: 100
+ *     responses:
+ *       200:
+ *         description: OK
+ */
+router.get(
+  '/:id/api-keys/:apiKeyId/cloned-voices',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.READ_ONLY),
+  getProviderDetailValidator,
+  getProviderApiKeyClonedVoicesValidator,
+  validate,
+  providerApiKeyController.getClonedVoicesForProviderApiKey.bind(providerApiKeyController)
+)
+
+/**
+ * @swagger
+ * /api/providers/{id}/api-keys/{apiKeyId}/decrypted-token:
+ *   post:
+ *     summary: 解密系统级 API Key（仅超级/平台管理员）
+ *     tags: [提供商API Key管理]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.post(
+  '/:id/api-keys/:apiKeyId/decrypted-token',
+  authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN),
+  getProviderDetailValidator,
+  postProviderApiKeyDecryptedTokenValidator,
+  validate,
+  providerApiKeyController.revealProviderApiKeyToken.bind(providerApiKeyController)
 )
 
 module.exports = router

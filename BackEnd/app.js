@@ -35,6 +35,7 @@ const paymentRoutes = require('./src/routes/payment.routes');
 const paymentCallbackRoutes = require('./src/routes/paymentCallback.routes');
 const userApiRoutes = require('./src/routes/userApi.routes');
 const userApiKeyRoutes = require('./src/routes/userApiKey.routes');
+const voiceProfileRoutes = require('./src/routes/voiceProfile.routes');
 
 const app = express();
 
@@ -141,6 +142,7 @@ app.use('/api/user', paymentRoutes);
 app.use('/api/payment/callback', paymentCallbackRoutes);
 app.use('/api/user', userApiRoutes);
 app.use('/api/user/api-keys', userApiKeyRoutes);
+app.use('/api/voice-profiles', voiceProfileRoutes);
 
 // 404 handler
 app.use((req, res, next) => {

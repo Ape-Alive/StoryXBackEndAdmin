@@ -9,6 +9,10 @@ const requestAuthorizationValidator = [
     .withMessage('Model ID is required')
     .isString()
     .withMessage('Model ID must be a string'),
+  body('userApiKeyId')
+    .optional()
+    .isString()
+    .withMessage('userApiKeyId must be a string'),
   body('deviceFingerprint')
     .notEmpty()
     .withMessage('Device fingerprint is required')
@@ -20,6 +24,11 @@ const requestAuthorizationValidator = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Estimated tokens must be a non-negative integer')
+  ,
+  body('estimatedChars')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Estimated chars must be a non-negative integer')
 ];
 
 /**
@@ -50,6 +59,22 @@ const reportCallValidator = [
     .optional()
     .isInt({ min: 0 })
     .withMessage('Total tokens must be a non-negative integer'),
+  body('inputChars')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Input chars must be a non-negative integer'),
+  body('outputChars')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Output chars must be a non-negative integer'),
+  body('totalChars')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Total chars must be a non-negative integer'),
+  body('usedChars')
+    .optional()
+    .isInt({ min: 0 })
+    .withMessage('Used chars must be a non-negative integer'),
   body('status')
     .notEmpty()
     .withMessage('Status is required')

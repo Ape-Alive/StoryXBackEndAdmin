@@ -13,40 +13,24 @@
       label-position="left"
     >
       <el-form-item label="提供商标识" prop="name">
-        <el-input
-          v-model="formData.name"
-          placeholder="例如：DeepSeek"
-          :disabled="!!formData.id"
-        />
+        <el-input v-model="formData.name" placeholder="例如：DeepSeek" :disabled="!!formData.id" />
         <div class="form-tip">唯一标识，创建后不可修改</div>
       </el-form-item>
 
       <el-form-item label="显示名称" prop="displayName">
-        <el-input
-          v-model="formData.displayName"
-          placeholder="例如：DeepSeek AI"
-        />
+        <el-input v-model="formData.displayName" placeholder="例如：DeepSeek AI" />
       </el-form-item>
 
       <el-form-item label="API 服务基地址" prop="baseUrl">
-        <el-input
-          v-model="formData.baseUrl"
-          placeholder="例如：https://api.deepseek.com"
-        />
+        <el-input v-model="formData.baseUrl" placeholder="例如：https://api.deepseek.com" />
       </el-form-item>
 
       <el-form-item label="官网链接" prop="website">
-        <el-input
-          v-model="formData.website"
-          placeholder="例如：https://www.deepseek.com"
-        />
+        <el-input v-model="formData.website" placeholder="例如：https://www.deepseek.com" />
       </el-form-item>
 
       <el-form-item label="Logo 链接" prop="logoUrl">
-        <el-input
-          v-model="formData.logoUrl"
-          placeholder="Logo 图片 URL"
-        />
+        <el-input v-model="formData.logoUrl" placeholder="Logo 图片 URL" />
       </el-form-item>
 
       <el-form-item label="描述信息">
@@ -63,21 +47,54 @@
           v-model="formData.quota"
           :min="0"
           :precision="2"
-          placeholder="请输入额度"
+          placeholder="由API Key额度汇总计算"
           style="width: 100%"
+          disabled
         />
+        <div class="form-tip">额度由该提供商关联的 API Key 额度汇总计算，不能手动设置</div>
       </el-form-item>
 
       <el-form-item label="额度单位" prop="quotaUnit">
-        <el-select
-          v-model="formData.quotaUnit"
-          placeholder="请选择额度单位"
-          style="width: 100%"
-        >
+        <el-select v-model="formData.quotaUnit" placeholder="请选择额度单位" style="width: 100%">
           <el-option label="积分" value="points" />
           <el-option label="元" value="yuan" />
           <el-option label="美元" value="usd" />
         </el-select>
+      </el-form-item>
+
+      <el-form-item label="API Key切换阈值">
+        <el-input-number
+          v-model="formData.apiKeyLowBalanceThreshold"
+          :min="0"
+          :step="100"
+          :precision="0"
+          placeholder="默认1000"
+          style="width: 100%"
+        />
+        <div class="form-tip">
+          当同一提供商下某个 API Key 的剩余额度 &lt; 阈值时，授权会优先选择其他余额更充足的 API Key
+        </div>
+      </el-form-item>
+
+      <el-form-item label="音色克隆API配置">
+        <div class="kv-list">
+          <div v-for="(row, idx) in voiceCloneApiRows" :key="row._key" class="kv-row">
+            <el-input v-model="row.name" placeholder="名称（展示用）" />
+            <el-input v-model="row.path" placeholder="Path（可相对 baseUrl，也可完整URL）" />
+            <el-button
+              type="danger"
+              plain
+              @click="removeVoiceCloneRow(idx)"
+              :disabled="voiceCloneApiRows.length <= 1"
+            >
+              删除
+            </el-button>
+          </div>
+          <el-button type="primary" plain :icon="Plus" @click="addVoiceCloneRow">新增</el-button>
+        </div>
+        <div class="form-tip">
+          用于“音色克隆”下拉选择（name/path）。path 可为完整URL或相对 baseUrl 的路径。
+        </div>
       </el-form-item>
 
       <el-form-item label="支持API Key创建">
@@ -105,9 +122,7 @@
     <template #footer>
       <div class="dialog-footer">
         <el-button @click="handleClose">取消</el-button>
-        <el-button type="primary" @click="handleSubmit" :loading="submitting">
-          确定
-        </el-button>
+        <el-button type="primary" @click="handleSubmit" :loading="submitting"> 确定 </el-button>
       </div>
     </template>
   </el-dialog>
@@ -116,6 +131,7 @@
 <script setup>
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Plus } from '@element-plus/icons-vue'
 
 const props = defineProps({
   modelValue: {
@@ -143,17 +159,64 @@ const formData = reactive({
   description: '',
   quota: null,
   quotaUnit: null,
+  apiKeyLowBalanceThreshold: 1000,
   mainAccountToken: '',
   supportsApiKeyCreation: false,
   isActive: true
 })
 
+const voiceCloneApiRows = ref([{ _key: `${Date.now()}_0`, name: '', path: '' }])
+
+function resetVoiceCloneRowsFromJson(jsonStr) {
+  if (!jsonStr) {
+    voiceCloneApiRows.value = [{ _key: `${Date.now()}_0`, name: '', path: '' }]
+    return
+  }
+  try {
+    const parsed = JSON.parse(jsonStr)
+    if (Array.isArray(parsed) && parsed.length) {
+      voiceCloneApiRows.value = parsed.map((item, idx) => ({
+        _key: `${Date.now()}_${idx}`,
+        name: item?.name || '',
+        path: item?.path || ''
+      }))
+      return
+    }
+  } catch {
+    // ignore
+  }
+  voiceCloneApiRows.value = [{ _key: `${Date.now()}_0`, name: '', path: '' }]
+}
+
+function addVoiceCloneRow() {
+  voiceCloneApiRows.value.push({
+    _key: `${Date.now()}_${voiceCloneApiRows.value.length}`,
+    name: '',
+    path: ''
+  })
+}
+
+function removeVoiceCloneRow(idx) {
+  if (voiceCloneApiRows.value.length <= 1) return
+  voiceCloneApiRows.value.splice(idx, 1)
+}
+
+function buildVoiceCloneApisJson() {
+  const rows = (voiceCloneApiRows.value || [])
+    .map(r => ({
+      name: String(r.name || '').trim(),
+      path: String(r.path || '').trim()
+    }))
+    .filter(r => r.name && r.path)
+
+  if (!rows.length) return null
+  return JSON.stringify(rows)
+}
+
 // 账户Token验证规则（动态）
 const mainAccountTokenRules = computed(() => {
   if (formData.supportsApiKeyCreation) {
-    return [
-      { required: true, message: '支持API Key创建时，账户Token为必填项', trigger: 'blur' }
-    ]
+    return [{ required: true, message: '支持API Key创建时，账户Token为必填项', trigger: 'blur' }]
   }
   return []
 })
@@ -161,11 +224,13 @@ const mainAccountTokenRules = computed(() => {
 const rules = {
   name: [
     { required: true, message: '请输入提供商标识', trigger: 'blur' },
-    { pattern: /^[a-zA-Z0-9_.-]+$/, message: '标识只能包含字母、数字、下划线、点号和连字符', trigger: 'blur' }
+    {
+      pattern: /^[a-zA-Z0-9_.-]+$/,
+      message: '标识只能包含字母、数字、下划线、点号和连字符',
+      trigger: 'blur'
+    }
   ],
-  displayName: [
-    { required: true, message: '请输入显示名称', trigger: 'blur' }
-  ],
+  displayName: [{ required: true, message: '请输入显示名称', trigger: 'blur' }],
   baseUrl: [
     { required: true, message: '请输入 API 服务基地址', trigger: 'blur' },
     { type: 'url', message: '请输入有效的 URL 地址', trigger: 'blur' }
@@ -178,52 +243,64 @@ const rules = {
     { required: true, message: '请输入 Logo 链接', trigger: 'blur' },
     { type: 'url', message: '请输入有效的 URL 地址', trigger: 'blur' }
   ],
-  quota: [
-    { required: true, message: '请输入额度', trigger: 'blur' },
-    { type: 'number', min: 0, message: '额度必须大于等于0', trigger: 'blur' }
-  ],
-  quotaUnit: [
-    { required: true, message: '请选择额度单位', trigger: 'change' }
-  ]
+  quota: [],
+  quotaUnit: [{ required: true, message: '请选择额度单位', trigger: 'change' }]
 }
 
-watch(() => props.modelValue, (val) => {
-  visible.value = val
-  if (val && props.provider) {
-    Object.assign(formData, {
-      id: props.provider.id,
-      name: props.provider.name || '',
-      displayName: props.provider.displayName || '',
-      baseUrl: props.provider.baseUrl || '',
-      website: props.provider.website || '',
-      logoUrl: props.provider.logoUrl || '',
-      description: props.provider.description || '',
-      quota: props.provider.quota !== undefined && props.provider.quota !== null ? parseFloat(props.provider.quota) : null,
-      quotaUnit: props.provider.quotaUnit || null,
-      mainAccountToken: props.provider.mainAccountToken || '',
-      supportsApiKeyCreation: props.provider.supportsApiKeyCreation !== undefined ? props.provider.supportsApiKeyCreation : false,
-      isActive: props.provider.isActive !== undefined ? props.provider.isActive : true
-    })
-  } else if (val) {
-    // 重置表单
-    Object.assign(formData, {
-      id: null,
-      name: '',
-      displayName: '',
-      baseUrl: '',
-      website: '',
-      logoUrl: '',
-      description: '',
-      quota: null,
-      quotaUnit: null,
-      mainAccountToken: '',
-      supportsApiKeyCreation: false,
-      isActive: true
-    })
+watch(
+  () => props.modelValue,
+  val => {
+    visible.value = val
+    if (val && props.provider) {
+      Object.assign(formData, {
+        id: props.provider.id,
+        name: props.provider.name || '',
+        displayName: props.provider.displayName || '',
+        baseUrl: props.provider.baseUrl || '',
+        website: props.provider.website || '',
+        logoUrl: props.provider.logoUrl || '',
+        description: props.provider.description || '',
+        quota:
+          props.provider.quota !== undefined && props.provider.quota !== null
+            ? parseFloat(props.provider.quota)
+            : null,
+        quotaUnit: props.provider.quotaUnit || null,
+        apiKeyLowBalanceThreshold:
+          props.provider.apiKeyLowBalanceThreshold !== undefined &&
+          props.provider.apiKeyLowBalanceThreshold !== null
+            ? parseFloat(props.provider.apiKeyLowBalanceThreshold)
+            : 1000,
+        mainAccountToken: props.provider.mainAccountToken || '',
+        supportsApiKeyCreation:
+          props.provider.supportsApiKeyCreation !== undefined
+            ? props.provider.supportsApiKeyCreation
+            : false,
+        isActive: props.provider.isActive !== undefined ? props.provider.isActive : true
+      })
+      resetVoiceCloneRowsFromJson(props.provider.voiceCloneApis || '')
+    } else if (val) {
+      // 重置表单
+      Object.assign(formData, {
+        id: null,
+        name: '',
+        displayName: '',
+        baseUrl: '',
+        website: '',
+        logoUrl: '',
+        description: '',
+        quota: null,
+        quotaUnit: null,
+        apiKeyLowBalanceThreshold: 1000,
+        mainAccountToken: '',
+        supportsApiKeyCreation: false,
+        isActive: true
+      })
+      resetVoiceCloneRowsFromJson('')
+    }
   }
-})
+)
 
-watch(visible, (val) => {
+watch(visible, val => {
   emit('update:modelValue', val)
 })
 
@@ -233,10 +310,13 @@ function handleClose() {
 }
 
 function handleSubmit() {
-  formRef.value?.validate((valid) => {
+  formRef.value?.validate(valid => {
     if (valid) {
       // 额外验证：如果支持API Key创建，必须填写mainAccountToken
-      if (formData.supportsApiKeyCreation && (!formData.mainAccountToken || formData.mainAccountToken.trim() === '')) {
+      if (
+        formData.supportsApiKeyCreation &&
+        (!formData.mainAccountToken || formData.mainAccountToken.trim() === '')
+      ) {
         ElMessage.error('支持API Key创建时，账户Token为必填项')
         return
       }
@@ -247,6 +327,7 @@ function handleSubmit() {
         ...formData,
         quota: formData.quota !== null && formData.quota !== undefined ? formData.quota : null,
         quotaUnit: formData.quotaUnit || null,
+        voiceCloneApis: buildVoiceCloneApisJson(),
         mainAccountToken: formData.mainAccountToken || null
       }
       emit('success', submitData)
@@ -275,5 +356,18 @@ defineExpose({
   justify-content: flex-end;
   gap: 12px;
 }
-</style>
 
+.kv-list {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kv-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+</style>

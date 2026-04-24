@@ -1,5 +1,3 @@
-// Prisma Schema for AI 能力中台后台管理系统
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -9,41 +7,34 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ==================== 用户管理模块 ====================
-
-// 管理员账号（后台系统用户）
 model Admin {
-  id        String   @id @default(cuid())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  role      String   // super_admin, platform_admin, operator, risk_control, finance, read_only
-  status    String   @default("active") // active, inactive
-  lastLogin DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // 关联的操作日志
-  operationLogs OperationLog[]
+  id                 String              @id @default(cuid())
+  username           String              @unique
+  email              String              @unique
+  password           String
+  role               String
+  status             String              @default("active")
+  lastLogin          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   emailVerifications EmailVerification[]
+  operationLogs      OperationLog[]
 
   @@index([username])
   @@index([email])
   @@map("admins")
 }
 
-// 邮箱验证码
 model EmailVerification {
   id        String   @id @default(cuid())
   email     String
-  code      String   // 6位数字验证码
-  type      String   // register, reset_password, etc.
-  adminId   String?  // 关联的管理员ID（注册时可能还未创建）
-  used      Boolean  @default(false) // 是否已使用
-  expiresAt DateTime // 过期时间
+  code      String
+  type      String
+  adminId   String?
+  used      Boolean  @default(false)
+  expiresAt DateTime
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-
   admin     Admin?   @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([email])
@@ -51,34 +42,33 @@ model EmailVerification {
   @@index([type])
   @@index([used])
   @@index([expiresAt])
+  @@index([adminId], map: "email_verifications_adminId_fkey")
   @@map("email_verifications")
 }
 
-// 终端用户（C端用户）
 model User {
-  id             String    @id @default(cuid())
-  email          String?   @unique
-  phone          String?   @unique
+  id             String          @id @default(cuid())
+  email          String?         @unique
+  phone          String?         @unique
   password       String?
-  role           String    @default("basic_user") // basic_user, user (未认证用户/已认证用户)
-  status         String    @default("normal") // normal, frozen, banned
+  status         String          @default("normal")
   banReason      String?
   banUntil       DateTime?
   lastLoginAt    DateTime?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  // 关联数据
-  packages       UserPackage[]
-  devices        Device[]
-  quotaRecords   QuotaRecord[]
-  quotas         UserQuota[]
-  authorizations Authorization[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  role           String          @default("basic_user")
   aiCallLogs     AICallLog[]
-  orders         Order[]
-  refreshTokens  RefreshToken[]
+  authorizations Authorization[]
+  devices        Device[]
   oneTimeTokens  OneTimeToken[]
+  orders         Order[]
+  quotaRecords   QuotaRecord[]
+  refreshTokens  RefreshToken[]
   apiKeys        UserApiKey[]
+  packages       UserPackage[]
+  quotas         UserQuota[]
+  voiceProfiles  VoiceProfile[]
 
   @@index([email])
   @@index([phone])
@@ -88,22 +78,20 @@ model User {
   @@map("users")
 }
 
-// 刷新令牌（用于桌面端登录和Token刷新）
 model RefreshToken {
-  id            String   @id @default(cuid())
-  userId        String
-  deviceId      String?  // 设备ID（可选）
-  token         String   @unique @db.VarChar(767) // 刷新令牌（JWT格式，767字符足够，且满足MySQL唯一索引限制）
-  accessToken   String?  @db.VarChar(767) // 当前关联的访问令牌（可选，用于追踪，JWT格式）
-  expiresAt     DateTime // 过期时间
-  revoked       Boolean  @default(false) // 是否已撤销
-  revokedAt     DateTime? // 撤销时间
-  lastUsedAt    DateTime? // 最后使用时间
-  ipAddress     String?  // 创建时的IP地址
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String    @id @default(cuid())
+  userId      String
+  deviceId    String?
+  token       String    @unique @db.VarChar(767)
+  accessToken String?   @db.VarChar(767)
+  expiresAt   DateTime
+  revoked     Boolean   @default(false)
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+  ipAddress   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -113,19 +101,17 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
-// 一次性令牌（用于桌面端登录）
 model OneTimeToken {
-  id            String   @id @default(cuid())
-  userId        String
-  token         String   @unique @db.VarChar(767) // 一次性token（JWT格式，767字符足够，且满足MySQL唯一索引限制）
-  used          Boolean  @default(false) // 是否已使用
-  usedAt        DateTime? // 使用时间
-  expiresAt     DateTime // 过期时间（通常5-10分钟）
-  ipAddress     String?  // 创建时的IP地址
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  userId    String
+  token     String    @unique @db.VarChar(767)
+  used      Boolean   @default(false)
+  usedAt    DateTime?
+  expiresAt DateTime
+  ipAddress String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([token])
@@ -134,20 +120,18 @@ model OneTimeToken {
   @@map("one_time_tokens")
 }
 
-// 用户设备
 model Device {
   id                String   @id @default(cuid())
   userId            String
-  deviceFingerprint String   // 设备指纹
-  name              String?  // 设备名称（用户自定义）
-  remark            String?  // 备注
+  deviceFingerprint String
   ipAddress         String?
   region            String?
-  status            String   @default("active") // active, revoked
   lastUsedAt        DateTime @default(now())
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
-
+  name              String?
+  remark            String?
+  status            String   @default("active")
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, deviceFingerprint])
@@ -157,30 +141,27 @@ model Device {
   @@map("devices")
 }
 
-// ==================== 模型管理模块 ====================
-
-// AI 模型提供商
 model AIProvider {
-  id                    String   @id @default(cuid())
-  name                  String   @unique // 内部标识，如 "DeepSeek", "OpenAI", "grsai"
-  displayName           String
-  baseUrl               String?  // API 服务基地址
-  website               String?
-  logoUrl               String?
-  description           String?
-  quota                 Decimal? @db.Decimal(20, 2) // 额度（积分）
-  quotaUnit             String?  @default("points") // 额度单位：points(积分)
-  mainAccountToken      String?  // 主账户token
-  supportsApiKeyCreation Boolean @default(false) // 是否支持通过接口创建API Key
-  apiKeyCreationConfig  String?  @db.Text // API Key创建接口配置（JSON字符串）
-  apiKeys               String?  @db.Text // 系统创建的API Key ID列表（JSON数组）
-  isActive              Boolean  @default(true)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
-
-  // 关联的模型
-  models      AIModel[]
-  userApiKeys UserApiKey[]
+  id                        String       @id @default(cuid())
+  name                      String       @unique
+  displayName               String
+  baseUrl                   String?
+  website                   String?
+  logoUrl                   String?
+  description               String?
+  isActive                  Boolean      @default(true)
+  createdAt                 DateTime     @default(now())
+  updatedAt                 DateTime     @updatedAt
+  mainAccountToken          String?
+  quota                     Decimal?     @db.Decimal(20, 2)
+  quotaUnit                 String?      @default("points")
+  apiKeyCreationConfig      String?      @db.Text
+  apiKeys                   String?      @db.Text
+  supportsApiKeyCreation    Boolean      @default(false)
+  apiKeyLowBalanceThreshold Decimal      @default(1000.00) @db.Decimal(20, 2)
+  voiceCloneApis            String?      @db.Text
+  models                    AIModel[]
+  userApiKeys               UserApiKey[]
 
   @@index([name])
   @@index([isActive])
@@ -189,28 +170,28 @@ model AIProvider {
   @@map("ai_providers")
 }
 
-// AI 模型
 model AIModel {
-  id          String   @id @default(cuid())
-  name        String   // 模型内部标识，如 "deepseek-chat"
-  displayName String
-  type        String   // llm, video, image, tts
-  category    String?  // chat, completion, generation
-  providerId  String
-  baseUrl     String   // 接口路径，如 "/v1/draw/nano-banana"
-  description String?
-  isActive    Boolean  @default(true)
-  requiresKey Boolean  @default(false) // 是否需要 API 密钥
-  apiConfig   String? @db.Text // API配置参数（JSON字符串），存储每个模型独有的请求参数
-  modelTag    String?  // 模型标签，逗号隔开的字符串，如 "chat,gpt4,vision"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // 关联数据
-  provider    AIProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  prices      ModelPrice[]
-  authorizations Authorization[]
-  aiCallLogs  AICallLog[]
+  id                 String              @id @default(cuid())
+  name               String
+  displayName        String
+  type               String
+  category           String?
+  providerId         String
+  baseUrl            String
+  description        String?
+  isActive           Boolean             @default(true)
+  requiresKey        Boolean             @default(false)
+  /// TTS 模型：是否支持语音指令；为 true 时会把绑定该模型的所有音色 supportsVoiceCommand 同步为 true
+  supportsVoiceCommand Boolean           @default(false)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  apiConfig          String?             @db.Text
+  modelTag           String?
+  aiCallLogs         AICallLog[]
+  provider           AIProvider          @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  authorizations     Authorization[]
+  prices             ModelPrice[]
+  voiceProfileModels VoiceProfileModel[]
 
   @@unique([providerId, name])
   @@index([providerId])
@@ -220,22 +201,22 @@ model AIModel {
   @@map("ai_models")
 }
 
-// 模型价格配置
 model ModelPrice {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   modelId     String
-  packageId   String?  // 套餐ID，null表示默认价格
-  pricingType String   @default("token") // 计价类型：token(按Token计价)、call(按调用次数计价)
-  inputPrice  Decimal  @default(0) @db.Decimal(10, 6) // 输入Token单价（积分），pricingType为token时使用
-  outputPrice Decimal  @default(0) @db.Decimal(10, 6) // 输出Token单价（积分），pricingType为token时使用
-  callPrice   Decimal  @default(0) @db.Decimal(10, 2) // 调用次数单价（积分），pricingType为call时使用
-  maxToken    Int?     // 最大Token数（pricingType为token时使用），用于预估费用计算，null表示不限制
-  effectiveAt DateTime @default(now())
+  packageId   String?
+  inputPrice  Decimal   @default(0.000000) @db.Decimal(10, 6)
+  outputPrice Decimal   @default(0.000000) @db.Decimal(10, 6)
+  callPrice   Decimal   @default(0.00) @db.Decimal(10, 2)
+  effectiveAt DateTime  @default(now())
   expiredAt   DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  model       AIModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  pricingType String    @default("token")
+  maxToken    Int?
+  charPrice   Decimal   @default(0.000000) @db.Decimal(10, 6)
+  maxChars    Int?
+  model       AIModel   @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@index([modelId])
   @@index([packageId])
@@ -244,33 +225,67 @@ model ModelPrice {
   @@map("model_prices")
 }
 
-// ==================== 套餐管理模块 ====================
+model VoiceProfileModel {
+  voiceProfileId String
+  modelId        String
+  createdAt      DateTime     @default(now())
+  model          AIModel      @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  voiceProfile   VoiceProfile @relation(fields: [voiceProfileId], references: [id], onDelete: Cascade)
 
-// 套餐
+  @@id([voiceProfileId, modelId])
+  @@index([voiceProfileId])
+  @@index([modelId])
+  @@map("voice_profile_models")
+}
+
+model VoiceProfile {
+  id            String              @id @default(uuid())
+  voiceId       String              @unique
+  scope         String
+  userId        String?
+  sampleUrl     String?
+  name          String?
+  description   String?
+  meta          String?             @db.Text
+  supportsVoiceCommand Boolean      @default(false)
+  isActive      Boolean             @default(true)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  isModelLocked Boolean             @default(false)
+  avatarUrl     String?
+  tags          Json?
+  models        VoiceProfileModel[]
+  user          User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([voiceId])
+  @@index([scope])
+  @@index([userId])
+  @@index([isActive])
+  @@map("voice_profiles")
+}
+
 model Package {
-  id             String        @id @default(cuid())
-  name           String
-  displayName    String
-  description    String?
-  type           String        // free, paid, trial
-  duration       Int?          // 有效期数值，null表示永久
-  durationUnit   String?       // 有效期单位：day, month, year，null表示永久
-  quota          Decimal?      @map("totalQuota") @db.Decimal(20, 2) // 额度（积分），null表示无限
-  price          Decimal?      @db.Decimal(20, 2) // 套餐金额
-  priceUnit      String?       // 套餐金额单位：CNY, USD
-  discount       Decimal?      @db.Decimal(5, 2) // 套餐折扣（百分比，0-100）
-  maxDevices     Int?          // 最大设备数量，null表示无限
-  availableModels String?      // 可用模型ID列表（JSON数组），null或空数组表示所有模型都可用
-  isStackable    Boolean       @default(false) // 是否可叠加
-  priority       Int           @default(0) // 优先级，数字越大优先级越高
-  isActive       Boolean       @default(true)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  // 关联数据
-  userPackages   UserPackage[]
-  quotaRecords   QuotaRecord[]
-  orders         Order[]
+  id              String        @id @default(cuid())
+  name            String
+  displayName     String
+  description     String?
+  type            String
+  duration        Int?
+  quota           Decimal?      @map("totalQuota") @db.Decimal(20, 2)
+  availableModels String?
+  isStackable     Boolean       @default(false)
+  priority        Int           @default(0)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  maxDevices      Int?
+  discount        Decimal?      @db.Decimal(5, 2)
+  price           Decimal?      @db.Decimal(20, 2)
+  priceUnit       String?
+  durationUnit    String?
+  orders          Order[]
+  quotaRecords    QuotaRecord[]
+  userPackages    UserPackage[]
 
   @@index([name])
   @@index([type])
@@ -278,19 +293,17 @@ model Package {
   @@map("packages")
 }
 
-// 用户套餐关系
 model UserPackage {
-  id          String   @id @default(cuid())
-  userId      String
-  packageId   String
-  startedAt   DateTime @default(now())
-  expiresAt   DateTime?
-  priority    Int      @default(0) // 套餐优先级
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  package     Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  id        String    @id @default(cuid())
+  userId    String
+  packageId String
+  startedAt DateTime  @default(now())
+  expiresAt DateTime?
+  priority  Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  package   Package   @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, packageId])
   @@index([userId])
@@ -299,19 +312,15 @@ model UserPackage {
   @@map("user_packages")
 }
 
-// ==================== 额度管理模块 ====================
-
-// 用户额度
 model UserQuota {
-  id          String   @id @default(cuid())
-  userId      String
-  packageId   String?
-  available   Decimal  @default(0) @db.Decimal(20, 2) // 可用额度（积分）
-  frozen      Decimal  @default(0) @db.Decimal(20, 2) // 冻结额度（积分）
-  used        Decimal  @default(0) @db.Decimal(20, 2) // 已使用额度（积分）
-  updatedAt   DateTime @updatedAt
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  userId    String
+  packageId String?
+  available Decimal  @default(0.00) @db.Decimal(20, 2)
+  frozen    Decimal  @default(0.00) @db.Decimal(20, 2)
+  used      Decimal  @default(0.00) @db.Decimal(20, 2)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, packageId])
   @@index([userId])
@@ -319,23 +328,21 @@ model UserQuota {
   @@map("user_quotas")
 }
 
-// 额度流水记录
 model QuotaRecord {
-  id          String   @id @default(cuid())
-  userId      String
-  packageId   String?
-  orderId     String?  // 关联的订单ID（如果是购买套餐产生的额度增加）
-  type        String   // increase, decrease, freeze, unfreeze
-  amount      Decimal  @db.Decimal(20, 2) // 变动额度（积分）
-  before      Decimal  @db.Decimal(20, 2) // 变动前额度（积分）
-  after       Decimal  @db.Decimal(20, 2) // 变动后额度（积分）
-  reason      String?
-  requestId   String?  // 关联的请求ID
-  createdAt   DateTime @default(now())
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  package     Package? @relation(fields: [packageId], references: [id], onDelete: SetNull)
-  order       Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  id        String   @id @default(cuid())
+  userId    String
+  packageId String?
+  type      String
+  amount    Decimal  @db.Decimal(20, 2)
+  before    Decimal  @db.Decimal(20, 2)
+  after     Decimal  @db.Decimal(20, 2)
+  reason    String?
+  requestId String?
+  createdAt DateTime @default(now())
+  orderId   String?
+  order     Order?   @relation(fields: [orderId], references: [id])
+  package   Package? @relation(fields: [packageId], references: [id])
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([packageId])
@@ -346,61 +353,56 @@ model QuotaRecord {
   @@map("quota_records")
 }
 
-// ==================== 订单与支付模块 ====================
-
-// 订单
 model Order {
-  id              String   @id @default(cuid())
-  orderNo         String   @unique // 订单号（全局唯一）
-  userId          String
-  packageId       String
-  type            String   // purchase, renewal, upgrade
-  status          String   @default("pending") // pending, paid, cancelled, refunded, expired
-  amount          Decimal  @db.Decimal(20, 2) // 订单金额（元）
-  currency        String   @default("CNY") // 货币单位
-  discount        Decimal? @db.Decimal(5, 2) // 折扣（百分比，0-100）
-  finalAmount     Decimal  @db.Decimal(20, 2) // 实付金额（元）
-  description     String?  // 订单描述
-  expiresAt       DateTime? // 订单过期时间
-  paidAt          DateTime? // 支付时间
-  cancelledAt     DateTime? // 取消时间
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  package         Package  @relation(fields: [packageId], references: [id], onDelete: Cascade)
-  payments        Payment[]
-  quotaRecords    QuotaRecord[]
+  id           String        @id @default(cuid())
+  orderNo      String        @unique
+  userId       String
+  packageId    String
+  type         String
+  status       String        @default("pending")
+  amount       Decimal       @db.Decimal(20, 2)
+  currency     String        @default("CNY")
+  discount     Decimal?      @db.Decimal(5, 2)
+  finalAmount  Decimal       @db.Decimal(20, 2)
+  description  String?
+  expiresAt    DateTime?
+  paidAt       DateTime?
+  cancelledAt  DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  package      Package       @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments     Payment[]
+  quotaRecords QuotaRecord[]
 
   @@index([userId])
   @@index([orderNo])
   @@index([status])
   @@index([createdAt])
+  @@index([packageId], map: "orders_packageId_fkey")
   @@map("orders")
 }
 
-// 支付记录
 model Payment {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   orderId         String
-  paymentNo       String   @unique // 支付单号（全局唯一）
-  thirdPartyNo    String?  // 第三方支付交易号
-  paymentMethod   String   // wxpay_native, alipay, stripe, etc.
-  paymentPlatform String   // yungouos, wechat_official, alipay_official, stripe
-  amount          Decimal  @db.Decimal(20, 2) // 支付金额（元）
-  currency        String   @default("CNY")
-  status          String   @default("pending") // pending, success, failed, cancelled, refunded
-  qrCodeUrl       String?  // 二维码地址（Native 支付）
-  payUrl          String?  // 支付链接
-  callbackData    String?  @db.Text // 回调数据（JSON）
-  notifyUrl       String?  // 回调通知地址
-  paidAt          DateTime? // 支付成功时间
-  failedAt        DateTime? // 支付失败时间
-  failureReason   String?  // 失败原因
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-
-  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentNo       String    @unique
+  thirdPartyNo    String?
+  paymentMethod   String
+  paymentPlatform String
+  amount          Decimal   @db.Decimal(20, 2)
+  currency        String    @default("CNY")
+  status          String    @default("pending")
+  qrCodeUrl       String?
+  payUrl          String?
+  callbackData    String?   @db.Text
+  notifyUrl       String?
+  paidAt          DateTime?
+  failedAt        DateTime?
+  failureReason   String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  order           Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([paymentNo])
@@ -411,9 +413,6 @@ model Payment {
   @@map("payments")
 }
 
-// ==================== 提示词库管理模块 ====================
-
-// 提示词类型
 model PromptCategory {
   id          String   @id @default(cuid())
   name        String   @unique
@@ -421,37 +420,32 @@ model PromptCategory {
   description String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-
   prompts     Prompt[]
 
   @@map("prompt_categories")
 }
 
-// 提示词
 model Prompt {
-  id          String   @id @default(cuid())
-  functionKey String   @unique // 功能键，唯一标识
-  title       String
-  content     String   @db.Text
-  description String?
-  categoryId  String
-  tags        String?  // JSON数组
-  type        String   // system, system_user, user
-  userId      String?  // 创建者ID（如果是用户提示词）
-  systemId    String?  // 关联的system类型提示词ID（system_user和user类型使用）
-  version        Int      @default(1)
-  isActive       Boolean  @default(true)
-  isStylePrompt  Boolean  @default(false) // 是否是风格提示词（仅 system_user、user 类型使用）
-  stylePromptKey String?  // 风格提示词标识（isStylePrompt 为 true 时必填，可重复）
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  category    PromptCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  versions    PromptVersion[]
-  // 关联的system提示词（system_user和user类型）
-  system      Prompt?  @relation("SystemPrompts", fields: [systemId], references: [id], onDelete: SetNull)
-  // 关联到该system的所有子提示词（system_user和user类型）
-  children    Prompt[] @relation("SystemPrompts")
+  id             String          @id @default(cuid())
+  title          String
+  content        String          @db.Text
+  description    String?
+  categoryId     String
+  tags           String?
+  type           String
+  userId         String?
+  version        Int             @default(1)
+  isActive       Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  systemId       String?
+  functionKey    String          @unique
+  isStylePrompt  Boolean         @default(false)
+  stylePromptKey String?
+  versions       PromptVersion[]
+  category       PromptCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  system         Prompt?         @relation("SystemPrompts", fields: [systemId], references: [id])
+  children       Prompt[]        @relation("SystemPrompts")
 
   @@index([categoryId])
   @@index([type])
@@ -463,16 +457,14 @@ model Prompt {
   @@map("prompts")
 }
 
-// 提示词版本
 model PromptVersion {
-  id          String   @id @default(cuid())
-  promptId    String
-  version     Int
-  content     String   @db.Text
-  updatedBy   String?  // 更新者ID
-  createdAt   DateTime @default(now())
-
-  prompt      Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  id        String   @id @default(cuid())
+  promptId  String
+  version   Int
+  content   String   @db.Text
+  updatedBy String?
+  createdAt DateTime @default(now())
+  prompt    Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
 
   @@unique([promptId, version])
   @@index([promptId])
@@ -480,27 +472,26 @@ model PromptVersion {
   @@map("prompt_versions")
 }
 
-// ==================== API Key 管理模块 ====================
-
-// 用户API Key
 model UserApiKey {
-  id          String   @id @default(cuid())
-  userId      String?  // 用户ID（null表示系统级API Key，关联到提供商）
-  providerId  String
-  apiKey      String   @db.Text // API密钥（加密存储）
-  apiKeyId    String?  // 第三方返回的ID（如grsai返回的id）
-  name        String   // API Key名称
-  type        String   // system_created（系统创建）, user_created（用户创建）
-  credits     Decimal  @default(0) @db.Decimal(20, 2) // 积分额度（固定为0表示无限制，仅用于记录）
-  expireTime  BigInt   @default(0) // 到期时间（时间戳，0表示永不过期）
-  status      String   @default("active") // active, expired, revoked
-  packageId   String?  // 关联的套餐ID（可选，用于追踪是哪个套餐创建的）
-  createdBy   String?  // 创建者ID（管理员ID或用户ID）
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user        User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  provider    AIProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  id             String          @id @default(cuid())
+  userId         String?
+  providerId     String
+  apiKey         String          @db.Text
+  apiKeyId       String?
+  name           String
+  type           String
+  credits        Decimal         @default(0.00) @db.Decimal(20, 2)
+  expireTime     BigInt          @default(0)
+  status         String          @default("active")
+  packageId      String?
+  createdBy      String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  voiceLimit     Int             @default(0)
+  usedCredits    Decimal         @default(0.00) @db.Decimal(20, 2)
+  authorizations Authorization[]
+  provider       AIProvider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([providerId])
@@ -511,25 +502,23 @@ model UserApiKey {
   @@map("user_api_keys")
 }
 
-// ==================== 授权与调用管理模块 ====================
-
-// 授权记录
 model Authorization {
-  id          String   @id @default(cuid())
-  userId      String
-  modelId     String
+  id                String      @id @default(cuid())
+  userId            String
+  modelId           String
   deviceFingerprint String
-  ipAddress   String?
-  frozenQuota Decimal  @db.Decimal(20, 2) // 预冻结额度
-  callToken   String? @unique // 调用令牌，用于上报调用结果时验证授权
-  status      String   @default("active") // active, used, expired, revoked
-  expiresAt   DateTime
-  requestId   String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  model       AIModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  ipAddress         String?
+  frozenQuota       Decimal     @db.Decimal(20, 2)
+  status            String      @default("active")
+  expiresAt         DateTime
+  requestId         String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  callToken         String?     @unique
+  userApiKeyId      String?
+  model             AIModel     @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  userApiKey        UserApiKey? @relation(fields: [userApiKeyId], references: [id])
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([modelId])
@@ -537,25 +526,22 @@ model Authorization {
   @@index([status])
   @@index([expiresAt])
   @@index([requestId])
+  @@index([userApiKeyId])
   @@map("authorizations")
 }
 
-// ==================== 日志与审计模块 ====================
-
-// 管理员操作日志
 model OperationLog {
-  id          String   @id @default(cuid())
-  adminId     String
-  action      String   // CREATE, UPDATE, DELETE, UPDATE_STATUS, etc.
-  targetType  String   // user, model, package, etc.
-  targetId    String?
-  details     String?  @db.Text // JSON格式的操作详情
-  ipAddress   String?
-  result      String   @default("success") // success, failure
-  errorMessage String? @db.Text
-  createdAt   DateTime @default(now())
-
-  admin       Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  id           String   @id @default(cuid())
+  adminId      String
+  action       String
+  targetType   String
+  targetId     String?
+  details      String?  @db.Text
+  ipAddress    String?
+  result       String   @default("success")
+  errorMessage String?  @db.Text
+  createdAt    DateTime @default(now())
+  admin        Admin    @relation(fields: [adminId], references: [id], onDelete: Cascade)
 
   @@index([adminId])
   @@index([action])
@@ -565,26 +551,24 @@ model OperationLog {
   @@map("operation_logs")
 }
 
-// AI 调用日志
 model AICallLog {
-  id          String   @id @default(cuid())
-  requestId   String   @unique
-  userId      String
-  modelId     String
-  inputTokens Int      @default(0)
-  outputTokens Int     @default(0)
-  totalTokens Int      @default(0)
-  cost        Decimal  @db.Decimal(10, 4) // 本次调用成本
-  status      String   // success, failure
-  errorMessage String? @db.Text
-  requestTime DateTime @default(now())
-  responseTime DateTime?
-  duration    Int?     // 响应时间（毫秒）
+  id                String    @id @default(cuid())
+  requestId         String    @unique
+  userId            String
+  modelId           String
+  inputTokens       Int       @default(0)
+  outputTokens      Int       @default(0)
+  totalTokens       Int       @default(0)
+  cost              Decimal   @db.Decimal(10, 4)
+  status            String
+  errorMessage      String?   @db.Text
+  requestTime       DateTime  @default(now())
+  responseTime      DateTime?
+  duration          Int?
   deviceFingerprint String?
-  ipAddress   String?
-
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  model       AIModel  @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  ipAddress         String?
+  model             AIModel   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([modelId])
@@ -594,37 +578,33 @@ model AICallLog {
   @@map("ai_call_logs")
 }
 
-// ==================== 风控与监控模块 ====================
-
-// 风控规则
 model RiskRule {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  description String?
-  conditions  String   @db.Text // JSON格式的触发条件
-  action      String   // limit_rate, freeze_quota, ban_account, alert
-  actionParams String? @db.Text // JSON格式的动作参数
-  priority    Int      @default(0)
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id           String   @id @default(cuid())
+  name         String   @unique
+  description  String?
+  conditions   String   @db.Text
+  action       String
+  actionParams String?  @db.Text
+  priority     Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   @@index([isActive])
   @@index([priority])
   @@map("risk_rules")
 }
 
-// 风控触发记录
 model RiskTrigger {
-  id          String   @id @default(cuid())
-  ruleId      String
-  userId      String?
-  modelId     String?
-  conditions  String   @db.Text // JSON格式的触发条件详情
-  action      String
-  actionResult String? @db.Text // 动作执行结果
-  status      String   @default("pending") // pending, executed, failed
-  createdAt   DateTime @default(now())
+  id           String   @id @default(cuid())
+  ruleId       String
+  userId       String?
+  modelId      String?
+  conditions   String   @db.Text
+  action       String
+  actionResult String?  @db.Text
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
 
   @@index([ruleId])
   @@index([userId])

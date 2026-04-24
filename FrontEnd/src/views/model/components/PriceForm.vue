@@ -21,6 +21,7 @@
         >
           <el-option label="按Token计价" value="token" />
           <el-option label="按调用次数计价" value="call" />
+          <el-option label="按字符计价" value="char" />
         </el-select>
       </el-form-item>
 
@@ -100,6 +101,33 @@
         </el-form-item>
       </template>
 
+      <template v-if="formData.pricingType === 'char'">
+        <el-form-item label="字符单价" prop="charPrice">
+          <el-input-number
+            v-model="formData.charPrice"
+            :min="0"
+            :precision="6"
+            :step="0.000001"
+            placeholder="请输入字符单价"
+            style="width: 100%"
+          />
+          <div class="form-tip">单位：积分</div>
+        </el-form-item>
+
+        <el-form-item label="最大字符数" prop="maxChars">
+          <el-input-number
+            v-model="formData.maxChars"
+            :min="1"
+            :precision="0"
+            :step="1"
+            placeholder="请输入最大字符数（可选）"
+            style="width: 100%"
+            :controls="true"
+          />
+          <div class="form-tip">留空表示不限制</div>
+        </el-form-item>
+      </template>
+
       <el-form-item label="生效时间" prop="effectiveAt">
         <el-date-picker
           v-model="formData.effectiveAt"
@@ -170,7 +198,9 @@ const formData = reactive({
   inputPrice: 0,
   outputPrice: 0,
   callPrice: 0,
+  charPrice: 0,
   maxToken: null,
+  maxChars: null,
   effectiveAt: '',
   expiredAt: ''
 })
@@ -201,6 +231,15 @@ const rules = {
     { required: true, message: '请输入调用次数单价', trigger: 'blur', validator: (rule, value, callback) => {
       if (formData.pricingType === 'call' && (value === null || value === undefined || value === '')) {
         callback(new Error('请输入调用次数单价'))
+      } else {
+        callback()
+      }
+    }}
+  ],
+  charPrice: [
+    { required: true, message: '请输入字符单价', trigger: 'blur', validator: (rule, value, callback) => {
+      if (formData.pricingType === 'char' && (value === null || value === undefined || value === '')) {
+        callback(new Error('请输入字符单价'))
       } else {
         callback()
       }

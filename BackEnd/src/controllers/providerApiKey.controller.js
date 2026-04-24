@@ -41,7 +41,7 @@ class ProviderApiKeyController {
     try {
       const { id } = req.params;
       const adminId = req.user.id;
-      const { apiKey, name, apiKeyId, credits, expireTime } = req.body;
+      const { apiKey, name, apiKeyId, credits, expireTime, voiceLimit } = req.body;
 
       // 处理过期时间
       let expireTimeValue = 0;
@@ -58,7 +58,8 @@ class ProviderApiKeyController {
         name,
         apiKeyId,
         credits: credits || 0,
-        expireTime: expireTimeValue
+        expireTime: expireTimeValue,
+        voiceLimit: voiceLimit || 0
       }, adminId);
 
       return ResponseHandler.success(
@@ -82,6 +83,58 @@ class ProviderApiKeyController {
 
       await userApiKeyService.deleteProviderApiKey(id, apiKeyId, adminId);
       return ResponseHandler.success(res, null, 'Provider API Key deleted successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 调整提供商关联API Key额度（管理员）
+   * - credits 表示该 API Key 的总额度
+   */
+  async adjustProviderApiKeyCredits(req, res, next) {
+    try {
+      const { id, apiKeyId } = req.params;
+      const adminId = req.user.id;
+      const { credits } = req.body;
+
+      const updated = await userApiKeyService.adjustProviderApiKeyCredits(id, apiKeyId, credits, adminId);
+      return ResponseHandler.success(res, updated, 'Provider API Key credits updated successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * 该 API Key 在「音色克隆」流程中产生的音色列表（meta 中记录 userApiKeyId）
+   */
+  /**
+   * 返回解密后的上游 API Key（仅超级/平台管理员；用于管理端上传工具）
+   */
+  async revealProviderApiKeyToken(req, res, next) {
+    try {
+      const { id, apiKeyId } = req.params;
+      const result = await userApiKeyService.getDecryptedTokenForProviderApiKey(id, apiKeyId);
+      return ResponseHandler.success(res, result, 'OK');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getClonedVoicesForProviderApiKey(req, res, next) {
+    try {
+      const { id, apiKeyId } = req.params;
+      const { page, pageSize } = req.query;
+      const result = await userApiKeyService.getClonedVoiceProfilesForProviderApiKey(id, apiKeyId, {
+        page,
+        pageSize,
+      });
+      return ResponseHandler.paginated(
+        res,
+        result.data,
+        { page: result.page, pageSize: result.pageSize, total: result.total },
+        'Cloned voice profiles retrieved successfully'
+      );
     } catch (error) {
       next(error);
     }

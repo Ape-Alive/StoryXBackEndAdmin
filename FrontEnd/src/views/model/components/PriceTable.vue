@@ -14,15 +14,32 @@
 
       <el-table-column label="计价类型" width="120" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.pricingType === 'token' ? 'primary' : 'success'" size="small">
-            {{ row.pricingType === 'token' ? '按Token计价' : '按调用次数计价' }}
+          <el-tag
+            :type="
+              row.pricingType === 'token'
+                ? 'primary'
+                : row.pricingType === 'call'
+                  ? 'success'
+                  : 'warning'
+            "
+            size="small"
+          >
+            {{
+              row.pricingType === 'token'
+                ? '按Token计价'
+                : row.pricingType === 'call'
+                  ? '按调用次数计价'
+                  : '按字符计价'
+            }}
           </el-tag>
         </template>
       </el-table-column>
 
       <el-table-column label="套餐" width="150" align="center">
         <template #default="{ row }">
-          <span class="package-name">{{ row.packageId ? (row.package?.displayName || row.package?.name || '套餐') : '默认价格' }}</span>
+          <span class="package-name">{{
+            row.packageId ? row.package?.displayName || row.package?.name || '套餐' : '默认价格'
+          }}</span>
         </template>
       </el-table-column>
 
@@ -53,6 +70,19 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="字符单价" width="140" align="center" v-if="showCharPrices">
+        <template #default="{ row }">
+          <span class="price-value">{{ formatPrice(row.charPrice) }}</span>
+          <span class="price-unit">积分</span>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="最大字符数" width="120" align="center" v-if="showCharPrices">
+        <template #default="{ row }">
+          <span class="token-value">{{ row.maxChars || '-' }}</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="生效时间" width="180" align="center">
         <template #default="{ row }">
           <span class="date-text">{{ formatDateTime(row.effectiveAt) }}</span>
@@ -61,7 +91,9 @@
 
       <el-table-column label="过期时间" width="180" align="center">
         <template #default="{ row }">
-          <span class="date-text">{{ row.expiredAt ? formatDateTime(row.expiredAt) : '永久有效' }}</span>
+          <span class="date-text">{{
+            row.expiredAt ? formatDateTime(row.expiredAt) : '永久有效'
+          }}</span>
         </template>
       </el-table-column>
 
@@ -74,13 +106,7 @@
       <el-table-column label="操作" width="120" align="center" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button
-              type="primary"
-              :icon="Edit"
-              circle
-              size="small"
-              @click="handleEdit(row)"
-            />
+            <el-button type="primary" :icon="Edit" circle size="small" @click="handleEdit(row)" />
             <el-button
               type="danger"
               :icon="Delete"
@@ -120,6 +146,10 @@ const showTokenPrices = computed(() => {
 // 判断是否显示调用次数价格列
 const showCallPrice = computed(() => {
   return props.tableData.some(item => item.pricingType === 'call')
+})
+
+const showCharPrices = computed(() => {
+  return props.tableData.some(item => item.pricingType === 'char')
 })
 
 // 格式化价格
@@ -197,4 +227,3 @@ function handleDelete(row) {
   justify-content: center;
 }
 </style>
-

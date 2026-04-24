@@ -330,6 +330,9 @@ router.get(
  *                     requiresKey:
  *                       type: boolean
  *                       description: 是否需要API密钥
+ *                     supportsVoiceCommand:
+ *                       type: boolean
+ *                       description: TTS 模型是否支持语音指令；为 true 时会把绑定该模型的所有音色 supportsVoiceCommand 同步为 true
  *                     apiConfig:
  *                       type: string
  *                       nullable: true
@@ -418,6 +421,11 @@ router.get(
  *                 type: boolean
  *                 default: false
  *                 description: 是否需要API密钥
+ *               supportsVoiceCommand:
+ *                 type: boolean
+ *                 default: false
+ *                 description: |
+ *                   仅 **TTS** 类型有效：是否支持语音指令。为 `true` 时，会将已绑定该模型的所有音色的 `supportsVoiceCommand` 设为 `true`。
  *               apiConfig:
  *                 type: string
  *                 example: '{"temperature": 0.7, "max_tokens": 2000}'
@@ -487,6 +495,9 @@ router.post(
  *               requiresKey:
  *                 type: boolean
  *                 description: 是否需要API密钥
+ *               supportsVoiceCommand:
+ *                 type: boolean
+ *                 description: 仅 TTS 有效；为 true 时同步更新绑定音色的 supportsVoiceCommand
  *               apiConfig:
  *                 type: string
  *                 example: '{"temperature": 0.7, "max_tokens": 2000}'

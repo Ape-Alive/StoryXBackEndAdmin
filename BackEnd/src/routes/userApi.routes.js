@@ -38,7 +38,7 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER))
  *       3. 验证模型和提供商状态（必须为active）
  *       4. 检查用户套餐权限（套餐必须包含该模型）
  *       5. 检查设备数量限制（使用最高优先级套餐的maxDevices）
- *       6. 计算预估费用（根据模型的pricingType、maxToken和estimatedTokens）
+ *       6. 计算预估费用（根据模型的pricingType、maxToken/maxChars和estimatedTokens/estimatedChars）
  *       7. 预冻结额度（从优先级高的套餐开始冻结）
  *       8. 选择API Key（按优先级：用户专属 > 提供商关联 > 主账户Token）
  *       9. 生成callToken并返回AI密钥等信息
@@ -96,6 +96,10 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER))
  *       - 对于按调用次数计价的模型（pricingType=call）：
  *         * 直接使用callPrice作为预估费用
  *         * estimatedTokens和maxToken不影响费用计算
+ *       - 对于按字符计价的模型（pricingType=char）：
+ *         * 优先使用maxChars（如果价格配置中设置了maxChars）
+ *         * 否则使用estimatedChars计算预估费用
+ *         * 兼容：不传estimatedChars时，会使用estimatedTokens作为预估字符数
  *
  *       **使用示例：**
  *       ```bash
@@ -106,6 +110,16 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER))
  *           "modelId": "clx123456789",
  *           "deviceFingerprint": "device_hash_abc123",
  *           "estimatedTokens": 1000
+ *         }'
+ *
+ *       # 字符计价模型（pricingType=char）示例
+ *       curl -X POST http://localhost:5800/api/user/authorization/request \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "modelId": "clx123456789",
+ *           "deviceFingerprint": "device_hash_abc123",
+ *           "estimatedChars": 2000
  *         }'
  *       ```
  *     tags: [终端用户AI调用]
@@ -125,6 +139,9 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER))
  *                 type: string
  *                 example: "clx123456789"
  *                 description: 模型ID
+ *               userApiKeyId:
+ *                 type: string
+ *                 description: 可选。指定要返回的 API Key 记录ID（UserApiKey.id），仅支持使用当前用户自己的 API Key
  *               deviceFingerprint:
  *                 type: string
  *                 example: "device_hash_abc123"
@@ -139,10 +156,21 @@ router.use(authorize(ROLES.USER, ROLES.BASIC_USER))
  *                   - 如果模型价格配置中设置了 `maxToken`，则优先使用 `maxToken` 计算费用（即使 `estimatedTokens` 更大）
  *                   - 如果模型价格配置中 `maxToken` 为 `null`，则使用 `estimatedTokens` 计算费用
  *                   - 如果 `pricingType` 为 `call`（按调用次数计价），`estimatedTokens` 不影响费用计算
+ *                   - 如果 `pricingType` 为 `char`（按字符计价），建议使用 `estimatedChars`；不传时会用 `estimatedTokens` 作为预估字符数
  *
  *                   **示例：**
  *                   - 模型：`gemini-2.5-flash-image`，`maxToken=8192`，用户传入 `estimatedTokens=10000`
  *                   - 实际预估费用按 `maxToken=8192` 计算（而不是10000）
+ *               estimatedChars:
+ *                 type: integer
+ *                 example: 2000
+ *                 description: |
+ *                   预估的字符数量（可选，**pricingType=char 时推荐传**），用于计算预估费用和预冻结额度
+ *
+ *                   **计费策略：**
+ *                   - 如果模型价格配置中设置了 `maxChars`，则优先使用 `maxChars` 计算费用（即使 `estimatedChars` 更大）
+ *                   - 如果模型价格配置中 `maxChars` 为 `null`，则使用 `estimatedChars` 计算费用
+ *                   - 兼容：不传 `estimatedChars` 时，会使用 `estimatedTokens` 作为预估字符数
  *     responses:
  *       200:
  *         description: 申请成功
@@ -625,10 +653,12 @@ router.post(
  *       4. 记录调用日志
  *       5. 更新授权状态为used
  *
- *       **Token说明：**
- *       - 如果pricingType为token，需要提供inputTokens和outputTokens
- *       - 如果pricingType为call，token数量不影响费用计算
- *       - totalTokens = inputTokens + outputTokens（可选，用于记录）
+ *       **用量说明：**
+ *       - 如果 pricingType=token：需要提供 inputTokens、outputTokens（totalTokens 可选）
+ *       - 如果 pricingType=call：token/字符数量不影响费用计算，可不传
+ *       - 如果 pricingType=char：推荐只提供 usedChars（一个字段即可）
+ *         - 兼容旧字段：inputChars/outputChars/totalChars
+ *       - 兼容：若只传 inputTokens/outputTokens，且模型为 char 计价，系统会把它们当作 inputChars/outputChars 使用
  *
  *       **状态说明：**
  *       - success：调用成功
@@ -651,6 +681,18 @@ router.post(
  *           "status": "success",
  *           "duration": 1500,
  *           "responseTime": "2024-01-01T12:00:00Z"
+ *         }'
+ *
+ *       # 字符计价模型（pricingType=char）成功上报示例
+ *       curl -X POST http://localhost:5800/api/user/ai/call/report \
+ *         -H "Authorization: Bearer {token}" \
+ *         -H "Content-Type: application/json" \
+ *         -d '{
+ *           "callToken": "call_token_abc123xyz",
+ *           "requestId": "req_123456_char",
+ *           "usedChars": 2000,
+ *           "status": "success",
+ *           "duration": 1500
  *         }'
  *
  *       # 失败调用
@@ -689,15 +731,34 @@ router.post(
  *               inputTokens:
  *                 type: integer
  *                 example: 100
- *                 description: 输入token数量（调用成功时必填）
+ *                 description: 输入token数量（pricingType=token 且调用成功时必填；char计价时可兼容作为inputChars）
  *               outputTokens:
  *                 type: integer
  *                 example: 200
- *                 description: 输出token数量（调用成功时必填）
+ *                 description: 输出token数量（pricingType=token 且调用成功时必填；char计价时可兼容作为outputChars）
  *               totalTokens:
  *                 type: integer
  *                 example: 300
- *                 description: 总token数量（可选，用于记录）
+ *                 description: 总token数量（可选，用于记录；char计价时可兼容作为totalChars）
+ *               usedChars:
+ *                 type: integer
+ *                 example: 2000
+ *                 description: 字符计价时的总字符用量（推荐只传这一个字段）
+ *               inputChars:
+ *                 type: integer
+ *                 example: 1200
+ *                 description: 输入字符数量（旧字段，兼容；推荐改用 usedChars）
+ *                 deprecated: true
+ *               outputChars:
+ *                 type: integer
+ *                 example: 800
+ *                 description: 输出字符数量（旧字段，兼容；推荐改用 usedChars）
+ *                 deprecated: true
+ *               totalChars:
+ *                 type: integer
+ *                 example: 2000
+ *                 description: 总字符数量（旧字段，兼容；推荐改用 usedChars）
+ *                 deprecated: true
  *               status:
  *                 type: string
  *                 enum: [success, failed, timeout, error]

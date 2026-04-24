@@ -11,6 +11,7 @@
 
 **更新内容**:
 - ✅ 添加了详细的流程说明（5步流程）
+- ✅ 新增可选参数 `userApiKeyId`：指定返回某个用户API Key（`UserApiKey.id`），用于客户端强制选择某把 Key
 - ✅ 补充了设备指纹验证说明
 - ✅ 添加了完整的响应示例
 - ✅ 添加了详细的错误响应示例（400/401/403/404）
@@ -70,10 +71,14 @@
 
 **更新内容**:
 - ✅ 添加了详细的流程说明（5步流程）
-- ✅ 补充了Token说明和状态说明
+- ✅ 补充了Token说明、字符计费说明（usedChars 单字段）和状态说明
 - ✅ 添加了完整的响应示例（包含结算详情）
 - ✅ 添加了详细的错误响应示例
 - ✅ 添加了成功和失败两种场景的curl示例
+
+**字段更新（字符计费）**:
+- ✅ 新增 `usedChars`：字符计费（pricingType=char）时推荐只上报一个字段即可
+- ✅ `inputChars` / `outputChars` / `totalChars`：标记为旧字段，继续兼容，但推荐迁移到 `usedChars`
 
 **响应字段说明**:
 - requestId：请求ID
@@ -130,6 +135,34 @@
 **响应字段**:
 - 与列表接口相同，但包含更完整的信息
 - 包含IP地址等详细信息
+
+---
+
+### 7. VoiceProfile.tags（音色标签）
+**新增字段**：`VoiceProfile.tags`（JSON 数组）
+
+**影响接口**：
+- ✅ `POST /api/voice-profiles`：创建音色时新增 `tags`
+- ✅ `PUT /api/voice-profiles/{id}`：更新音色时支持更新 `tags`
+
+**约束（后端强制）**：
+- `tags` 必须至少包含 3 类标签：
+  - `age`：年龄范围（例如 `18-25`）
+  - `gender`：性别（`male` 或 `female`）
+  - `trait`：特征词（性格、外貌等，至少 1 个，可多个）
+
+---
+
+### 8. AIModel.supportsVoiceCommand（TTS 模型语音指令）
+**新增字段**：`AIModel.supportsVoiceCommand`（布尔，默认 `false`）
+
+**影响接口**：
+- ✅ `POST /api/models`：创建模型时可传 `supportsVoiceCommand`（仅 `type=tts` 时落库为 true，其它类型强制为 false）
+- ✅ `PUT /api/models/{id}`：更新时可修改；`type` 改为非 TTS 时自动置为 `false`
+
+**联动行为**：
+- 当模型为 **TTS** 且 `supportsVoiceCommand=true` 时，后端会将 **已绑定该模型的所有音色** 的 `VoiceProfile.supportsVoiceCommand` 批量更新为 `true`
+- 当 TTS 模型该字段为 `false`，或非 TTS 模型时，会将绑定音色的 `supportsVoiceCommand` 批量更新为 `false`（与模型开关保持一致）
 
 ---
 

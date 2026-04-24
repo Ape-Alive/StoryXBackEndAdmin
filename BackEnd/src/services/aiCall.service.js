@@ -47,6 +47,7 @@ class AICallService {
 
     // 2. 计算实际费用
     let actualCost = 0;
+    let pricingType = null;
     if (status === 'success') {
       const costInfo = await priceCalculatorService.calculateActualCost(
         modelId,
@@ -55,6 +56,21 @@ class AICallService {
         outputTokens
       );
       actualCost = costInfo.cost;
+      pricingType = costInfo.price?.pricingType || null;
+
+      // 基础防护：成功调用时，token/char 计费必须上报非 0 消耗，避免 0 成本结算
+      if (pricingType === 'token') {
+        const total = (Number(inputTokens) || 0) + (Number(outputTokens) || 0);
+        if (total <= 0) {
+          throw new BadRequestError('Token pricing requires non-zero inputTokens/outputTokens when status=success');
+        }
+      }
+      if (pricingType === 'char') {
+        const total = (Number(inputTokens) || 0) + (Number(outputTokens) || 0);
+        if (total <= 0) {
+          throw new BadRequestError('Char pricing requires non-zero inputChars/outputChars when status=success');
+        }
+      }
     }
 
     // 3. 结算额度
@@ -248,6 +264,29 @@ class AICallService {
               remainingToUse -= useAmount;
             }
           }
+        }
+      }
+
+      // 结算上游 API Key 额度（扣减选中的那一个 API Key）
+      if (status === 'success' && actualCost > 0 && authorization.userApiKeyId) {
+        const apiKey = await tx.userApiKey.findUnique({
+          where: { id: authorization.userApiKeyId }
+        });
+        if (apiKey) {
+          const credits = Number(apiKey.credits) || 0;
+          const used = Number(apiKey.usedCredits) || 0;
+          if (credits > 0) {
+            const remaining = credits - used;
+            if (remaining < actualCost) {
+              throw new BadRequestError('Insufficient API key credits for this call');
+            }
+          }
+          await tx.userApiKey.update({
+            where: { id: apiKey.id },
+            data: {
+              usedCredits: { increment: actualCost }
+            }
+          });
         }
       }
 

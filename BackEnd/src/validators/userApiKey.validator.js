@@ -1,4 +1,4 @@
-const { body } = require('express-validator');
+const { body, param, query } = require('express-validator');
 
 /**
  * 用户创建API Key验证规则
@@ -55,6 +55,16 @@ const addProviderApiKeyValidator = [
     .optional({ nullable: true })
     .isFloat({ min: 0 })
     .withMessage('Credits must be a non-negative number'),
+  body('voiceLimit')
+    .optional({ nullable: true })
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') return true
+      const intValue = typeof value === 'string' ? parseInt(value) : value
+      if (isNaN(intValue) || intValue < 0) {
+        throw new Error('voiceLimit must be a non-negative integer')
+      }
+      return true
+    }),
   body('expireTime')
     .optional({ nullable: true })
     .custom((value) => {
@@ -83,7 +93,33 @@ const addProviderApiKeyValidator = [
     })
 ];
 
+/**
+ * 管理员调整提供商API Key额度验证规则
+ */
+const adjustProviderApiKeyCreditsValidator = [
+  body('credits')
+    .notEmpty()
+    .withMessage('Credits is required')
+    .isFloat({ min: 0 })
+    .withMessage('Credits must be a non-negative number')
+];
+
+const getProviderApiKeyClonedVoicesValidator = [
+  param('id').notEmpty().withMessage('Provider ID is required'),
+  param('apiKeyId').notEmpty().withMessage('API Key ID is required'),
+  query('page').optional().isInt({ min: 1 }).toInt(),
+  query('pageSize').optional().isInt({ min: 1, max: 100 }).toInt(),
+];
+
+const postProviderApiKeyDecryptedTokenValidator = [
+  param('id').notEmpty().withMessage('Provider ID is required'),
+  param('apiKeyId').notEmpty().withMessage('API Key ID is required'),
+];
+
 module.exports = {
   createUserApiKeyValidator,
-  addProviderApiKeyValidator
+  addProviderApiKeyValidator,
+  adjustProviderApiKeyCreditsValidator,
+  getProviderApiKeyClonedVoicesValidator,
+  postProviderApiKeyDecryptedTokenValidator,
 };

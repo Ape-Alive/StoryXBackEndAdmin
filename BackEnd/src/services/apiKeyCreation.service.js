@@ -154,11 +154,22 @@ class ApiKeyCreationService {
    * 选择API Key（按优先级）
    * @param {string} userId - 用户ID
    * @param {string} providerId - 提供商ID
-   * @returns {Promise<string|null>} - API Key（解密后的），如果不存在则返回null
+   * @param {number} estimatedCost - 预估消耗（用于校验剩余额度是否足够）
+   * @param {Object} prismaClient - Prisma client（可选，用于事务内查询）
+   * @returns {Promise<{ userApiKeyId: string, apiKey: string } | null>} - API Key（解密后的）与记录ID
    */
-  async selectApiKeyForUser(userId, providerId) {
+  async selectApiKeyForUser(userId, providerId, estimatedCost = 0, prismaClient = prisma) {
     const { decryptApiKey } = require('../utils/crypto')
     const userApiKeyRepository = require('../repositories/userApiKey.repository')
+
+    const minCost = Number(estimatedCost) || 0
+    const getRemaining = (apiKeyRecord) => {
+      const credits = Number(apiKeyRecord?.credits) || 0
+      const used = Number(apiKeyRecord?.usedCredits) || 0
+      if (credits <= 0) return true // 0=不限制
+      const remaining = credits - used
+      return remaining
+    }
 
     // 1. 优先使用用户专属API Key（user_created类型优先）
     const userApiKeys = await userApiKeyRepository.findActiveByUserAndProvider(userId, providerId)
@@ -167,19 +178,33 @@ class ApiKeyCreationService {
       // 优先使用user_created类型
       const userCreated = userApiKeys.find((k) => k.type === 'user_created')
       if (userCreated) {
-        return decryptApiKey(userCreated.apiKey)
+        return { userApiKeyId: userCreated.id, apiKey: decryptApiKey(userCreated.apiKey) }
       }
       // 其次使用system_created类型
       const systemCreated = userApiKeys.find((k) => k.type === 'system_created')
       if (systemCreated) {
-        return decryptApiKey(systemCreated.apiKey)
+        return { userApiKeyId: systemCreated.id, apiKey: decryptApiKey(systemCreated.apiKey) }
       }
     }
 
     // 2. 使用提供商关联的API Key
-    const provider = await prisma.aIProvider.findUnique({
+    const provider = await prismaClient.aIProvider.findUnique({
       where: { id: providerId },
     })
+
+    const lowBalanceThreshold = Number(provider?.apiKeyLowBalanceThreshold) || 1000
+    const passThreshold = (apiKeyRecord) => {
+      const credits = Number(apiKeyRecord?.credits) || 0
+      if (credits <= 0) return true
+      const remaining = getRemaining(apiKeyRecord)
+      return remaining >= lowBalanceThreshold
+    }
+    const passCost = (apiKeyRecord) => {
+      const credits = Number(apiKeyRecord?.credits) || 0
+      if (credits <= 0) return true
+      const remaining = getRemaining(apiKeyRecord)
+      return remaining >= minCost && remaining > 0
+    }
 
     logger.info(`[ApiKeyCreation] Selecting API Key for userId=${userId}, providerId=${providerId}`)
     logger.debug(
@@ -200,22 +225,14 @@ class ApiKeyCreationService {
               // 检查是否过期
               const now = Math.floor(Date.now() / 1000)
               if (providerApiKey.expireTime === 0 || providerApiKey.expireTime > now) {
-                // 检查API Key的积分额度（如果有限制）
-                const apiKeyCredits = parseFloat(providerApiKey.credits) || 0
-                if (apiKeyCredits > 0) {
-                  // API Key有积分限制，需要检查提供商是否有足够积分
-                  const providerQuota = parseFloat(provider.quota) || 0
-                  if (providerQuota <= 0) {
-                    // 提供商没有积分，跳过这个API Key
-                    logger.warn(
-                      `[ApiKeyCreation] Provider ${providerId} has no quota (${providerQuota}), skipping API Key ${apiKeyId}`
-                    )
-                    continue
-                  }
+                // API Key可用（无限制或剩余额度足够）
+                // 第一优先：剩余额度>=阈值 且 满足预估消耗
+                if (!(passThreshold(providerApiKey) && passCost(providerApiKey))) {
+                  logger.warn(`[ApiKeyCreation] API Key ${apiKeyId} below threshold or insufficient for cost, skipping`)
+                  continue
                 }
-                // API Key可用（无限制或提供商有积分）
                 logger.info(`[ApiKeyCreation] Found available API Key from provider.apiKeys array: ${apiKeyId}`)
-                return decryptApiKey(providerApiKey.apiKey)
+                return { userApiKeyId: providerApiKey.id, apiKey: decryptApiKey(providerApiKey.apiKey) }
               } else {
                 logger.debug(`[ApiKeyCreation] API Key ${apiKeyId} is expired`)
               }
@@ -238,6 +255,8 @@ class ApiKeyCreationService {
 
     if (systemApiKeys && systemApiKeys.length > 0) {
       const now = Math.floor(Date.now() / 1000)
+      // 先按阈值过滤，再兜底（如果都低于阈值，则按最大剩余额选择）
+      const candidates = []
       for (const apiKey of systemApiKeys) {
         logger.debug(
           `[ApiKeyCreation] Checking system API Key: id=${apiKey.id}, name=${apiKey.name}, expireTime=${apiKey.expireTime}`
@@ -245,25 +264,33 @@ class ApiKeyCreationService {
         // 检查是否过期
         const expireTime = typeof apiKey.expireTime === 'bigint' ? Number(apiKey.expireTime) : apiKey.expireTime
         if (expireTime === 0 || expireTime > now) {
-          // 检查API Key的积分额度（如果有限制）
-          const apiKeyCredits = parseFloat(apiKey.credits) || 0
-          if (apiKeyCredits > 0) {
-            // API Key有积分限制，需要检查提供商是否有足够积分
-            const providerQuota = parseFloat(provider?.quota) || 0
-            if (providerQuota <= 0) {
-              // 提供商没有积分，跳过这个API Key
-              logger.warn(
-                `[ApiKeyCreation] Provider ${providerId} has no quota (${providerQuota}), skipping API Key ${apiKey.id}`
-              )
-              continue
-            }
+          // 无限制直接可用
+          if (Number(apiKey.credits) <= 0) {
+            logger.info(`[ApiKeyCreation] Found available system-level API Key (unlimited): ${apiKey.id}`)
+            return { userApiKeyId: apiKey.id, apiKey: decryptApiKey(apiKey.apiKey) }
           }
-          // API Key可用（无限制或提供商有积分）
-          logger.info(`[ApiKeyCreation] Found available system-level API Key: ${apiKey.id}`)
-          return decryptApiKey(apiKey.apiKey)
+
+          if (passCost(apiKey)) {
+            candidates.push(apiKey)
+          }
         } else {
           logger.debug(`[ApiKeyCreation] System API Key ${apiKey.id} is expired`)
         }
+      }
+
+      const preferred = candidates.find((k) => passThreshold(k))
+      if (preferred) {
+        logger.info(`[ApiKeyCreation] Found available system-level API Key above threshold: ${preferred.id}`)
+        return { userApiKeyId: preferred.id, apiKey: decryptApiKey(preferred.apiKey) }
+      }
+
+      // 兜底：如果都低于阈值，但仍满足预估消耗，选剩余额度最大的
+      if (candidates.length > 0) {
+        const best = candidates
+          .slice()
+          .sort((a, b) => Number(getRemaining(b)) - Number(getRemaining(a)))[0]
+        logger.info(`[ApiKeyCreation] Fallback to best remaining system-level API Key: ${best.id}`)
+        return { userApiKeyId: best.id, apiKey: decryptApiKey(best.apiKey) }
       }
     }
 

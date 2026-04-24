@@ -40,11 +40,14 @@
       <el-table-column label="额度" width="150" align="center">
         <template #default="{ row }">
           <div class="quota-display">
-            <span v-if="row.quota !== null && row.quota !== undefined" class="quota-value">
+            <span v-if="row.quotaIsUnlimited" class="quota-unlimited">无限制</span>
+            <span v-else-if="row.quota !== null && row.quota !== undefined" class="quota-value">
               {{ formatQuota(row.quota) }}
             </span>
             <span v-else class="quota-empty">-</span>
-            <span v-if="row.quotaUnit" class="quota-unit">{{ getQuotaUnitLabel(row.quotaUnit) }}</span>
+            <span v-if="!row.quotaIsUnlimited && row.quotaUnit" class="quota-unit">{{
+              getQuotaUnitLabel(row.quotaUnit)
+            }}</span>
           </div>
         </template>
       </el-table-column>
@@ -101,12 +104,12 @@
 </template>
 
 <script setup>
-import { Edit, Delete, CircleCheck, CircleClose, Key } from '@element-plus/icons-vue'
+import { Edit, Delete, Key } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 
 const router = useRouter()
 
-const props = defineProps({
+defineProps({
   tableData: {
     type: Array,
     default: () => []
@@ -137,7 +140,7 @@ function getAvatarColor(name) {
     '#f59e0b', // 橙色
     '#3b82f6', // 蓝色
     '#10b981', // 绿色
-    '#ec4899'  // 粉色
+    '#ec4899' // 粉色
   ]
   let hash = 0
   for (let i = 0; i < name.length; i++) {
@@ -347,4 +350,3 @@ function handleManageApiKeys(row) {
   font-size: 13px;
 }
 </style>
-

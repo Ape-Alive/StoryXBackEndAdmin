@@ -17,8 +17,10 @@ class UserApiKeyRepository {
         name: data.name,
         type: data.type,
         credits: data.credits || 0,
+        usedCredits: data.usedCredits || 0,
         expireTime: data.expireTime || 0,
         status: data.status || 'active',
+        voiceLimit: data.voiceLimit || 0,
         packageId: data.packageId || null,
         createdBy: data.createdBy || null
       }
@@ -165,6 +167,10 @@ class UserApiKeyRepository {
         processed.credits = parseFloat(processed.credits.toString());
       } else if (processed.credits !== null && processed.credits !== undefined) {
         processed.credits = parseFloat(processed.credits.toString());
+      }
+      // 处理 usedCredits（Decimal）：转换为数字
+      if (processed.usedCredits !== null && processed.usedCredits !== undefined) {
+        processed.usedCredits = parseFloat(processed.usedCredits.toString());
       }
       return processed;
     });

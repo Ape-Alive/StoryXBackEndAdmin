@@ -130,7 +130,7 @@ class AuthorizationService {
   /**
    * 申请调用授权（获取AI密钥）
    */
-  async requestAuthorization(userId, modelId, deviceFingerprint, estimatedTokens = 0, ipAddress = null) {
+  async requestAuthorization(userId, modelId, deviceFingerprint, estimatedTokens = 0, ipAddress = null, userApiKeyId = null) {
     // 0. 验证设备指纹格式和状态
     deviceService.validateDeviceFingerprint(deviceFingerprint);
     await deviceService.checkDeviceStatus(userId, deviceFingerprint);
@@ -334,16 +334,52 @@ class AuthorizationService {
         logger.warn(`Failed to update device for authorization ${authorization.id}:`, error);
       }
 
-      // 选择API Key（按优先级）
-      const selectedApiKey = await apiKeyCreationService.selectApiKeyForUser(
-        userId,
-        model.providerId
-      );
+      // 选择API Key（可指定 userApiKeyId；否则按优先级），并记录本次选择的API Key记录ID（用于后续扣减上游API Key额度）
+      let selected = null
+      const preferredId = userApiKeyId ? String(userApiKeyId).trim() : null
+
+      if (preferredId) {
+        const { decryptApiKey } = require('../utils/crypto')
+        const preferred = await tx.userApiKey.findUnique({ where: { id: preferredId } })
+        if (!preferred) throw new BadRequestError('Specified API Key not found')
+        if (preferred.status !== 'active') throw new BadRequestError('Specified API Key is not active')
+        // 允许指定：自己的用户 Key；或系统 Key（userId=null）
+        // 禁止指定：其它用户的 Key
+        if (preferred.userId !== null && preferred.userId !== userId) {
+          throw new ForbiddenError('You do not have permission to use this API Key')
+        }
+        if (preferred.providerId !== model.providerId) {
+          throw new BadRequestError('Specified API Key does not belong to this model provider')
+        }
+        // 过期校验
+        const now = Math.floor(Date.now() / 1000)
+        const exp = typeof preferred.expireTime === 'bigint' ? Number(preferred.expireTime) : Number(preferred.expireTime)
+        if (exp && exp > 0 && exp <= now) throw new BadRequestError('Specified API Key is expired')
+        // 额度校验（若 credits>0 则必须剩余足够）
+        const credits = Number(preferred.credits) || 0
+        const usedCredits = Number(preferred.usedCredits) || 0
+        if (credits > 0) {
+          const remaining = credits - usedCredits
+          if (!(remaining >= estimatedCost && remaining > 0)) {
+            throw new BadRequestError('Specified API Key has insufficient remaining credits')
+          }
+        }
+        selected = { userApiKeyId: preferred.id, apiKey: decryptApiKey(preferred.apiKey) }
+      } else {
+        selected = await apiKeyCreationService.selectApiKeyForUser(userId, model.providerId, estimatedCost, tx);
+      }
+
+      if (selected?.userApiKeyId) {
+        await tx.authorization.update({
+          where: { id: authorization.id },
+          data: { userApiKeyId: selected.userApiKeyId }
+        });
+      }
 
       return {
         id: authorization.id,
         callToken: authorization.callToken,
-        apiKey: selectedApiKey || null, // 返回AI密钥（优先使用用户专属API Key，注意：mainAccountToken 不能返回给客户端）
+        apiKey: selected?.apiKey || null, // 返回AI密钥（优先使用用户专属API Key，注意：mainAccountToken 不能返回给客户端）
         providerBaseUrl: model.provider.baseUrl || null,
         modelBaseUrl: model.baseUrl,
         modelName: model.name,

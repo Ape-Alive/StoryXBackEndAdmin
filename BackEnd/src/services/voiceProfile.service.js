@@ -1,0 +1,591 @@
+const voiceProfileRepository = require('../repositories/voiceProfile.repository')
+const modelRepository = require('../repositories/model.repository')
+const { NotFoundError, ConflictError, BadRequestError, ForbiddenError } = require('../utils/errors')
+const { ROLES } = require('../constants/roles')
+
+function isAdminRole(role) {
+  return [
+    ROLES.SUPER_ADMIN,
+    ROLES.PLATFORM_ADMIN,
+    ROLES.OPERATOR,
+    ROLES.RISK_CONTROL,
+    ROLES.FINANCE,
+    ROLES.READ_ONLY,
+  ].includes(role)
+}
+
+function parseIncludeAllFlag(includeAll) {
+  return (
+    includeAll === true ||
+    includeAll === 'true' ||
+    includeAll === '1' ||
+    includeAll === 1
+  )
+}
+
+/** 终端用户可见：system 全量 + scope=user 且 userId=当前用户（其它筛选可叠加） */
+function endUserAccessibleVoiceWhere(filters, userId) {
+  return {
+    ...(filters.voiceId ? { voiceId: { contains: filters.voiceId } } : {}),
+    ...(filters.name ? { name: { contains: filters.name } } : {}),
+    ...(filters.modelId !== undefined
+      ? { models: { some: { modelId: filters.modelId } } }
+      : {}),
+    ...(filters.isActive !== undefined
+      ? { isActive: filters.isActive === 'true' || filters.isActive === true }
+      : {}),
+    OR: [{ scope: 'system' }, { scope: 'user', userId }],
+  }
+}
+
+class VoiceProfileService {
+  async getVoiceProfiles(
+    filters = {},
+    pagination = {},
+    sort = {},
+    userRole = null,
+    userId = null,
+    includeAll = false
+  ) {
+    const isAdmin = userRole && isAdminRole(userRole)
+    const includeAllOn = parseIncludeAllFlag(includeAll)
+
+    // 管理员：includeAll=true 时忽略 scope/userId 限制，强制“全量”查询
+    if (isAdmin && includeAllOn) {
+      const effectiveFilters = { ...(filters || {}) }
+      delete effectiveFilters.scope
+      delete effectiveFilters.userId
+      return voiceProfileRepository.findVoiceProfiles(effectiveFilters, pagination, sort)
+    }
+
+    // 终端用户：只能看到 system 音色 + 自己的 user 音色
+    if (!isAdmin) {
+      // includeAll=true：一次性返回全部「system + 自己的 user」（仍受 voiceId/name/modelId/isActive 筛选）
+      if (includeAllOn) {
+        const prisma = require('../config/database')
+        const orderBy = { createdAt: sort.createdAt || 'desc' }
+        const baseWhere = endUserAccessibleVoiceWhere(filters, userId)
+
+        const [data, total] = await Promise.all([
+          prisma.voiceProfile.findMany({
+            where: baseWhere,
+            orderBy,
+            include: {
+              user: true,
+              models: { include: { model: { include: { provider: true } } } },
+            },
+          }),
+          prisma.voiceProfile.count({ where: baseWhere }),
+        ])
+
+        return { data, total, page: 1, pageSize: Math.max(total, 1) }
+      }
+
+      // 若明确筛 scope=user，则强制 userId=自己
+      if (filters.scope === 'user') {
+        filters.userId = userId
+      } else if (filters.scope === 'system') {
+        filters.userId = null
+      } else {
+        // 不传 scope：同时返回 system + 自己的 user
+        // Prisma where 需要 OR，这里转成 repository 可识别的直接 where
+        // 为了保持 repository 简单，这里直接走 prisma
+        const prisma = require('../config/database')
+        const { page = 1, pageSize = 20 } = pagination
+        const skip = (page - 1) * pageSize
+        const orderBy = { createdAt: sort.createdAt || 'desc' }
+
+        const baseWhere = endUserAccessibleVoiceWhere(filters, userId)
+
+        const [data, total] = await Promise.all([
+          prisma.voiceProfile.findMany({
+            where: baseWhere,
+            skip,
+            take: pageSize,
+            orderBy,
+            include: {
+              user: true,
+              models: { include: { model: { include: { provider: true } } } },
+            },
+          }),
+          prisma.voiceProfile.count({ where: baseWhere }),
+        ])
+
+        return { data, total, page, pageSize }
+      }
+    }
+
+    return voiceProfileRepository.findVoiceProfiles(filters, pagination, sort)
+  }
+
+  async getVoiceProfileDetail(id, userRole = null, userId = null) {
+    const profile = await voiceProfileRepository.findById(id)
+    if (!profile) throw new NotFoundError('Voice profile not found')
+
+    const isAdmin = userRole && isAdminRole(userRole)
+    if (!isAdmin) {
+      const canView =
+        profile.scope === 'system' || (profile.scope === 'user' && profile.userId === userId)
+      if (!canView) throw new ForbiddenError('Permission denied')
+    }
+
+    return profile
+  }
+
+  async createVoiceProfile(data, userId = null, userRole = null) {
+    const isAdmin = userRole && isAdminRole(userRole)
+
+    if (!data.voiceId || !String(data.voiceId).trim()) {
+      throw new BadRequestError('voiceId is required')
+    }
+
+    const scope = data.scope || 'system'
+    if (!['system', 'user'].includes(scope)) {
+      throw new BadRequestError('Invalid scope')
+    }
+
+    // scope=system 只能管理员创建
+    if (scope === 'system' && !isAdmin) {
+      throw new ForbiddenError('Only admin can create system voice profiles')
+    }
+
+    // scope=user：userId 固定为当前用户
+    const targetUserId = scope === 'user' ? userId : null
+    if (scope === 'user' && !targetUserId) {
+      throw new BadRequestError('User ID is required for user voice profiles')
+    }
+
+    // voiceId 全局唯一
+    const existing = await voiceProfileRepository.findByVoiceId(String(data.voiceId).trim())
+    if (existing) throw new ConflictError('voiceId already exists')
+
+    // tags（JSON数组）校验与规范化
+    const normalizeTags = (tags) => {
+      if (tags === undefined) return undefined
+      if (tags === null) return null
+      if (!Array.isArray(tags)) throw new BadRequestError('tags must be an array')
+      // 允许 string 或 {type,value}；统一转成 {type,value}
+      const out = []
+      for (const t of tags) {
+        if (t == null) continue
+        if (typeof t === 'string') {
+          const s = t.trim()
+          if (s) out.push({ type: 'trait', value: s })
+          continue
+        }
+        if (typeof t === 'object') {
+          const type = String(t.type || '').trim()
+          const value = String(t.value || '').trim()
+          if (type && value) out.push({ type, value })
+          continue
+        }
+      }
+      return out
+    }
+
+    const tags = normalizeTags(data.tags)
+    if (!tags || tags.length === 0) {
+      throw new BadRequestError('tags is required')
+    }
+    const hasAge = tags.some((t) => t.type === 'age')
+    const hasGender = tags.some((t) => t.type === 'gender' && (t.value === 'male' || t.value === 'female'))
+    const hasTrait = tags.some((t) => t.type === 'trait')
+    if (!hasAge) throw new BadRequestError('tags missing required age')
+    if (!hasGender) throw new BadRequestError('tags missing required gender (male/female)')
+    if (!hasTrait) throw new BadRequestError('tags missing required trait')
+
+    // modelIds 校验（可选）
+    const modelIds = Array.isArray(data.modelIds)
+      ? data.modelIds.filter(Boolean)
+      : data.modelId
+        ? [data.modelId]
+        : []
+    for (const mid of modelIds) {
+      const model = await modelRepository.findById(mid)
+      if (!model) throw new NotFoundError('Model not found')
+    }
+
+    const prisma = require('../config/database')
+    const profile = await prisma.voiceProfile.create({
+      data: {
+        voiceId: String(data.voiceId).trim(),
+        scope,
+        userId: targetUserId,
+        sampleUrl: data.sampleUrl || null,
+        avatarUrl: data.avatarUrl || null,
+        name: data.name || null,
+        description: data.description || null,
+        meta: data.meta || null,
+        supportsVoiceCommand: data.supportsVoiceCommand === true,
+        tags: tags === null ? null : tags,
+        isActive: data.isActive !== undefined ? data.isActive === true : true,
+        models: modelIds.length
+          ? {
+            create: modelIds.map((id) => ({
+              model: { connect: { id } }
+            }))
+          }
+          : undefined
+      },
+      include: {
+        user: true,
+        models: { include: { model: { include: { provider: true } } } }
+      }
+    })
+
+    return profile
+  }
+
+  async updateVoiceProfile(id, data, userId = null, userRole = null) {
+    const profile = await voiceProfileRepository.findById(id)
+    if (!profile) throw new NotFoundError('Voice profile not found')
+
+    const isAdmin = userRole && isAdminRole(userRole)
+
+    if (!isAdmin) {
+      // 用户只能更新自己的 user 音色
+      if (!(profile.scope === 'user' && profile.userId === userId)) {
+        throw new ForbiddenError('Permission denied')
+      }
+    }
+
+    if (data.voiceId !== undefined && String(data.voiceId).trim() !== profile.voiceId) {
+      const existing = await voiceProfileRepository.findByVoiceId(String(data.voiceId).trim())
+      if (existing) throw new ConflictError('voiceId already exists')
+    }
+
+    if (data.scope !== undefined && data.scope !== profile.scope) {
+      throw new BadRequestError('scope cannot be changed')
+    }
+
+    if (data.userId !== undefined) {
+      // 避免越权：不允许客户端直接改 userId
+      if (data.userId !== undefined) {
+        throw new BadRequestError('userId cannot be updated')
+      }
+    }
+
+    const prisma = require('../config/database')
+
+    // tags（可选更新）：若传入则必须包含 age/gender/trait
+    const normalizeTags = (tags) => {
+      if (tags === undefined) return undefined
+      if (tags === null) return null
+      if (!Array.isArray(tags)) throw new BadRequestError('tags must be an array')
+      const out = []
+      for (const t of tags) {
+        if (t == null) continue
+        if (typeof t === 'string') {
+          const s = t.trim()
+          if (s) out.push({ type: 'trait', value: s })
+          continue
+        }
+        if (typeof t === 'object') {
+          const type = String(t.type || '').trim()
+          const value = String(t.value || '').trim()
+          if (type && value) out.push({ type, value })
+          continue
+        }
+      }
+      return out
+    }
+    const normalizedTags = normalizeTags(data.tags)
+    if (normalizedTags !== undefined) {
+      if (!normalizedTags || normalizedTags.length === 0) throw new BadRequestError('tags is required')
+      const hasAge = normalizedTags.some((t) => t.type === 'age')
+      const hasGender = normalizedTags.some((t) => t.type === 'gender' && (t.value === 'male' || t.value === 'female'))
+      const hasTrait = normalizedTags.some((t) => t.type === 'trait')
+      if (!hasAge) throw new BadRequestError('tags missing required age')
+      if (!hasGender) throw new BadRequestError('tags missing required gender (male/female)')
+      if (!hasTrait) throw new BadRequestError('tags missing required trait')
+    }
+
+    // modelIds 更新（可选）：传 modelIds 或 兼容旧字段 modelId
+    let wantsUpdateModels = data.modelIds !== undefined || data.modelId !== undefined
+    const modelIds = Array.isArray(data.modelIds)
+      ? data.modelIds.filter(Boolean)
+      : data.modelId !== undefined
+        ? (data.modelId ? [data.modelId] : [])
+        : null
+
+    const normalizeIds = (ids) => [...new Set((ids || []).filter(Boolean))].sort()
+    const existingModelIds = normalizeIds((profile.models || []).map((m) => m.modelId))
+    const incomingModelIds = normalizeIds(modelIds || [])
+
+    // 如果客户端每次都带上 modelIds，但实际没有变化，则视为“未更新模型绑定”
+    if (
+      wantsUpdateModels &&
+      modelIds &&
+      modelIds.length > 0 &&
+      JSON.stringify(existingModelIds) === JSON.stringify(incomingModelIds)
+    ) {
+      wantsUpdateModels = false
+    }
+
+    if (wantsUpdateModels && profile.isModelLocked) {
+      throw new BadRequestError('Model binding is locked for this voice profile')
+    }
+
+    if (wantsUpdateModels && modelIds) {
+      for (const mid of modelIds) {
+        const model = await modelRepository.findById(mid)
+        if (!model) throw new NotFoundError('Model not found')
+      }
+    }
+
+    return prisma.voiceProfile.update({
+      where: { id },
+      data: {
+        ...(data.voiceId !== undefined ? { voiceId: String(data.voiceId).trim() } : {}),
+        ...(data.sampleUrl !== undefined ? { sampleUrl: data.sampleUrl || null } : {}),
+        ...(data.avatarUrl !== undefined ? { avatarUrl: data.avatarUrl || null } : {}),
+        ...(data.name !== undefined ? { name: data.name || null } : {}),
+        ...(data.description !== undefined ? { description: data.description || null } : {}),
+        ...(data.meta !== undefined ? { meta: data.meta || null } : {}),
+        ...(data.supportsVoiceCommand !== undefined
+          ? { supportsVoiceCommand: data.supportsVoiceCommand === true }
+          : {}),
+        ...(normalizedTags !== undefined ? { tags: normalizedTags === null ? null : normalizedTags } : {}),
+        ...(data.isActive !== undefined ? { isActive: data.isActive === true } : {}),
+        ...(wantsUpdateModels && modelIds
+          ? {
+            models: {
+              deleteMany: {},
+              create: modelIds.map((mid) => ({
+                model: { connect: { id: mid } }
+              }))
+            }
+          }
+          : {})
+      },
+      include: {
+        user: true,
+        models: { include: { model: { include: { provider: true } } } }
+      }
+    })
+  }
+
+  async deleteVoiceProfile(id, userId = null, userRole = null) {
+    const profile = await voiceProfileRepository.findById(id)
+    if (!profile) throw new NotFoundError('Voice profile not found')
+
+    const isAdmin = userRole && isAdminRole(userRole)
+    if (!isAdmin) {
+      if (!(profile.scope === 'user' && profile.userId === userId)) {
+        throw new ForbiddenError('Permission denied')
+      }
+    }
+
+    // 若该音色由「音色克隆」流程创建，则同步删除第三方远程音色（delete_voice）
+    // - 仅当 meta 中具备 providerId/apiPath/userApiKeyId 时才执行远程删除
+    let meta
+    if (profile.meta) {
+      try {
+        meta = typeof profile.meta === 'string' ? JSON.parse(profile.meta) : profile.meta
+      } catch {
+        meta = null
+      }
+    }
+
+    const canRemoteDelete =
+      meta &&
+      meta.source === 'clone' &&
+      typeof meta.providerId === 'string' &&
+      typeof meta.apiPath === 'string' &&
+      typeof meta.userApiKeyId === 'string' &&
+      profile.voiceId
+
+    if (canRemoteDelete) {
+      const prisma = require('../config/database')
+      const axios = require('axios')
+      const { decryptApiKey } = require('../utils/crypto')
+
+      const provider = await prisma.aIProvider.findUnique({ where: { id: meta.providerId } })
+      if (!provider) throw new BadRequestError('Remote delete failed: provider not found')
+
+      const endpoint = meta.apiPath.startsWith('http')
+        ? meta.apiPath
+        : `${String(provider.baseUrl || '').replace(/\/$/, '')}${meta.apiPath.startsWith('/') ? '' : '/'}${meta.apiPath}`
+      if (!endpoint.startsWith('http')) {
+        throw new BadRequestError('Remote delete failed: invalid provider baseUrl or apiPath')
+      }
+
+      const apiKeyRecord = await prisma.userApiKey.findUnique({ where: { id: meta.userApiKeyId } })
+      if (!apiKeyRecord) throw new BadRequestError('Remote delete failed: API Key not found')
+      if (apiKeyRecord.providerId !== meta.providerId) {
+        throw new BadRequestError('Remote delete failed: API Key does not belong to this provider')
+      }
+      if (apiKeyRecord.status !== 'active') throw new BadRequestError('Remote delete failed: API Key is not active')
+
+      const token = decryptApiKey(apiKeyRecord.apiKey)
+      if (!token) throw new BadRequestError('Remote delete failed: invalid API key')
+
+      const payload = {
+        model: 'voice-enrollment',
+        input: {
+          action: 'delete_voice',
+          voice_id: String(profile.voiceId),
+        },
+      }
+
+      try {
+        const resp = await axios.post(endpoint, payload, {
+          timeout: 30000,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+        // 调试：打印第三方删除响应（必要时可删除）
+        console.log(
+          '[DELETE /api/voice-profiles/:id] third-party delete_voice response:',
+          JSON.stringify(resp?.data, (_, v) => (typeof v === 'bigint' ? v.toString() : v), 2)
+        )
+      } catch (e) {
+        throw new BadRequestError(`Remote delete failed: ${e.response?.data?.message || e.message}`)
+      }
+    }
+
+    await voiceProfileRepository.delete(id)
+    return { success: true }
+  }
+
+  async cloneVoiceProfile(data, userId = null, userRole = null) {
+    const prisma = require('../config/database')
+    const axios = require('axios')
+    const { decryptApiKey } = require('../utils/crypto')
+
+    const isAdmin = userRole && isAdminRole(userRole)
+    if (!isAdmin) throw new ForbiddenError('Only admin can clone voice profiles')
+
+    const providerId = data.providerId
+    const apiPath = String(data.apiPath || '').trim()
+    const userApiKeyId = data.userApiKeyId
+    const prefix = String(data.prefix || '').trim()
+    const audioUrl = String(data.audioUrl || '').trim()
+    const modelId = data.modelId
+
+    if (!providerId || !apiPath || !userApiKeyId || !prefix || !audioUrl || !modelId) {
+      throw new BadRequestError('Missing required fields')
+    }
+    if (!/^[a-zA-Z0-9]+$/.test(prefix)) {
+      throw new BadRequestError('prefix 仅支持英文字母与数字（与上游复刻接口要求一致）')
+    }
+
+    const provider = await prisma.aIProvider.findUnique({ where: { id: providerId } })
+    if (!provider) throw new NotFoundError('Provider not found')
+
+    // 校验 apiPath 是否在提供商配置里
+    let allowed = []
+    if (provider.voiceCloneApis) {
+      try {
+        const parsed = JSON.parse(provider.voiceCloneApis)
+        if (Array.isArray(parsed)) allowed = parsed
+      } catch {
+        // ignore
+      }
+    }
+    const isAllowed = allowed.some((x) => x && x.path === apiPath)
+    if (!isAllowed) throw new BadRequestError('apiPath is not allowed for this provider')
+
+    const apiKeyRecord = await prisma.userApiKey.findUnique({ where: { id: userApiKeyId } })
+    if (!apiKeyRecord) throw new NotFoundError('API Key not found')
+    if (apiKeyRecord.providerId !== providerId) throw new BadRequestError('API Key does not belong to this provider')
+    if (apiKeyRecord.status !== 'active') throw new BadRequestError('API Key is not active')
+
+    const now = Math.floor(Date.now() / 1000)
+    const expireTime = typeof apiKeyRecord.expireTime === 'bigint' ? Number(apiKeyRecord.expireTime) : Number(apiKeyRecord.expireTime)
+    if (expireTime && expireTime > 0 && expireTime <= now) throw new BadRequestError('API Key is expired')
+
+    const model = await modelRepository.findById(modelId)
+    if (!model) throw new NotFoundError('Model not found')
+
+    const endpoint = apiPath.startsWith('http')
+      ? apiPath
+      : `${String(provider.baseUrl || '').replace(/\/$/, '')}${apiPath.startsWith('/') ? '' : '/'}${apiPath}`
+
+    if (!endpoint.startsWith('http')) {
+      throw new BadRequestError('Invalid provider baseUrl or apiPath')
+    }
+
+    const token = decryptApiKey(apiKeyRecord.apiKey)
+    if (!token) throw new BadRequestError('Invalid API key')
+
+    const payload = {
+      model: 'voice-enrollment',
+      input: {
+        action: 'create_voice',
+        target_model: model.name,
+        prefix,
+        url: audioUrl,
+      },
+    }
+
+    let resp
+    try {
+      resp = await axios.post(endpoint, payload, {
+        timeout: 30000,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+    } catch (e) {
+      throw new BadRequestError(`Clone voice request failed: ${e.response?.data?.message || e.message}`)
+    }
+
+    const body = resp?.data
+    const voiceId =
+      body?.voice_id ||
+      body?.voiceId ||
+      body?.output?.voice_id ||
+      body?.output?.voiceId ||
+      body?.data?.voice_id ||
+      body?.data?.voiceId
+    if (!voiceId) throw new BadRequestError('Clone voice response missing voice_id')
+
+    // voiceId 全局唯一
+    const existing = await voiceProfileRepository.findByVoiceId(String(voiceId))
+    if (existing) throw new ConflictError('voiceId already exists')
+
+    const created = await prisma.voiceProfile.create({
+      data: {
+        voiceId: String(voiceId),
+        scope: 'system',
+        userId: null,
+        sampleUrl: data.sampleUrl || null,
+        avatarUrl: data.avatarUrl || null,
+        name: data.name || null,
+        description: data.description || null,
+        meta: JSON.stringify({
+          source: 'clone',
+          providerId,
+          apiPath,
+          userApiKeyId,
+          prefix,
+          audioUrl,
+          targetModel: model.name,
+          raw: body,
+        }),
+        isModelLocked: true,
+        isActive: true,
+        models: {
+          create: [
+            {
+              model: { connect: { id: modelId } },
+            },
+          ],
+        },
+      },
+      include: {
+        user: true,
+        models: { include: { model: { include: { provider: true } } } },
+      },
+    })
+
+    return created
+  }
+}
+
+module.exports = new VoiceProfileService()
+

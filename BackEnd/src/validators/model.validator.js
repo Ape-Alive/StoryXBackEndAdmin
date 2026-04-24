@@ -64,6 +64,10 @@ const createModelValidator = [
   body('description').optional().isString().withMessage('Description must be a string'),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
   body('requiresKey').optional().isBoolean().withMessage('requiresKey must be a boolean'),
+  body('supportsVoiceCommand')
+    .optional()
+    .isBoolean()
+    .withMessage('supportsVoiceCommand must be a boolean'),
   body('apiConfig')
     .optional()
     .isString()
@@ -94,6 +98,10 @@ const updateModelValidator = [
   body('description').optional().isString().withMessage('Description must be a string'),
   body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
   body('requiresKey').optional().isBoolean().withMessage('requiresKey must be a boolean'),
+  body('supportsVoiceCommand')
+    .optional()
+    .isBoolean()
+    .withMessage('supportsVoiceCommand must be a boolean'),
   body('apiConfig')
     .optional()
     .isString()
@@ -143,7 +151,10 @@ const getModelPricesValidator = [
   body('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
   body('pageSize').optional().isInt({ min: 1, max: 1000 }).withMessage('Page size must be between 1 and 1000'),
   body('packageId').optional().isString().withMessage('Package ID must be a string'),
-  body('pricingType').optional().isIn(['token', 'call']).withMessage('Pricing type must be either token or call'),
+  body('pricingType')
+    .optional()
+    .isIn(['token', 'call', 'char'])
+    .withMessage('Pricing type must be either token, call or char'),
   body('startDate').optional().isISO8601().withMessage('Invalid start date format'),
   body('endDate').optional().isISO8601().withMessage('Invalid end date format'),
   body('expiredStartDate').optional().isISO8601().withMessage('Invalid expired start date format'),
@@ -170,8 +181,8 @@ const createModelPriceValidator = [
   body('pricingType')
     .notEmpty()
     .withMessage('Pricing type is required')
-    .isIn(['token', 'call'])
-    .withMessage('Pricing type must be either token or call'),
+    .isIn(['token', 'call', 'char'])
+    .withMessage('Pricing type must be either token, call or char'),
   body('inputPrice')
     .optional()
     .custom((value, { req }) => {
@@ -217,6 +228,21 @@ const createModelPriceValidator = [
       return true
     })
     .withMessage('Call price must be a non-negative number'),
+  body('charPrice')
+    .optional()
+    .custom((value, { req }) => {
+      if (req.body.pricingType === 'char') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Char price is required when pricing type is char')
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Char price must be a non-negative number')
+        }
+      }
+      return true
+    })
+    .withMessage('Char price must be a non-negative number'),
   body('maxToken')
     .optional()
     .custom((value, { req }) => {
@@ -233,6 +259,21 @@ const createModelPriceValidator = [
       return true
     })
     .withMessage('Max token must be a positive integer or null (only valid when pricing type is token)'),
+  body('maxChars')
+    .optional()
+    .custom((value, { req }) => {
+      if (req.body.pricingType === 'char') {
+        if (value === null || value === undefined || value === '') {
+          return true
+        }
+        const intValue = typeof value === 'string' ? parseInt(value) : value
+        if (isNaN(intValue) || intValue < 1) {
+          throw new Error('Max chars must be a positive integer or null')
+        }
+      }
+      return true
+    })
+    .withMessage('Max chars must be a positive integer or null (only valid when pricing type is char)'),
   body('effectiveAt')
     .notEmpty()
     .withMessage('Effective date is required')
@@ -260,7 +301,10 @@ const createModelPriceValidator = [
 const updateModelPriceValidator = [
   param('id').notEmpty().withMessage('Model ID is required'),
   param('priceId').notEmpty().withMessage('Price ID is required'),
-  body('pricingType').optional().isIn(['token', 'call']).withMessage('Pricing type must be either token or call'),
+  body('pricingType')
+    .optional()
+    .isIn(['token', 'call', 'char'])
+    .withMessage('Pricing type must be either token, call or char'),
   body('inputPrice')
     .optional()
     .custom((value, { req }) => {
@@ -327,6 +371,26 @@ const updateModelPriceValidator = [
       return true
     })
     .withMessage('Call price must be a non-negative number'),
+  body('charPrice')
+    .optional()
+    .custom((value, { req }) => {
+      if (req.body.pricingType === 'char') {
+        if (value === undefined || value === null || value === '') {
+          throw new Error('Char price is required when pricing type is char')
+        }
+        const numValue = typeof value === 'string' ? parseFloat(value) : value
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Char price must be a non-negative number')
+        }
+      } else if (value !== undefined && value !== null && value !== '') {
+        const numValue = typeof value === 'string' ? parseFloat(value) : value
+        if (isNaN(numValue) || numValue < 0) {
+          throw new Error('Char price must be a non-negative number')
+        }
+      }
+      return true
+    })
+    .withMessage('Char price must be a non-negative number'),
   body('maxToken')
     .optional()
     .custom((value, { req }) => {
@@ -342,6 +406,19 @@ const updateModelPriceValidator = [
       return true
     })
     .withMessage('Max token must be a positive integer or null (only valid when pricing type is token)'),
+  body('maxChars')
+    .optional()
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true
+      }
+      const intValue = typeof value === 'string' ? parseInt(value) : value
+      if (isNaN(intValue) || intValue < 1) {
+        throw new Error('Max chars must be a positive integer or null')
+      }
+      return true
+    })
+    .withMessage('Max chars must be a positive integer or null'),
   body('effectiveAt')
     .optional()
     .custom((value) => {
