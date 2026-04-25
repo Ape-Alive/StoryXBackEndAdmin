@@ -192,8 +192,11 @@ router.get(
  *   get:
  *     summary: 获取 AI 调用日志列表
  *     description: |
- *       分页获取 AI 模型调用日志，支持按用户、模型、状态、请求ID、时间范围筛选。
- *       用于审计终端用户的 AI 调用记录，含 token 消耗、成本、耗时等。
+ *       分页获取统一日志流，支持按用户、模型、状态、请求ID、时间范围筛选。
+ *       可返回两类日志：
+ *       - `model_call`：模型调用日志（原 AICallLog）
+ *       - `voice_clone`：声音复刻日志（来自 voice_clone_credit_logs）
+ *       不传 `logType` 默认返回两类合并结果，按时间倒序。
  *       **权限**：需 super_admin、platform_admin、risk_control、finance 或 read_only 角色。
  *     tags: [日志审计]
  *     security:
@@ -236,6 +239,13 @@ router.get(
  *           type: string
  *         description: 请求ID
  *       - in: query
+ *         name: logType
+ *         schema:
+ *           type: string
+ *           enum: [all, model_call, voice_clone]
+ *           default: all
+ *         description: 日志类型筛选
+ *       - in: query
  *         name: startDate
  *         schema:
  *           type: string
@@ -264,7 +274,28 @@ router.get(
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/AICallLog'
+ *                     type: object
+ *                     properties:
+ *                       requestId:
+ *                         type: string
+ *                         description: 模型调用为原 requestId；声音复刻为 voice_clone:{id}
+ *                       logType:
+ *                         type: string
+ *                         enum: [model_call, voice_clone]
+ *                       logTypeLabel:
+ *                         type: string
+ *                       status:
+ *                         type: string
+ *                         enum: [success, failure]
+ *                       requestTime:
+ *                         type: string
+ *                         format: date-time
+ *                       cost:
+ *                         type: number
+ *                       cloneStatus:
+ *                         type: string
+ *                         nullable: true
+ *                         description: 仅声音复刻日志返回（charged/no_charge_configured/admin_exempt）
  *                 pagination:
  *                   $ref: '#/components/schemas/Pagination'
  *       400:
@@ -299,7 +330,10 @@ router.get(
  * /api/logs/ai/{requestId}:
  *   get:
  *     summary: 获取 AI 调用日志详情
- *     description: 根据请求ID获取单条 AI 调用日志的详细信息
+ *     description: |
+ *       根据请求ID获取单条日志详情。
+ *       - 模型调用：传原始 requestId
+ *       - 声音复刻：传 `voice_clone:{voiceCloneCreditLog.id}`
  *     tags: [日志审计]
  *     security:
  *       - bearerAuth: []
@@ -325,7 +359,26 @@ router.get(
  *                   type: string
  *                   example: AI call log detail retrieved successfully
  *                 data:
- *                   $ref: '#/components/schemas/AICallLog'
+ *                   type: object
+ *                   properties:
+ *                     requestId:
+ *                       type: string
+ *                     logType:
+ *                       type: string
+ *                       enum: [model_call, voice_clone]
+ *                     logTypeLabel:
+ *                       type: string
+ *                     status:
+ *                       type: string
+ *                       enum: [success, failure]
+ *                     requestTime:
+ *                       type: string
+ *                       format: date-time
+ *                     cost:
+ *                       type: number
+ *                     cloneStatus:
+ *                       type: string
+ *                       nullable: true
  *       404:
  *         description: 日志不存在
  *         content:

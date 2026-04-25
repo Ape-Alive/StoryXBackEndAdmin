@@ -4,7 +4,9 @@
     <div class="page-header">
       <div class="header-left">
         <h1 class="page-title">AI 调用日志</h1>
-        <p class="page-description">审计终端用户的 AI 模型调用记录，含 token 消耗、成本、耗时等。</p>
+        <p class="page-description">
+          审计终端用户的 AI 模型调用记录，含 token 消耗、成本、耗时等。
+        </p>
       </div>
     </div>
 
@@ -24,7 +26,9 @@
     <!-- 分页器 -->
     <div class="pagination-wrapper">
       <div class="pagination-info">
-        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{ paginationRange.end }}
+        共 {{ pagination.total }} 条记录, 当前显示 {{ paginationRange.start }}-{{
+          paginationRange.end
+        }}
       </div>
       <el-pagination
         :current-page="pagination.page"
@@ -68,6 +72,7 @@ const filters = reactive({
   userId: '',
   modelId: '',
   requestId: '',
+  logType: 'all',
   status: undefined,
   startDate: '',
   endDate: ''
@@ -94,6 +99,7 @@ async function fetchData() {
       userId: filters.userId || undefined,
       modelId: filters.modelId || undefined,
       requestId: filters.requestId || undefined,
+      logType: filters.logType || undefined,
       status: filters.status || undefined,
       startDate: filters.startDate || undefined,
       endDate: filters.endDate || undefined

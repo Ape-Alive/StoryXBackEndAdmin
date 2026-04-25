@@ -881,10 +881,15 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *   get:
  *     summary: 获取调用日志列表 [仅终端用户]
  *     description: |
- *       查询当前用户的所有AI调用日志，支持按模型、状态、时间范围筛选和分页查询。
+ *       查询当前用户的日志流，支持按模型、日志类型、状态、时间范围筛选和分页查询。
+ *       返回两类日志并按时间倒序合并：
+ *       - `model_call`：模型调用日志（AICallLog）
+ *       - `voice_clone`：声音复刻日志（voice_clone_credit_logs）
  *
  *       **返回字段说明：**
  *       - **requestTime**：请求时间（客户端发起AI调用请求的时间）
+ *       - **logType**：日志类型（`model_call` 或 `voice_clone`）
+ *       - **logTypeLabel**：日志类型展示文案（模型调用/声音复刻）
  *       - **model**：调用的AI模型信息（包含模型名称、显示名称、提供商信息）
  *       - **cost**：消耗的额度（积分），本次调用实际扣除的积分
  *       - **status**：任务状态
@@ -920,6 +925,10 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *       # 组合筛选
  *       curl "http://localhost:5800/api/user/ai/logs?modelId=clx123456789&status=success&page=1&pageSize=10" \
  *         -H "Authorization: Bearer {token}"
+ *
+ *       # 仅查看声音复刻日志
+ *       curl "http://localhost:5800/api/user/ai/logs?logType=voice_clone&page=1&pageSize=20" \
+ *         -H "Authorization: Bearer {token}"
  *       ```
  *     tags: [终端用户AI调用]
  *     security:
@@ -942,6 +951,13 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *         schema:
  *           type: string
  *         description: 模型ID筛选
+ *       - in: query
+ *         name: logType
+ *         schema:
+ *           type: string
+ *           enum: [all, model_call, voice_clone]
+ *           default: all
+ *         description: 日志类型筛选
  *       - in: query
  *         name: status
  *         schema:
@@ -1011,6 +1027,13 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *                                     type: string
  *                                   displayName:
  *                                     type: string
+ *                           logType:
+ *                             type: string
+ *                             enum: [model_call, voice_clone]
+ *                             example: "model_call"
+ *                           logTypeLabel:
+ *                             type: string
+ *                             example: "模型调用"
  *                           inputTokens:
  *                             type: integer
  *                             example: 100
@@ -1065,6 +1088,24 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *                             nullable: true
  *                             example: "192.168.1.1"
  *                             description: 请求IP地址
+ *                           cloneStatus:
+ *                             type: string
+ *                             nullable: true
+ *                             example: "charged"
+ *                             description: 声音复刻流水状态（仅 logType=voice_clone 时返回）
+ *                           voiceId:
+ *                             type: string
+ *                             nullable: true
+ *                             example: "voice_xxx"
+ *                             description: 复刻后的音色ID（仅 logType=voice_clone 时返回）
+ *                           voiceProfileId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 本地音色记录ID（仅 logType=voice_clone 时返回）
+ *                           userApiKeyId:
+ *                             type: string
+ *                             nullable: true
+ *                             description: 本次复刻使用的 API Key 记录ID（仅 logType=voice_clone 时返回）
  *             examples:
  *               example1:
  *                 summary: 成功调用日志
@@ -1075,6 +1116,8 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *                     - id: "log_123456"
  *                       requestId: "req_123456"
  *                       userId: "user_123"
+ *                       logType: "model_call"
+ *                       logTypeLabel: "模型调用"
  *                       modelId: "model_123"
  *                       model:
  *                         id: "model_123"
@@ -1104,6 +1147,8 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *                     - id: "log_123457"
  *                       requestId: "req_123457"
  *                       userId: "user_123"
+ *                       logType: "model_call"
+ *                       logTypeLabel: "模型调用"
  *                       modelId: "model_123"
  *                       model:
  *                         id: "model_123"
@@ -1124,6 +1169,43 @@ router.post('/ai/call/report', reportCallValidator, validate, userApiController.
  *                       duration: 500
  *                       deviceFingerprint: "device_hash_abc123"
  *                       ipAddress: "192.168.1.1"
+ *               example3:
+ *                 summary: 声音复刻日志
+ *                 value:
+ *                   success: true
+ *                   message: "Success"
+ *                   data:
+ *                     - id: "cmvoiceclone001"
+ *                       requestId: "voice_clone:cmvoiceclone001"
+ *                       userId: "user_123"
+ *                       logType: "voice_clone"
+ *                       logTypeLabel: "声音复刻"
+ *                       modelId: "model_tts_123"
+ *                       model:
+ *                         id: "model_tts_123"
+ *                         name: "voice-model"
+ *                         displayName: "Voice Model"
+ *                         provider:
+ *                           id: "provider_123"
+ *                           name: "Provider"
+ *                           displayName: "Provider AI"
+ *                       inputTokens: null
+ *                       outputTokens: null
+ *                       totalTokens: null
+ *                       cost: 1.5
+ *                       status: "success"
+ *                       cloneStatus: "charged"
+ *                       requestTime: "2024-01-01T12:00:00Z"
+ *                       responseTime: "2024-01-01T12:00:00Z"
+ *                       duration: null
+ *                       deviceFingerprint: null
+ *                       ipAddress: null
+ *                       voiceId: "voice_abc123"
+ *                       voiceProfileId: "uuid-profile-001"
+ *                       userApiKeyId: "uak_xxx"
+ *                       amountCharged: 1.5
+ *                       usedCreditsBefore: 10
+ *                       usedCreditsAfter: 11.5
  *                   pagination:
  *                     $ref: '#/components/schemas/Pagination'
  *       400:
@@ -1153,15 +1235,21 @@ router.get('/ai/logs', getCallLogsValidator, validate, userApiController.getCall
  *   get:
  *     summary: 获取调用日志详情 [仅终端用户]
  *     description: |
- *       根据requestId获取调用日志的详细信息，包括完整的调用参数、响应信息等。
+ *       根据 requestId 获取日志详情。
+ *       - 模型调用日志：传原始 requestId（如 `req_123456`）
+ *       - 声音复刻日志：传 `voice_clone:{id}`（如 `voice_clone:cmabc123...`）
  *
  *       **注意事项：**
  *       - 只能查看自己的调用日志
- *       - requestId必须唯一，由客户端生成
+ *       - 模型调用 requestId 由客户端生成并唯一；声音复刻 requestId 为服务端派生前缀
  *
  *       **使用示例：**
  *       ```bash
  *       curl "http://localhost:5800/api/user/ai/logs/req_123456" \
+ *         -H "Authorization: Bearer {token}"
+ *
+ *       # 声音复刻详情
+ *       curl "http://localhost:5800/api/user/ai/logs/voice_clone:cmabc123456789" \
  *         -H "Authorization: Bearer {token}"
  *       ```
  *     tags: [终端用户AI调用]
@@ -1196,6 +1284,13 @@ router.get('/ai/logs', getCallLogsValidator, validate, userApiController.getCall
  *                         userId:
  *                           type: string
  *                           example: "user_123"
+ *                         logType:
+ *                           type: string
+ *                           enum: [model_call, voice_clone]
+ *                           example: "model_call"
+ *                         logTypeLabel:
+ *                           type: string
+ *                           example: "模型调用"
  *                         modelId:
  *                           type: string
  *                           example: "model_123"
@@ -1288,6 +1383,28 @@ router.get('/ai/logs', getCallLogsValidator, validate, userApiController.getCall
  *                           nullable: true
  *                           example: "192.168.1.1"
  *                           description: 请求IP地址
+ *                         cloneStatus:
+ *                           type: string
+ *                           nullable: true
+ *                           description: 声音复刻流水状态（仅 voice_clone）
+ *                         voiceId:
+ *                           type: string
+ *                           nullable: true
+ *                         voiceProfileId:
+ *                           type: string
+ *                           nullable: true
+ *                         userApiKeyId:
+ *                           type: string
+ *                           nullable: true
+ *                         amountCharged:
+ *                           type: number
+ *                           nullable: true
+ *                         usedCreditsBefore:
+ *                           type: number
+ *                           nullable: true
+ *                         usedCreditsAfter:
+ *                           type: number
+ *                           nullable: true
  *       400:
  *         description: 请求参数错误
  *         content:

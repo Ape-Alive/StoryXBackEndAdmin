@@ -110,6 +110,10 @@ const getMyAuthorizationsValidator = [
     .optional()
     .isString()
     .withMessage('Model ID must be a string'),
+  query('logType')
+    .optional()
+    .isIn(['all', 'model_call', 'voice_clone'])
+    .withMessage('logType must be one of: all, model_call, voice_clone'),
   query('status')
     .optional()
     .isIn(['active', 'used', 'expired', 'revoked'])

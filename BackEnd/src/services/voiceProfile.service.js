@@ -23,6 +23,65 @@ function parseIncludeAllFlag(includeAll) {
   )
 }
 
+/** 剩余积分（credits - usedCredits），用于排序 */
+function remainingCredits(key) {
+  return Number(key.credits ?? 0) - Number(key.usedCredits ?? 0)
+}
+
+/**
+ * 未传 userApiKeyId 时自动选择一条 Key。
+ * 管理员：仅系统级 Key（userId 为空）。
+ * 终端用户：本人 Key 与系统级 Key 均可；**优先本人 Key**，同档内绑定授权数更少、剩余积分更多优先。
+ * @param {{ providerId: string, userId: string|null, isAdmin: boolean }} opts
+ */
+async function pickUserApiKeyIdForClone(prisma, { providerId, userId, isAdmin }) {
+  const now = Math.floor(Date.now() / 1000)
+  const where = isAdmin
+    ? { providerId, status: 'active', userId: null }
+    : {
+        providerId,
+        status: 'active',
+        OR: [{ userId }, { userId: null }],
+      }
+  const keys = await prisma.userApiKey.findMany({
+    where,
+    select: {
+      id: true,
+      userId: true,
+      expireTime: true,
+      credits: true,
+      usedCredits: true,
+      _count: { select: { authorizations: true } },
+    },
+  })
+  const candidates = keys.filter((k) => {
+    const exp = typeof k.expireTime === 'bigint' ? Number(k.expireTime) : Number(k.expireTime)
+    return !(exp && exp > 0 && exp <= now)
+  })
+  if (!candidates.length) {
+    throw new BadRequestError(
+      isAdmin
+        ? 'No active system API key for this provider; add one or pass userApiKeyId'
+        : 'No active API key for this provider; bind a key or pass userApiKeyId'
+    )
+  }
+  const tier = (k) => (k.userId === null ? 1 : 0) // 0=本人优先，1=系统级次之（仅终端用户分支会混排）
+  candidates.sort((a, b) => {
+    if (!isAdmin) {
+      const ta = tier(a)
+      const tb = tier(b)
+      if (ta !== tb) return ta - tb
+    }
+    const bindA = a._count.authorizations
+    const bindB = b._count.authorizations
+    if (bindA !== bindB) return bindA - bindB
+    const remDiff = remainingCredits(b) - remainingCredits(a)
+    if (remDiff !== 0) return remDiff
+    return String(a.id).localeCompare(String(b.id))
+  })
+  return candidates[0].id
+}
+
 /** 终端用户可见：system 全量 + scope=user 且 userId=当前用户（其它筛选可叠加） */
 function endUserAccessibleVoiceWhere(filters, userId) {
   return {
@@ -456,16 +515,21 @@ class VoiceProfileService {
     const { decryptApiKey } = require('../utils/crypto')
 
     const isAdmin = userRole && isAdminRole(userRole)
-    if (!isAdmin) throw new ForbiddenError('Only admin can clone voice profiles')
+    /** 与 `/clone` 路由一致：仅超级/平台管理员免计积分 */
+    const isVoiceCloneBillingExempt =
+      userRole && [ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN].includes(userRole)
+    if (!isAdmin && !userId) {
+      throw new ForbiddenError('Login required to clone voice profile')
+    }
 
     const providerId = data.providerId
     const apiPath = String(data.apiPath || '').trim()
-    const userApiKeyId = data.userApiKeyId
     const prefix = String(data.prefix || '').trim()
     const audioUrl = String(data.audioUrl || '').trim()
     const modelId = data.modelId
+    const rawKeyId = data.userApiKeyId
 
-    if (!providerId || !apiPath || !userApiKeyId || !prefix || !audioUrl || !modelId) {
+    if (!providerId || !apiPath || !prefix || !audioUrl || !modelId) {
       throw new BadRequestError('Missing required fields')
     }
     if (!/^[a-zA-Z0-9]+$/.test(prefix)) {
@@ -488,10 +552,25 @@ class VoiceProfileService {
     const isAllowed = allowed.some((x) => x && x.path === apiPath)
     if (!isAllowed) throw new BadRequestError('apiPath is not allowed for this provider')
 
+    let userApiKeyId =
+      rawKeyId !== undefined && rawKeyId !== null && String(rawKeyId).trim() !== ''
+        ? String(rawKeyId).trim()
+        : null
+    if (!userApiKeyId) {
+      userApiKeyId = await pickUserApiKeyIdForClone(prisma, { providerId, userId, isAdmin })
+    }
+
     const apiKeyRecord = await prisma.userApiKey.findUnique({ where: { id: userApiKeyId } })
     if (!apiKeyRecord) throw new NotFoundError('API Key not found')
     if (apiKeyRecord.providerId !== providerId) throw new BadRequestError('API Key does not belong to this provider')
     if (apiKeyRecord.status !== 'active') throw new BadRequestError('API Key is not active')
+    if (!isAdmin) {
+      const isOwn = apiKeyRecord.userId === userId
+      const isSystemKey = apiKeyRecord.userId === null
+      if (!isOwn && !isSystemKey) {
+        throw new ForbiddenError('You can only clone using your own API Key or a system API key')
+      }
+    }
 
     const now = Math.floor(Date.now() / 1000)
     const expireTime = typeof apiKeyRecord.expireTime === 'bigint' ? Number(apiKeyRecord.expireTime) : Number(apiKeyRecord.expireTime)
@@ -510,6 +589,14 @@ class VoiceProfileService {
 
     const token = decryptApiKey(apiKeyRecord.apiKey)
     if (!token) throw new BadRequestError('Invalid API key')
+
+    const cloneCost = Math.max(0, Number(provider.voiceCloneCreditsPerCall ?? 0) || 0)
+    const keyCap = Number(apiKeyRecord.credits) || 0
+    const keyUsed = Number(apiKeyRecord.usedCredits) || 0
+    // 终端用户需校验 Key 剩余积分；超级/平台管理员克隆不扣费、不拦截
+    if (!isVoiceCloneBillingExempt && cloneCost > 0 && keyCap > 0 && keyCap - keyUsed < cloneCost) {
+      throw new BadRequestError('Insufficient API key credits for voice clone')
+    }
 
     const payload = {
       model: 'voice-enrollment',
@@ -544,43 +631,139 @@ class VoiceProfileService {
       body?.data?.voiceId
     if (!voiceId) throw new BadRequestError('Clone voice response missing voice_id')
 
-    // voiceId 全局唯一
-    const existing = await voiceProfileRepository.findByVoiceId(String(voiceId))
-    if (existing) throw new ConflictError('voiceId already exists')
+    const scope = isAdmin ? 'system' : 'user'
+    const ownerUserId = isAdmin ? null : userId
+    const logMetaBase = { modelId, prefix, isAdmin, billingExempt: !!isVoiceCloneBillingExempt, cloneCost, configuredPerCall: cloneCost }
 
-    const created = await prisma.voiceProfile.create({
-      data: {
-        voiceId: String(voiceId),
-        scope: 'system',
-        userId: null,
-        sampleUrl: data.sampleUrl || null,
-        avatarUrl: data.avatarUrl || null,
-        name: data.name || null,
-        description: data.description || null,
-        meta: JSON.stringify({
-          source: 'clone',
-          providerId,
-          apiPath,
-          userApiKeyId,
-          prefix,
-          audioUrl,
-          targetModel: model.name,
-          raw: body,
-        }),
-        isModelLocked: true,
-        isActive: true,
-        models: {
-          create: [
-            {
-              model: { connect: { id: modelId } },
-            },
-          ],
+    const created = await prisma.$transaction(async (tx) => {
+      const dup = await tx.voiceProfile.findUnique({ where: { voiceId: String(voiceId) } })
+      if (dup) throw new ConflictError('voiceId already exists')
+
+      const profile = await tx.voiceProfile.create({
+        data: {
+          voiceId: String(voiceId),
+          scope,
+          userId: ownerUserId,
+          sampleUrl:
+            data.sampleUrl === undefined || data.sampleUrl === null || String(data.sampleUrl).trim() === ''
+              ? null
+              : String(data.sampleUrl).trim(),
+          avatarUrl:
+            data.avatarUrl === undefined || data.avatarUrl === null || String(data.avatarUrl).trim() === ''
+              ? null
+              : String(data.avatarUrl).trim(),
+          name:
+            data.name === undefined || data.name === null || String(data.name).trim() === ''
+              ? null
+              : String(data.name).trim(),
+          description:
+            data.description === undefined || data.description === null || String(data.description).trim() === ''
+              ? null
+              : String(data.description).trim(),
+          tags: data.tags === undefined ? null : data.tags,
+          meta: JSON.stringify({
+            source: 'clone',
+            providerId,
+            apiPath,
+            userApiKeyId,
+            prefix,
+            audioUrl,
+            targetModel: model.name,
+            cloneCreditsCharged: isVoiceCloneBillingExempt ? 0 : cloneCost,
+            ...(isVoiceCloneBillingExempt ? { adminCloneNoCharge: true, configuredCloneCost: cloneCost } : {}),
+            ...(ownerUserId ? { ownerUserId } : {}),
+            raw: body,
+          }),
+          isModelLocked: true,
+          isActive: true,
+          models: {
+            create: [
+              {
+                model: { connect: { id: modelId } },
+              },
+            ],
+          },
         },
-      },
-      include: {
-        user: true,
-        models: { include: { model: { include: { provider: true } } } },
-      },
+      })
+
+      const keyRow = await tx.userApiKey.findUnique({ where: { id: userApiKeyId } })
+      if (!keyRow) throw new NotFoundError('API Key not found')
+      const usedBefore = Number(keyRow.usedCredits) || 0
+
+      if (isVoiceCloneBillingExempt) {
+        await tx.voiceCloneCreditLog.create({
+          data: {
+            actorUserId: userId || null,
+            userApiKeyId,
+            providerId,
+            voiceProfileId: profile.id,
+            voiceId: String(voiceId),
+            amountCharged: 0,
+            keyCreditsCap: keyRow.credits,
+            usedCreditsBefore: usedBefore,
+            usedCreditsAfter: usedBefore,
+            status: 'admin_exempt',
+            meta: JSON.stringify({
+              ...logMetaBase,
+              reason: 'super/platform admin clone: no credit deduction',
+              configuredPerCall: cloneCost,
+            }),
+          },
+        })
+      } else if (cloneCost > 0) {
+        const cap = Number(keyRow.credits) || 0
+        if (cap > 0 && cap - usedBefore < cloneCost) {
+          throw new BadRequestError('Insufficient API key credits for voice clone')
+        }
+        await tx.userApiKey.update({
+          where: { id: userApiKeyId },
+          data: { usedCredits: { increment: cloneCost } },
+        })
+        const keyAfter = await tx.userApiKey.findUnique({
+          where: { id: userApiKeyId },
+          select: { usedCredits: true, credits: true },
+        })
+        const usedAfter = Number(keyAfter.usedCredits) || 0
+        await tx.voiceCloneCreditLog.create({
+          data: {
+            actorUserId: userId || null,
+            userApiKeyId,
+            providerId,
+            voiceProfileId: profile.id,
+            voiceId: String(voiceId),
+            amountCharged: cloneCost,
+            keyCreditsCap: keyRow.credits,
+            usedCreditsBefore: usedBefore,
+            usedCreditsAfter: usedAfter,
+            status: 'charged',
+            meta: JSON.stringify(logMetaBase),
+          },
+        })
+      } else {
+        await tx.voiceCloneCreditLog.create({
+          data: {
+            actorUserId: userId || null,
+            userApiKeyId,
+            providerId,
+            voiceProfileId: profile.id,
+            voiceId: String(voiceId),
+            amountCharged: 0,
+            keyCreditsCap: keyRow.credits,
+            usedCreditsBefore: usedBefore,
+            usedCreditsAfter: usedBefore,
+            status: 'no_charge_configured',
+            meta: JSON.stringify({ ...logMetaBase, reason: 'voiceCloneCreditsPerCall is 0' }),
+          },
+        })
+      }
+
+      return tx.voiceProfile.findUnique({
+        where: { id: profile.id },
+        include: {
+          user: true,
+          models: { include: { model: { include: { provider: true } } } },
+        },
+      })
     })
 
     return created

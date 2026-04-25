@@ -20,9 +20,16 @@ class ProviderController {
         }
       };
 
+      const includeAll =
+        req.query.includeAll === true ||
+        req.query.includeAll === 'true' ||
+        req.query.includeAll === '1' ||
+        req.query.includeAll === 1;
+
       const pagination = {
         page: parseInt(req.query.page) || 1,
-        pageSize: parseInt(req.query.pageSize) || 20
+        pageSize: parseInt(req.query.pageSize) || 20,
+        includeAll,
       };
 
       const sort = {

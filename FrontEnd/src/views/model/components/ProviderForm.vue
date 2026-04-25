@@ -97,6 +97,19 @@
         </div>
       </el-form-item>
 
+      <el-form-item label="复刻单次积分">
+        <el-input-number
+          v-model="formData.voiceCloneCreditsPerCall"
+          :min="0"
+          :precision="2"
+          :step="1"
+          style="width: 100%"
+        />
+        <div class="form-tip">
+          每成功一次克隆增加所选 Key 已用积分；0 不扣。流水表 voice_clone_credit_logs。
+        </div>
+      </el-form-item>
+
       <el-form-item label="支持API Key创建">
         <el-switch v-model="formData.supportsApiKeyCreation" />
         <div class="form-tip">是否支持通过接口创建API Key（如grsai）</div>
@@ -160,6 +173,7 @@ const formData = reactive({
   quota: null,
   quotaUnit: null,
   apiKeyLowBalanceThreshold: 1000,
+  voiceCloneCreditsPerCall: 0,
   mainAccountToken: '',
   supportsApiKeyCreation: false,
   isActive: true
@@ -270,6 +284,11 @@ watch(
           props.provider.apiKeyLowBalanceThreshold !== null
             ? parseFloat(props.provider.apiKeyLowBalanceThreshold)
             : 1000,
+        voiceCloneCreditsPerCall:
+          props.provider.voiceCloneCreditsPerCall !== undefined &&
+          props.provider.voiceCloneCreditsPerCall !== null
+            ? parseFloat(props.provider.voiceCloneCreditsPerCall)
+            : 0,
         mainAccountToken: props.provider.mainAccountToken || '',
         supportsApiKeyCreation:
           props.provider.supportsApiKeyCreation !== undefined
@@ -291,6 +310,7 @@ watch(
         quota: null,
         quotaUnit: null,
         apiKeyLowBalanceThreshold: 1000,
+        voiceCloneCreditsPerCall: 0,
         mainAccountToken: '',
         supportsApiKeyCreation: false,
         isActive: true

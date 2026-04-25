@@ -413,6 +413,64 @@
           <el-input v-model="cloneForm.audioUrl" placeholder="公网可访问音频文件URL" />
         </el-form-item>
 
+        <el-form-item label="音色示例链接">
+          <el-input v-model="cloneForm.sampleUrl" placeholder="可选，试听/展示用 URL（写入 sampleUrl）" />
+        </el-form-item>
+
+        <el-form-item label="头像URL">
+          <el-input v-model="cloneForm.avatarUrl" placeholder="可选，音色头像链接（写入 avatarUrl）" />
+        </el-form-item>
+
+        <el-form-item label="描述">
+          <el-input
+            v-model="cloneForm.description"
+            type="textarea"
+            :rows="2"
+            placeholder="可选，音色描述（写入 description）"
+          />
+        </el-form-item>
+
+        <el-form-item label="年龄" required>
+          <el-select
+            v-model="cloneForm.tagAge"
+            clearable
+            filterable
+            allow-create
+            default-first-option
+            style="width: 100%"
+            placeholder="选择或输入年龄范围（如 18-25 / 25-35 / 60+）"
+          >
+            <el-option label="0-12" value="0-12" />
+            <el-option label="13-17" value="13-17" />
+            <el-option label="18-25" value="18-25" />
+            <el-option label="26-35" value="26-35" />
+            <el-option label="36-45" value="36-45" />
+            <el-option label="46-60" value="46-60" />
+            <el-option label="60+" value="60+" />
+          </el-select>
+        </el-form-item>
+
+        <el-form-item label="性别" required>
+          <el-radio-group v-model="cloneForm.tagGender">
+            <el-radio label="male">male（男性）</el-radio>
+            <el-radio label="female">female（女性）</el-radio>
+          </el-radio-group>
+        </el-form-item>
+
+        <el-form-item label="特征词" required>
+          <el-select
+            v-model="cloneForm.tagTraits"
+            multiple
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            style="width: 100%"
+            placeholder="输入后回车，可多个（性格/外貌等）"
+          />
+          <div class="tip">至少填写 1 个特征词。</div>
+        </el-form-item>
+
         <el-form-item label="绑定模型（仅一个）" required>
           <el-select
             v-model="cloneForm.modelId"
@@ -535,6 +593,12 @@ const cloneForm = reactive({
   userApiKeyId: '',
   prefix: '',
   audioUrl: '',
+  sampleUrl: '',
+  avatarUrl: '',
+  description: '',
+  tagAge: '',
+  tagGender: '',
+  tagTraits: [],
   modelId: ''
 })
 
@@ -796,6 +860,12 @@ function openCloneDialog() {
     userApiKeyId: '',
     prefix: '',
     audioUrl: '',
+    sampleUrl: '',
+    avatarUrl: '',
+    description: '',
+    tagAge: '',
+    tagGender: '',
+    tagTraits: [],
     modelId: ''
   })
   cloneApis.value = []
@@ -848,15 +918,46 @@ async function submitClone() {
     ElMessage.warning('音色前缀仅支持英文字母与数字，不能含空格、下划线或中文等')
     return
   }
+  const age = String(cloneForm.tagAge || '').trim()
+  const gender = String(cloneForm.tagGender || '').trim()
+  const traits = [...new Set((cloneForm.tagTraits || []).map(x => String(x || '').trim()).filter(Boolean))]
+  if (!age) {
+    ElMessage.warning('请选择年龄范围')
+    return
+  }
+  if (!(gender === 'male' || gender === 'female')) {
+    ElMessage.warning('请选择性别（male/female）')
+    return
+  }
+  if (traits.length === 0) {
+    ElMessage.warning('请至少填写 1 个特征词')
+    return
+  }
   cloning.value = true
   try {
+    const parsedTags = [
+      { type: 'age', value: age },
+      { type: 'gender', value: gender },
+      ...traits.map(v => ({ type: 'trait', value: v }))
+    ]
+
     const res = await cloneVoiceProfile({
       providerId: cloneForm.providerId,
       apiPath: cloneForm.apiPath,
       userApiKeyId: cloneForm.userApiKeyId,
       prefix: prefixTrimmed,
       audioUrl: cloneForm.audioUrl,
-      modelId: cloneForm.modelId
+      modelId: cloneForm.modelId,
+      ...(String(cloneForm.sampleUrl || '').trim()
+        ? { sampleUrl: String(cloneForm.sampleUrl).trim() }
+        : {}),
+      ...(String(cloneForm.avatarUrl || '').trim()
+        ? { avatarUrl: String(cloneForm.avatarUrl).trim() }
+        : {}),
+      ...(String(cloneForm.description || '').trim()
+        ? { description: String(cloneForm.description).trim() }
+        : {}),
+      ...(parsedTags.length ? { tags: parsedTags } : {})
     })
     if (res.success) {
       ElMessage.success('克隆成功')

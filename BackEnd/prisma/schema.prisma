@@ -47,28 +47,29 @@ model EmailVerification {
 }
 
 model User {
-  id             String          @id @default(cuid())
-  email          String?         @unique
-  phone          String?         @unique
-  password       String?
-  status         String          @default("normal")
-  banReason      String?
-  banUntil       DateTime?
-  lastLoginAt    DateTime?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  role           String          @default("basic_user")
-  aiCallLogs     AICallLog[]
-  authorizations Authorization[]
-  devices        Device[]
-  oneTimeTokens  OneTimeToken[]
-  orders         Order[]
-  quotaRecords   QuotaRecord[]
-  refreshTokens  RefreshToken[]
-  apiKeys        UserApiKey[]
-  packages       UserPackage[]
-  quotas         UserQuota[]
-  voiceProfiles  VoiceProfile[]
+  id                   String                 @id @default(cuid())
+  email                String?                @unique
+  phone                String?                @unique
+  password             String?
+  status               String                 @default("normal")
+  banReason            String?
+  banUntil             DateTime?
+  lastLoginAt          DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  role                 String                 @default("basic_user")
+  aiCallLogs           AICallLog[]
+  authorizations       Authorization[]
+  devices              Device[]
+  oneTimeTokens        OneTimeToken[]
+  orders               Order[]
+  quotaRecords         QuotaRecord[]
+  refreshTokens        RefreshToken[]
+  apiKeys              UserApiKey[]
+  packages             UserPackage[]
+  quotas               UserQuota[]
+  voiceProfiles        VoiceProfile[]
+  voiceCloneCreditLogs VoiceCloneCreditLog[]
 
   @@index([email])
   @@index([phone])
@@ -160,14 +161,47 @@ model AIProvider {
   supportsApiKeyCreation    Boolean      @default(false)
   apiKeyLowBalanceThreshold Decimal      @default(1000.00) @db.Decimal(20, 2)
   voiceCloneApis            String?      @db.Text
+  /// 单次音色复刻（/api/voice-profiles/clone）从所选 UserApiKey 扣除的积分；0 表示不扣费
+  voiceCloneCreditsPerCall  Decimal      @default(0.00) @db.Decimal(20, 2)
   models                    AIModel[]
   userApiKeys               UserApiKey[]
+  voiceCloneCreditLogs      VoiceCloneCreditLog[]
 
   @@index([name])
   @@index([isActive])
   @@index([quotaUnit])
   @@index([supportsApiKeyCreation])
   @@map("ai_providers")
+}
+
+/// 音色复刻扣费流水（关联 UserApiKey.usedCredits）
+model VoiceCloneCreditLog {
+  id                 String        @id @default(cuid())
+  /// 发起克隆的登录用户（管理员或终端用户）
+  actorUserId        String?
+  userApiKeyId       String
+  providerId         String
+  voiceProfileId     String?
+  voiceId            String?
+  amountCharged      Decimal       @db.Decimal(20, 2)
+  keyCreditsCap      Decimal       @db.Decimal(20, 2)
+  usedCreditsBefore  Decimal       @db.Decimal(20, 2)
+  usedCreditsAfter   Decimal       @db.Decimal(20, 2)
+  /// charged | no_charge_configured | admin_exempt（管理员克隆不扣费，仅审计）
+  status             String
+  meta               String?       @db.Text
+  createdAt          DateTime      @default(now())
+  actorUser          User?         @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  userApiKey         UserApiKey    @relation(fields: [userApiKeyId], references: [id], onDelete: Cascade)
+  provider           AIProvider    @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  voiceProfile         VoiceProfile? @relation(fields: [voiceProfileId], references: [id], onDelete: SetNull)
+
+  @@index([userApiKeyId])
+  @@index([providerId])
+  @@index([actorUserId])
+  @@index([voiceProfileId])
+  @@index([createdAt])
+  @@map("voice_clone_credit_logs")
 }
 
 model AIModel {
@@ -254,8 +288,9 @@ model VoiceProfile {
   isModelLocked Boolean             @default(false)
   avatarUrl     String?
   tags          Json?
-  models        VoiceProfileModel[]
-  user          User?               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  models               VoiceProfileModel[]
+  user                 User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voiceCloneCreditLogs VoiceCloneCreditLog[]
 
   @@index([voiceId])
   @@index([scope])
@@ -489,9 +524,10 @@ model UserApiKey {
   updatedAt      DateTime        @updatedAt
   voiceLimit     Int             @default(0)
   usedCredits    Decimal         @default(0.00) @db.Decimal(20, 2)
-  authorizations Authorization[]
-  provider       AIProvider      @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  user           User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  authorizations       Authorization[]
+  provider             AIProvider            @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  user                 User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voiceCloneCreditLogs VoiceCloneCreditLog[]
 
   @@index([userId])
   @@index([providerId])

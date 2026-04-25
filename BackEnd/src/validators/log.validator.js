@@ -89,6 +89,10 @@ const getAICallLogsValidator = [
     .isString()
     .isLength({ max: 128 })
     .withMessage('requestId must be a string up to 128 characters'),
+  query('logType')
+    .optional()
+    .isIn(['all', 'model_call', 'voice_clone'])
+    .withMessage('logType must be all, model_call or voice_clone'),
   query('startDate')
     .optional()
     .isISO8601()

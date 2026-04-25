@@ -27,11 +27,23 @@
         </template>
       </el-table-column>
 
-      <el-table-column label="模型" min-width="140">
+      <el-table-column label="日志类型" width="120" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.logType === 'voice_clone' ? 'warning' : 'info'" effect="plain">
+            {{ row.logType === 'voice_clone' ? '声音复刻' : '模型调用' }}
+          </el-tag>
+        </template>
+      </el-table-column>
+
+      <el-table-column label="模型 / 音色" min-width="180">
         <template #default="{ row }">
           <div class="model-info" v-if="row.model">
             <div class="model-name">{{ row.model.displayName || row.model.name || row.modelId }}</div>
             <div class="model-provider" v-if="row.model.provider">{{ row.model.provider.displayName || row.model.provider.name }}</div>
+          </div>
+          <div v-else-if="row.logType === 'voice_clone'" class="model-info">
+            <div class="model-name">音色ID: {{ row.voiceId || '-' }}</div>
+            <div class="model-provider">复刻流水: {{ row.cloneStatus || '-' }}</div>
           </div>
           <span v-else class="text-muted">{{ row.modelId }}</span>
         </template>
@@ -39,7 +51,7 @@
 
       <el-table-column label="Token" width="120" align="center">
         <template #default="{ row }">
-          <span class="token-text">{{ row.totalTokens ?? '-' }}</span>
+          <span class="token-text">{{ row.logType === 'voice_clone' ? '-' : (row.totalTokens ?? '-') }}</span>
         </template>
       </el-table-column>
 

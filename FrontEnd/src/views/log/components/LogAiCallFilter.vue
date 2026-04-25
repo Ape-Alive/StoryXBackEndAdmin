@@ -34,6 +34,19 @@
       </template>
     </el-input>
     <div class="filter-group">
+      <label class="filter-label">日志类型</label>
+      <el-select
+        v-model="filters.logType"
+        placeholder="选择类型"
+        class="filter-select"
+        style="width: 160px"
+      >
+        <el-option label="全部" value="all" />
+        <el-option label="模型调用" value="model_call" />
+        <el-option label="声音复刻" value="voice_clone" />
+      </el-select>
+    </div>
+    <div class="filter-group">
       <label class="filter-label">调用状态</label>
       <el-select
         v-model="filters.status"
@@ -84,6 +97,7 @@ const filters = reactive({
   userId: props.modelValue.userId || '',
   modelId: props.modelValue.modelId || '',
   requestId: props.modelValue.requestId || '',
+  logType: props.modelValue.logType || 'all',
   status: props.modelValue.status,
   startDate: props.modelValue.startDate || '',
   endDate: props.modelValue.endDate || ''
@@ -97,6 +111,7 @@ watch(
     filters.userId = val.userId || ''
     filters.modelId = val.modelId || ''
     filters.requestId = val.requestId || ''
+    filters.logType = val.logType || 'all'
     filters.status = val.status
     filters.startDate = val.startDate || ''
     filters.endDate = val.endDate || ''

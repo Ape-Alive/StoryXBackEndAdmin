@@ -63,6 +63,7 @@ class LogController {
         modelId: req.query.modelId,
         status: req.query.status,
         requestId: req.query.requestId,
+        logType: req.query.logType,
         startDate: req.query.startDate,
         endDate: req.query.endDate
       };

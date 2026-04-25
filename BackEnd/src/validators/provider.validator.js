@@ -8,6 +8,10 @@ const getProvidersValidator = [
     .optional()
     .isInt({ min: 1 })
     .withMessage('Page must be a positive integer'),
+  query('includeAll')
+    .optional()
+    .isBoolean()
+    .withMessage('includeAll must be a boolean'),
   query('pageSize')
     .optional()
     .isInt({ min: 1, max: 1000 })
@@ -71,6 +75,10 @@ const createProviderValidator = [
     .optional()
     .isIn(['points'])
     .withMessage('Quota unit must be points (积分)'),
+  body('voiceCloneCreditsPerCall')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('voiceCloneCreditsPerCall must be a non-negative number'),
   body('supportsApiKeyCreation')
     .optional()
     .isBoolean()
@@ -137,6 +145,10 @@ const updateProviderValidator = [
     .optional({ nullable: true })
     .custom((v) => v === null || typeof v === 'string')
     .withMessage('voiceCloneApis must be a JSON string or null'),
+  body('voiceCloneCreditsPerCall')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('voiceCloneCreditsPerCall must be a non-negative number'),
   body('supportsApiKeyCreation')
     .optional()
     .isBoolean()

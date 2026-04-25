@@ -7,6 +7,54 @@ const prisma = require('../config/database');
  * AI调用服务
  */
 class AICallService {
+  normalizeUserModelCallLog(log) {
+    return {
+      ...log,
+      logType: 'model_call',
+      logTypeLabel: '模型调用'
+    }
+  }
+
+  normalizeUserVoiceCloneLog(log) {
+    let metaObj = null
+    if (log.meta) {
+      try {
+        metaObj = JSON.parse(log.meta)
+      } catch {
+        metaObj = null
+      }
+    }
+    const modelId = metaObj?.modelId || log.voiceProfile?.models?.[0]?.modelId || null
+
+    return {
+      id: log.id,
+      requestId: `voice_clone:${log.id}`,
+      userId: log.actorUserId,
+      modelId,
+      model: log.voiceProfile?.models?.[0]?.model || null,
+      inputTokens: null,
+      outputTokens: null,
+      totalTokens: null,
+      cost: log.amountCharged,
+      status: 'success',
+      errorMessage: null,
+      requestTime: log.createdAt,
+      responseTime: log.createdAt,
+      duration: null,
+      deviceFingerprint: null,
+      ipAddress: null,
+      logType: 'voice_clone',
+      logTypeLabel: '声音复刻',
+      cloneStatus: log.status,
+      voiceId: log.voiceId,
+      voiceProfileId: log.voiceProfileId,
+      userApiKeyId: log.userApiKeyId,
+      amountCharged: log.amountCharged,
+      usedCreditsBefore: log.usedCreditsBefore,
+      usedCreditsAfter: log.usedCreditsAfter
+    }
+  }
+
   /**
    * 上报调用结果
    */
@@ -356,44 +404,110 @@ class AICallService {
   async getUserCallLogs(userId, filters = {}, pagination = {}) {
     const { page = 1, pageSize = 20 } = pagination;
     const skip = (page - 1) * pageSize;
+    const logType = filters.logType || 'all'
 
-    const where = {
-      userId
-    };
+    const modelWhere = { userId }
+    const cloneWhere = { actorUserId: userId }
 
     if (filters.modelId) {
-      where.modelId = filters.modelId;
+      modelWhere.modelId = filters.modelId;
+      cloneWhere.meta = { contains: `"modelId":"${filters.modelId}"` }
     }
 
     if (filters.status) {
       // 将前端的状态映射到数据库状态（success/failure）
       // 数据库只支持 success 和 failure，其他状态都映射为 failure
       if (filters.status === 'success') {
-        where.status = 'success';
+        modelWhere.status = 'success';
       } else {
         // failed, failure, timeout, error 都映射为 failure
-        where.status = 'failure';
+        modelWhere.status = 'failure';
+        // 声音复刻日志当前只记录成功事件，失败态不返回
+        cloneWhere.id = '__no_match__'
       }
     }
 
     if (filters.startDate || filters.endDate) {
-      where.requestTime = {};
+      modelWhere.requestTime = {};
+      cloneWhere.createdAt = {}
       if (filters.startDate) {
-        where.requestTime.gte = new Date(filters.startDate);
+        modelWhere.requestTime.gte = new Date(filters.startDate);
+        cloneWhere.createdAt.gte = new Date(filters.startDate)
       }
       if (filters.endDate) {
-        where.requestTime.lte = new Date(filters.endDate);
+        modelWhere.requestTime.lte = new Date(filters.endDate);
+        cloneWhere.createdAt.lte = new Date(filters.endDate)
       }
     }
 
-    const [data, total] = await Promise.all([
+    if (logType === 'model_call') {
+      const [data, total] = await Promise.all([
+        prisma.aICallLog.findMany({
+          where: modelWhere,
+          skip,
+          take: pageSize,
+          orderBy: {
+            requestTime: 'desc'
+          },
+          include: {
+            model: {
+              include: {
+                provider: true
+              }
+            }
+          }
+        }),
+        prisma.aICallLog.count({ where: modelWhere })
+      ]);
+
+      return {
+        data: data.map((item) => this.normalizeUserModelCallLog(item)),
+        total,
+        page,
+        pageSize
+      };
+    }
+
+    if (logType === 'voice_clone') {
+      const [data, total] = await Promise.all([
+        prisma.voiceCloneCreditLog.findMany({
+          where: cloneWhere,
+          skip,
+          take: pageSize,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            voiceProfile: {
+              include: {
+                models: {
+                  include: {
+                    model: {
+                      include: {
+                        provider: true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }),
+        prisma.voiceCloneCreditLog.count({ where: cloneWhere })
+      ])
+
+      return {
+        data: data.map((item) => this.normalizeUserVoiceCloneLog(item)),
+        total,
+        page,
+        pageSize
+      }
+    }
+
+    const needTopN = page * pageSize
+    const [modelLogs, cloneLogs, modelTotal, cloneTotal] = await Promise.all([
       prisma.aICallLog.findMany({
-        where,
-        skip,
-        take: pageSize,
-        orderBy: {
-          requestTime: 'desc'
-        },
+        where: modelWhere,
+        take: needTopN,
+        orderBy: { requestTime: 'desc' },
         include: {
           model: {
             include: {
@@ -402,12 +516,40 @@ class AICallService {
           }
         }
       }),
-      prisma.aICallLog.count({ where })
-    ]);
+      prisma.voiceCloneCreditLog.findMany({
+        where: cloneWhere,
+        take: needTopN,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          voiceProfile: {
+            include: {
+              models: {
+                include: {
+                  model: {
+                    include: {
+                      provider: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }),
+      prisma.aICallLog.count({ where: modelWhere }),
+      prisma.voiceCloneCreditLog.count({ where: cloneWhere })
+    ])
+
+    const data = [
+      ...modelLogs.map((item) => this.normalizeUserModelCallLog(item)),
+      ...cloneLogs.map((item) => this.normalizeUserVoiceCloneLog(item))
+    ]
+      .sort((a, b) => new Date(b.requestTime).getTime() - new Date(a.requestTime).getTime())
+      .slice(skip, skip + pageSize)
 
     return {
       data,
-      total,
+      total: modelTotal + cloneTotal,
       page,
       pageSize
     };
@@ -417,8 +559,38 @@ class AICallService {
    * 获取调用日志详情
    */
   async getCallLogDetail(requestId, userId) {
+    const raw = String(requestId || '')
+    if (raw.startsWith('voice_clone:')) {
+      const id = raw.replace('voice_clone:', '')
+      const cloneLog = await prisma.voiceCloneCreditLog.findUnique({
+        where: { id },
+        include: {
+          voiceProfile: {
+            include: {
+              models: {
+                include: {
+                  model: {
+                    include: {
+                      provider: true
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      })
+      if (!cloneLog) {
+        throw new NotFoundError('Call log not found');
+      }
+      if (cloneLog.actorUserId !== userId) {
+        throw new ForbiddenError('Call log does not belong to user');
+      }
+      return this.normalizeUserVoiceCloneLog(cloneLog)
+    }
+
     const log = await prisma.aICallLog.findUnique({
-      where: { requestId },
+      where: { requestId: raw },
       include: {
         model: {
           include: {

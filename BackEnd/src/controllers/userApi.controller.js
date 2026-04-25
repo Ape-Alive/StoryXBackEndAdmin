@@ -143,6 +143,7 @@ class UserApiController {
       const userId = req.user.id;
       const filters = {
         modelId: req.query.modelId,
+        logType: req.query.logType,
         status: req.query.status,
         startDate: req.query.startDate,
         endDate: req.query.endDate

@@ -8,6 +8,11 @@ class ProviderRepository {
    * 获取提供商列表（分页）
    */
   async findProviders(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}) {
+    const includeAll =
+      pagination.includeAll === true ||
+      pagination.includeAll === 'true' ||
+      pagination.includeAll === '1' ||
+      pagination.includeAll === 1;
     const { page = 1, pageSize = 20 } = pagination;
     const skip = (page - 1) * pageSize;
 
@@ -44,8 +49,7 @@ class ProviderRepository {
     const [data, total] = await Promise.all([
       prisma.aIProvider.findMany({
         where,
-        skip,
-        take: pageSize,
+        ...(includeAll ? {} : { skip, take: pageSize }),
         orderBy,
         include: {
           _count: {
@@ -94,8 +98,8 @@ class ProviderRepository {
     return {
       data: withQuota,
       total,
-      page,
-      pageSize
+      page: includeAll ? 1 : page,
+      pageSize: includeAll ? Math.max(total, 1) : pageSize
     };
   }
 
@@ -154,6 +158,10 @@ class ProviderRepository {
         apiKeyLowBalanceThreshold:
           data.apiKeyLowBalanceThreshold !== undefined ? data.apiKeyLowBalanceThreshold : 1000,
         voiceCloneApis: data.voiceCloneApis || null,
+        voiceCloneCreditsPerCall:
+          data.voiceCloneCreditsPerCall !== undefined && data.voiceCloneCreditsPerCall !== null
+            ? data.voiceCloneCreditsPerCall
+            : 0,
         isActive: data.isActive !== undefined ? data.isActive : true
       }
     });
@@ -180,6 +188,9 @@ class ProviderRepository {
       updateData.apiKeyLowBalanceThreshold = data.apiKeyLowBalanceThreshold;
     }
     if (data.voiceCloneApis !== undefined) updateData.voiceCloneApis = data.voiceCloneApis || null;
+    if (data.voiceCloneCreditsPerCall !== undefined) {
+      updateData.voiceCloneCreditsPerCall = data.voiceCloneCreditsPerCall
+    }
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
 
     updateData.updatedAt = new Date();

@@ -9,6 +9,7 @@ import request from './request'
  * @param {string} params.modelId - 模型ID筛选
  * @param {string} params.status - 调用状态 success|failure
  * @param {string} params.requestId - 请求ID
+ * @param {string} params.logType - 日志类型 all|model_call|voice_clone
  * @param {string} params.startDate - 开始日期 ISO 8601
  * @param {string} params.endDate - 结束日期 ISO 8601
  */

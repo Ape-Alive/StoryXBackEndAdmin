@@ -43,6 +43,7 @@ router.use(authenticate)
  *       **分页说明**：
  *       - page：页码，从1开始，默认1
  *       - pageSize：每页数量，默认20，建议不超过100
+ *       - **includeAll**：可选布尔。为 `true` 时**忽略分页**，一次性返回当前筛选条件下的**全部**提供商（`data` 为全量；`pagination.pageSize` 等于 `total`）
  *
  *       **排序说明**：
  *       - 默认按创建时间降序排列（最新的在前）
@@ -52,6 +53,7 @@ router.use(authenticate)
  *       - 仅获取启用的提供商：`GET /api/providers?isActive=true`
  *       - 搜索提供商：`GET /api/providers?name=DeepSeek`
  *       - 组合筛选：`GET /api/providers?isActive=true&page=1&pageSize=20`
+ *       - 全量列表（不分页）：`GET /api/providers?includeAll=true`
  *     tags: [提供商管理]
  *     security:
  *       - bearerAuth: []
@@ -64,6 +66,13 @@ router.use(authenticate)
  *           minimum: 1
  *         description: 页码（从1开始）
  *         example: 1
+ *       - in: query
+ *         name: includeAll
+ *         schema:
+ *           type: boolean
+ *           default: false
+ *         description: 为 true 时忽略分页，返回全部匹配记录
+ *         example: true
  *       - in: query
  *         name: pageSize
  *         schema:
