@@ -57,9 +57,17 @@ if [[ ! -d "${RELEASE_DIR}/backend" || ! -d "${RELEASE_DIR}/frontend/dist" ]]; t
   exit 1
 fi
 
+mkdir -p "${BACKEND_DIR}" "${FRONTEND_DIR}/dist"
+
+if [[ ! -w "${BACKEND_DIR}" ]]; then
+  echo "ERROR: ${BACKEND_DIR} is not writable by $(whoami)."
+  echo "On server as root run:"
+  echo "  chown -R deploy:deploy ${DEPLOY_PATH}"
+  exit 1
+fi
+
 if [[ ! -f "${BACKEND_DIR}/.env" && ! -f "${RELEASE_DIR}/backend/.env" ]]; then
   if [[ -f "${DEPLOY_PATH}/.env" ]]; then
-    mkdir -p "${BACKEND_DIR}"
     cp "${DEPLOY_PATH}/.env" "${BACKEND_DIR}/.env"
   else
     echo "Missing backend .env. Create ${BACKEND_DIR}/.env on the server first."
@@ -67,14 +75,16 @@ if [[ ! -f "${BACKEND_DIR}/.env" && ! -f "${RELEASE_DIR}/backend/.env" ]]; then
   fi
 fi
 
+# -a 会尝试改 owner/group；deploy 用户通常无权限，改为不保留属主
+RSYNC_OPTS=(-a --no-owner --no-group --delete)
+
 echo "==> Sync backend code (preserve .env / uploads / logs)"
-mkdir -p "${BACKEND_DIR}"
-rsync -a \
-  --delete \
+rsync "${RSYNC_OPTS[@]}" \
   --exclude .env \
   --exclude node_modules \
   --exclude uploads \
   --exclude logs \
+  --exclude 'storyx-admin_start.sh' \
   "${RELEASE_DIR}/backend/" "${BACKEND_DIR}/"
 
 if [[ ! -f "${BACKEND_DIR}/.env" && -f "${DEPLOY_PATH}/.env" ]]; then
@@ -82,8 +92,7 @@ if [[ ! -f "${BACKEND_DIR}/.env" && -f "${DEPLOY_PATH}/.env" ]]; then
 fi
 
 echo "==> Sync frontend dist"
-mkdir -p "${FRONTEND_DIR}"
-rsync -a --delete "${RELEASE_DIR}/frontend/dist/" "${FRONTEND_DIR}/dist/"
+rsync "${RSYNC_OPTS[@]}" "${RELEASE_DIR}/frontend/dist/" "${FRONTEND_DIR}/dist/"
 
 echo "==> Install backend dependencies"
 cd "${BACKEND_DIR}"
