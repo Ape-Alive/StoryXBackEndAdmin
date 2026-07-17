@@ -37,6 +37,16 @@ const menuMap = buildMenuMap()
 // 生成面包屑
 function generateBreadcrumb() {
   const path = route.path
+  const menuItem = menuMap[path]
+
+  if (menuItem) {
+    breadcrumbList.value = [
+      { title: menuItem.parent, path: null },
+      { title: menuItem.title, path }
+    ]
+    return
+  }
+
   const matched = route.matched
   const list = []
 

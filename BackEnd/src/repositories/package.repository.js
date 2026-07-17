@@ -1,4 +1,4 @@
-const prisma = require('../config/database');
+const prisma = require('../config/database')
 
 /**
  * 套餐数据访问层
@@ -8,47 +8,44 @@ class PackageRepository {
    * 获取套餐列表（分页）
    */
   async findPackages(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}) {
-    const { page = 1, pageSize = 20 } = pagination;
-    const skip = (page - 1) * pageSize;
+    const { page = 1, pageSize = 20 } = pagination
+    const skip = (page - 1) * pageSize
 
-    const where = {};
+    const where = {}
 
     if (filters.name || filters.displayName) {
-      where.OR = [
-        { name: { contains: filters.name } },
-        { displayName: { contains: filters.displayName } }
-      ];
+      where.OR = [{ name: { contains: filters.name } }, { displayName: { contains: filters.displayName } }]
     }
 
     if (filters.type) {
-      where.type = filters.type;
+      where.type = filters.type
     }
 
     if (filters.isActive !== undefined) {
-      where.isActive = filters.isActive === 'true' || filters.isActive === true;
+      where.isActive = filters.isActive === 'true' || filters.isActive === true
     }
 
     if (filters.isStackable !== undefined) {
-      where.isStackable = filters.isStackable === 'true' || filters.isStackable === true;
+      where.isStackable = filters.isStackable === 'true' || filters.isStackable === true
     }
 
     if (filters.createdAt) {
-      where.createdAt = {};
+      where.createdAt = {}
       if (filters.createdAt.gte) {
-        where.createdAt.gte = new Date(filters.createdAt.gte);
+        where.createdAt.gte = new Date(filters.createdAt.gte)
       }
       if (filters.createdAt.lte) {
-        where.createdAt.lte = new Date(filters.createdAt.lte);
+        where.createdAt.lte = new Date(filters.createdAt.lte)
       }
     }
 
-    const orderBy = {};
+    const orderBy = {}
     if (sort.createdAt) {
-      orderBy.createdAt = sort.createdAt;
+      orderBy.createdAt = sort.createdAt
     } else if (sort.priority) {
-      orderBy.priority = sort.priority;
+      orderBy.priority = sort.priority
     } else {
-      orderBy.createdAt = 'desc';
+      orderBy.createdAt = 'desc'
     }
 
     const [data, total] = await Promise.all([
@@ -61,30 +58,38 @@ class PackageRepository {
           _count: {
             select: {
               userPackages: true,
-              quotaRecords: true
-            }
-          }
-        }
+              quotaRecords: true,
+            },
+          },
+          clientRole: {
+            select: {
+              id: true,
+              roleKey: true,
+              name: true,
+              priority: true,
+            },
+          },
+        },
       }),
-      prisma.package.count({ where })
-    ]);
+      prisma.package.count({ where }),
+    ])
 
-    const formattedData = data.map(item => {
+    const formattedData = data.map((item) => {
       // 确保 availableModels 字段被正确保留
-      const { _count, ...rest } = item;
+      const { _count, ...rest } = item
       return {
         ...rest,
         userCount: _count.userPackages,
-        quotaRecordCount: _count.quotaRecords
-      };
-    });
+        quotaRecordCount: _count.quotaRecords,
+      }
+    })
 
     return {
       data: formattedData,
       total,
       page,
-      pageSize
-    };
+      pageSize,
+    }
   }
 
   /**
@@ -92,8 +97,18 @@ class PackageRepository {
    */
   async findById(id) {
     return await prisma.package.findUnique({
-      where: { id }
-    });
+      where: { id },
+      include: {
+        clientRole: {
+          select: {
+            id: true,
+            roleKey: true,
+            name: true,
+            priority: true,
+          },
+        },
+      },
+    })
   }
 
   /**
@@ -102,8 +117,8 @@ class PackageRepository {
   async findByName(name) {
     // name 在业务上应唯一，但数据库层面目前只是普通索引，这里使用 findFirst 以避免 Prisma 唯一约束错误
     return await prisma.package.findFirst({
-      where: { name }
-    });
+      where: { name },
+    })
   }
 
   /**
@@ -126,13 +141,13 @@ class PackageRepository {
         // availableModels: null 或空数组表示所有模型都可用
         // 处理 availableModels：如果是数组且长度>0，转换为JSON字符串；否则为null
         availableModels: (() => {
-          const models = data.availableModels;
+          const models = data.availableModels
           // 如果是字符串，尝试解析
           if (typeof models === 'string' && models.trim() !== '') {
             try {
-              const parsed = JSON.parse(models);
+              const parsed = JSON.parse(models)
               if (Array.isArray(parsed) && parsed.length > 0) {
-                return JSON.stringify(parsed);
+                return JSON.stringify(parsed)
               }
             } catch (e) {
               // 解析失败，返回 null
@@ -140,65 +155,71 @@ class PackageRepository {
           }
           // 如果是数组且长度>0，转换为JSON字符串
           if (Array.isArray(models) && models.length > 0) {
-            return JSON.stringify(models);
+            return JSON.stringify(models)
           }
           // 其他情况（null、undefined、空数组、空字符串）都返回 null
-          return null;
+          return null
         })(),
         isStackable: data.isStackable !== undefined ? data.isStackable : false,
         priority: data.priority || 0,
-        isActive: data.isActive !== undefined ? data.isActive : true
-      }
-    });
+        isActive: data.isActive !== undefined ? data.isActive : true,
+        clientRoleId: data.clientRoleId || null,
+        isRecommend: data.isRecommend !== undefined ? data.isRecommend : false,
+        guideScene: data.guideScene || null,
+      },
+    })
   }
 
   /**
    * 更新套餐
    */
   async update(id, data) {
-    const updateData = {};
+    const updateData = {}
 
-    if (data.displayName !== undefined) updateData.displayName = data.displayName;
-    if (data.description !== undefined) updateData.description = data.description;
-    if (data.type !== undefined) updateData.type = data.type;
-    if (data.duration !== undefined) updateData.duration = data.duration;
-    if (data.durationUnit !== undefined) updateData.durationUnit = data.durationUnit;
-    if (data.quota !== undefined) updateData.quota = data.quota;
-    if (data.price !== undefined) updateData.price = data.price;
-    if (data.priceUnit !== undefined) updateData.priceUnit = data.priceUnit;
-    if (data.discount !== undefined) updateData.discount = data.discount;
-    if (data.maxDevices !== undefined) updateData.maxDevices = data.maxDevices;
+    if (data.displayName !== undefined) updateData.displayName = data.displayName
+    if (data.description !== undefined) updateData.description = data.description
+    if (data.type !== undefined) updateData.type = data.type
+    if (data.duration !== undefined) updateData.duration = data.duration
+    if (data.durationUnit !== undefined) updateData.durationUnit = data.durationUnit
+    if (data.quota !== undefined) updateData.quota = data.quota
+    if (data.price !== undefined) updateData.price = data.price
+    if (data.priceUnit !== undefined) updateData.priceUnit = data.priceUnit
+    if (data.discount !== undefined) updateData.discount = data.discount
+    if (data.maxDevices !== undefined) updateData.maxDevices = data.maxDevices
     if (data.availableModels !== undefined) {
       // availableModels: null 或空数组表示所有模型都可用
       // 处理 availableModels：如果是数组且长度>0，转换为JSON字符串；否则为null
-      const models = data.availableModels;
+      const models = data.availableModels
       if (typeof models === 'string' && models.trim() !== '') {
         try {
-          const parsed = JSON.parse(models);
+          const parsed = JSON.parse(models)
           if (Array.isArray(parsed) && parsed.length > 0) {
-            updateData.availableModels = JSON.stringify(parsed);
+            updateData.availableModels = JSON.stringify(parsed)
           } else {
-            updateData.availableModels = null;
+            updateData.availableModels = null
           }
         } catch (e) {
-          updateData.availableModels = null;
+          updateData.availableModels = null
         }
       } else if (Array.isArray(models) && models.length > 0) {
-        updateData.availableModels = JSON.stringify(models);
+        updateData.availableModels = JSON.stringify(models)
       } else {
-        updateData.availableModels = null;
+        updateData.availableModels = null
       }
     }
-    if (data.isStackable !== undefined) updateData.isStackable = data.isStackable;
-    if (data.priority !== undefined) updateData.priority = data.priority;
-    if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.isStackable !== undefined) updateData.isStackable = data.isStackable
+    if (data.priority !== undefined) updateData.priority = data.priority
+    if (data.isActive !== undefined) updateData.isActive = data.isActive
+    if (data.clientRoleId !== undefined) updateData.clientRoleId = data.clientRoleId
+    if (data.isRecommend !== undefined) updateData.isRecommend = data.isRecommend
+    if (data.guideScene !== undefined) updateData.guideScene = data.guideScene
 
-    updateData.updatedAt = new Date();
+    updateData.updatedAt = new Date()
 
     return await prisma.package.update({
       where: { id },
-      data: updateData
-    });
+      data: updateData,
+    })
   }
 
   /**
@@ -206,8 +227,8 @@ class PackageRepository {
    */
   async delete(id) {
     return await prisma.package.delete({
-      where: { id }
-    });
+      where: { id },
+    })
   }
 
   /**
@@ -215,9 +236,9 @@ class PackageRepository {
    */
   async hasUsers(id) {
     const count = await prisma.userPackage.count({
-      where: { packageId: id }
-    });
-    return count > 0;
+      where: { packageId: id },
+    })
+    return count > 0
   }
 
   /**
@@ -225,11 +246,11 @@ class PackageRepository {
    */
   async duplicate(id, newName, newDisplayName) {
     const original = await prisma.package.findUnique({
-      where: { id }
-    });
+      where: { id },
+    })
 
     if (!original) {
-      throw new Error('Package not found');
+      throw new Error('Package not found')
     }
 
     return await prisma.package.create({
@@ -248,9 +269,9 @@ class PackageRepository {
         availableModels: original.availableModels,
         isStackable: original.isStackable,
         priority: original.priority,
-        isActive: false // 复制的套餐默认不启用
-      }
-    });
+        isActive: false, // 复制的套餐默认不启用
+      },
+    })
   }
 
   /**
@@ -259,18 +280,18 @@ class PackageRepository {
   async batchUpdate(ids, data) {
     const result = await prisma.package.updateMany({
       where: {
-        id: { in: ids }
+        id: { in: ids },
       },
       data: {
         ...data,
-        updatedAt: new Date()
-      }
-    });
+        updatedAt: new Date(),
+      },
+    })
 
     return {
       count: result.count,
-      ids: ids
-    };
+      ids: ids,
+    }
   }
 
   /**
@@ -279,14 +300,14 @@ class PackageRepository {
   async batchDelete(ids) {
     const result = await prisma.package.deleteMany({
       where: {
-        id: { in: ids }
-      }
-    });
+        id: { in: ids },
+      },
+    })
 
     return {
       count: result.count,
-      ids: ids
-    };
+      ids: ids,
+    }
   }
 
   /**
@@ -295,16 +316,16 @@ class PackageRepository {
   async findPackagesInUse(ids) {
     const userPackages = await prisma.userPackage.findMany({
       where: {
-        packageId: { in: ids }
+        packageId: { in: ids },
       },
       select: {
-        packageId: true
+        packageId: true,
       },
-      distinct: ['packageId']
-    });
+      distinct: ['packageId'],
+    })
 
-    return userPackages.map(up => up.packageId);
+    return userPackages.map((up) => up.packageId)
   }
 }
 
-module.exports = new PackageRepository();
+module.exports = new PackageRepository()

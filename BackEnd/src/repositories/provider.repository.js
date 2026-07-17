@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { mergeWhereWithRoleVisibility } = require('../utils/catalogRoleBinding');
 
 /**
  * 提供商数据访问层
@@ -7,7 +8,7 @@ class ProviderRepository {
   /**
    * 获取提供商列表（分页）
    */
-  async findProviders(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}) {
+  async findProviders(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}, roleVisibilityWhere = null) {
     const includeAll =
       pagination.includeAll === true ||
       pagination.includeAll === 'true' ||
@@ -16,7 +17,7 @@ class ProviderRepository {
     const { page = 1, pageSize = 20 } = pagination;
     const skip = (page - 1) * pageSize;
 
-    const where = {};
+    let where = {};
 
     if (filters.name || filters.displayName) {
       where.OR = [
@@ -38,6 +39,8 @@ class ProviderRepository {
         where.createdAt.lte = new Date(filters.createdAt.lte);
       }
     }
+
+    where = mergeWhereWithRoleVisibility(where, roleVisibilityWhere);
 
     const orderBy = {};
     if (sort.createdAt) {
@@ -170,7 +173,8 @@ class ProviderRepository {
   /**
    * 更新提供商
    */
-  async update(id, data) {
+  async update(id, data, tx = null) {
+    const db = tx || prisma;
     const updateData = {};
 
     if (data.displayName !== undefined) updateData.displayName = data.displayName;
@@ -192,10 +196,11 @@ class ProviderRepository {
       updateData.voiceCloneCreditsPerCall = data.voiceCloneCreditsPerCall
     }
     if (data.isActive !== undefined) updateData.isActive = data.isActive;
+    if (data.clientRoleBindAll !== undefined) updateData.clientRoleBindAll = data.clientRoleBindAll;
 
     updateData.updatedAt = new Date();
 
-    return await prisma.aIProvider.update({
+    return await db.aIProvider.update({
       where: { id },
       data: updateData
     });

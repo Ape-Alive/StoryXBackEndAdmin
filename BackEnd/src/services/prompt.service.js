@@ -1,5 +1,15 @@
 const promptRepository = require('../repositories/prompt.repository');
 const promptCategoryRepository = require('../repositories/promptCategory.repository');
+const {
+  TARGET_TYPES,
+  buildVisibleWhereForRole,
+  mergeWhereWithRoleVisibility,
+  enrichItemsWithRoleBindings,
+  enrichItemWithRoleBindings,
+  parseOptionalRoleBindingInput,
+  applyRoleBindingFields,
+  hasRoleBindingInput,
+} = require('../utils/catalogRoleBinding');
 const { NotFoundError, ConflictError, BadRequestError, ForbiddenError } = require('../utils/errors');
 const { ROLES } = require('../constants/roles');
 
@@ -43,7 +53,7 @@ class PromptService {
    * @param {String} userRole - 用户角色
    * @param {String} userId - 用户ID（终端用户需要）
    */
-  async getPrompts(filters = {}, pagination = {}, sort = {}, userRole = null, userId = null) {
+  async getPrompts(filters = {}, pagination = {}, sort = {}, userRole = null, userId = null, catalogRoleContext = null) {
     // 如果是终端用户，只能看到：
     // 1. system 类型的提示词（可查看）
     // 2. system_user 类型的提示词（可查看）
@@ -85,7 +95,20 @@ class PromptService {
     // 管理员可以看到所有类型的提示词
     // 如果不传 type，返回所有类型；如果传了 type，返回指定类型
 
-    return await promptRepository.findPrompts(filters, pagination, sort);
+    let roleVisibilityWhere = null;
+    if (catalogRoleContext) {
+      const roleWhere = await buildVisibleWhereForRole(
+        TARGET_TYPES.PROMPT,
+        catalogRoleContext.effectiveRoleId,
+      );
+      roleVisibilityWhere = userRole && isTerminalUserRole(userRole) && userId
+        ? { OR: [{ type: 'user', userId }, roleWhere] }
+        : roleWhere;
+    }
+
+    const result = await promptRepository.findPrompts(filters, pagination, sort, roleVisibilityWhere);
+    result.data = await enrichItemsWithRoleBindings(TARGET_TYPES.PROMPT, result.data);
+    return result;
   }
 
   /**
@@ -94,13 +117,13 @@ class PromptService {
    * @param {String} userRole - 用户角色
    * @param {String} userId - 用户ID（终端用户需要）
    */
-  async getPromptDetail(id, userRole = null, userId = null) {
+  async getPromptDetail(id, userRole = null, userId = null, catalogRoleContext = null) {
     const prompt = await promptRepository.findById(id);
     if (!prompt) {
       throw new NotFoundError('Prompt not found');
     }
 
-    // 权限检查：终端用户只能查看system、system_user类型和自己的user类型
+    // 权限检查：终端用户只能查看 system / system_user / 自己的 user 提示词
     if (userRole && isTerminalUserRole(userRole)) {
       const canView =
         prompt.type === 'system' ||
@@ -109,6 +132,27 @@ class PromptService {
 
       if (!canView) {
         throw new ForbiddenError('Permission denied');
+      }
+    }
+
+    // catalog 角色可见性：type=user JWT 强制；本人 user 提示词除外
+    if (catalogRoleContext) {
+      if (prompt.type === 'user') {
+        if (prompt.userId !== (userId || catalogRoleContext.userId)) {
+          throw new NotFoundError('Prompt not found');
+        }
+      } else {
+        const prisma = require('../config/database');
+        const roleWhere = await buildVisibleWhereForRole(
+          TARGET_TYPES.PROMPT,
+          catalogRoleContext.effectiveRoleId,
+        );
+        const visible = await prisma.prompt.findFirst({
+          where: mergeWhereWithRoleVisibility({ id }, roleWhere),
+        });
+        if (!visible) {
+          throw new NotFoundError('Prompt not found');
+        }
       }
     }
 
@@ -121,7 +165,7 @@ class PromptService {
       }
     }
 
-    return prompt;
+    return enrichItemWithRoleBindings(TARGET_TYPES.PROMPT, prompt);
   }
 
   /**
@@ -172,6 +216,10 @@ class PromptService {
     // 权限检查：带有"系统"的类型只能管理员创建
     if (isSystemType(data.type) && !isAdmin) {
       throw new ForbiddenError('Only admin can create system-related prompts');
+    }
+
+    if (!isAdmin && hasRoleBindingInput(data)) {
+      throw new ForbiddenError('Only admin can set catalog role bindings');
     }
 
     // 终端用户提示词（user）必须设置 userId，且只能终端用户创建
@@ -268,6 +316,7 @@ class PromptService {
     const updatedBy = adminId || userId || null;
 
     // 批量 or 单条创建（事务保证一致性，同时写入初始版本）
+    const bindingInput = parseOptionalRoleBindingInput(data);
     const created = await prisma.$transaction(async tx => {
       const results = [];
 
@@ -295,7 +344,8 @@ class PromptService {
             version: 1,
             isActive: data.isActive !== undefined ? data.isActive : true,
             isStylePrompt: data.isStylePrompt === true,
-            stylePromptKey: data.isStylePrompt ? (data.stylePromptKey || null) : null
+            stylePromptKey: data.isStylePrompt ? (data.stylePromptKey || null) : null,
+            clientRoleBindAll: bindingInput?.clientRoleBindAll ?? true,
           },
           include: {
             category: true,
@@ -304,6 +354,10 @@ class PromptService {
             }
           }
         });
+
+        if (bindingInput) {
+          await applyRoleBindingFields(tx, TARGET_TYPES.PROMPT, prompt.id, data, tx.prompt);
+        }
 
         await tx.promptVersion.create({
           data: {
@@ -335,7 +389,9 @@ class PromptService {
       }
     }
 
-    return wantsBatch ? created : created[0];
+    return wantsBatch
+      ? enrichItemsWithRoleBindings(TARGET_TYPES.PROMPT, created)
+      : enrichItemWithRoleBindings(TARGET_TYPES.PROMPT, created[0]);
   }
 
   /**
@@ -358,6 +414,10 @@ class PromptService {
     // 权限检查：带有"系统"的类型只能管理员更新
     if (isSystemType(prompt.type) && !isAdmin) {
       throw new ForbiddenError('Only admin can update system-related prompts');
+    }
+
+    if (!isAdmin && hasRoleBindingInput(data)) {
+      throw new ForbiddenError('Only admin can set catalog role bindings');
     }
 
     // 终端用户提示词（user）：只能更新自己的，管理员可以更新所有
@@ -411,7 +471,20 @@ class PromptService {
       data.stylePromptKey = null;
     }
 
-    const updated = await promptRepository.update(id, data, adminId || userId);
+    const bindingInput = parseOptionalRoleBindingInput(data);
+    const prisma = require('../config/database');
+    const updated = await prisma.$transaction(async tx => {
+      const row = await promptRepository.update(id, {
+        ...data,
+        ...(bindingInput ? { clientRoleBindAll: bindingInput.clientRoleBindAll } : {}),
+      }, adminId || userId, tx);
+
+      if (bindingInput) {
+        await applyRoleBindingFields(tx, TARGET_TYPES.PROMPT, id, data, tx.prompt);
+      }
+
+      return row;
+    });
 
     // 记录操作日志
     if (isAdmin) {
@@ -426,7 +499,7 @@ class PromptService {
       });
     }
 
-    return updated;
+    return enrichItemWithRoleBindings(TARGET_TYPES.PROMPT, updated);
   }
 
   /**

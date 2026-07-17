@@ -2,9 +2,17 @@ const express = require('express');
 const router = express.Router();
 const userApiKeyController = require('../controllers/userApiKey.controller');
 const { createUserApiKeyValidator } = require('../validators/userApiKey.validator');
-const { authenticate, authorize } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
+const { requireEntitlement } = require('../middleware/entitlement');
+const { requireTerminalUser } = require('../middleware/terminalUser');
+const { requireAnyClientPermission } = require('../middleware/clientPermission');
+const { CLIENT_API_PERMISSIONS } = require('../constants/clientApiPermissions');
 const validate = require('../middleware/validate');
-const { ROLES } = require('../constants/roles');
+
+router.use(authenticate);
+router.use(requireTerminalUser);
+router.use(requireEntitlement);
+router.use(requireAnyClientPermission(...CLIENT_API_PERMISSIONS.API_KEY_MANAGE));
 
 /**
  * @swagger
@@ -38,8 +46,6 @@ const { ROLES } = require('../constants/roles');
  */
 router.get(
   '/',
-  authenticate,
-  authorize(ROLES.USER, ROLES.BASIC_USER),
   userApiKeyController.getUserApiKeys.bind(userApiKeyController)
 );
 
@@ -64,8 +70,6 @@ router.get(
  */
 router.get(
   '/:id',
-  authenticate,
-  authorize(ROLES.USER, ROLES.BASIC_USER),
   userApiKeyController.getApiKeyDetail.bind(userApiKeyController)
 );
 
@@ -97,8 +101,6 @@ router.get(
  */
 router.post(
   '/',
-  authenticate,
-  authorize(ROLES.USER, ROLES.BASIC_USER),
   createUserApiKeyValidator,
   validate,
   userApiKeyController.createUserApiKey.bind(userApiKeyController)
@@ -125,8 +127,6 @@ router.post(
  */
 router.delete(
   '/:id',
-  authenticate,
-  authorize(ROLES.USER, ROLES.BASIC_USER),
   userApiKeyController.deleteUserApiKey.bind(userApiKeyController)
 );
 

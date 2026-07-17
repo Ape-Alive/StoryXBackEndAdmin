@@ -213,6 +213,25 @@ class UserApiKeyRepository {
   }
 
   /**
+   * 作废指定用户+套餐下、指定提供商的系统创建 API Key（续期轮换旧 Key 用）
+   */
+  async revokeSystemKeysByUserPackageProviders(userId, packageId, providerIds = []) {
+    if (!Array.isArray(providerIds) || providerIds.length === 0) {
+      return { count: 0 }
+    }
+    return prisma.userApiKey.updateMany({
+      where: {
+        userId,
+        packageId,
+        providerId: { in: providerIds },
+        type: 'system_created',
+        status: { in: ['active', 'expired'] },
+      },
+      data: { status: 'revoked' },
+    })
+  }
+
+  /**
    * 更新套餐关联的API Key过期时间
    * @param {string} userId - 用户ID
    * @param {string} packageId - 套餐ID

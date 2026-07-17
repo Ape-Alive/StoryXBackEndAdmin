@@ -18,7 +18,7 @@ class PaymentController {
         return ResponseHandler.error(res, 'Payment method is required', 400);
       }
 
-      const payment = await paymentService.createPayment(orderId, paymentMethod, extra);
+      const payment = await paymentService.createPayment(orderId, userId, paymentMethod, extra);
       return ResponseHandler.success(res, payment, 'Payment created successfully', 201);
     } catch (error) {
       next(error);

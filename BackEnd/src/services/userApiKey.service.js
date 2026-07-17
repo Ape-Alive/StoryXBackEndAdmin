@@ -296,6 +296,21 @@ class UserApiKeyService {
   }
 
   /**
+   * 续期/重新开通时：作废该套餐下旧系统 Key，并在上游（如 Grsai）创建新子 Key
+   */
+  async rotateSystemApiKeysForPackage(userId, packageId, providerIds = []) {
+    if (!Array.isArray(providerIds) || providerIds.length === 0) {
+      return { revoked: 0 }
+    }
+    const result = await userApiKeyRepository.revokeSystemKeysByUserPackageProviders(
+      userId,
+      packageId,
+      providerIds
+    )
+    return { revoked: result?.count ?? 0 }
+  }
+
+  /**
    * 获取提供商的API Key列表（管理员）
    */
   async getProviderApiKeys(providerId, filters = {}) {

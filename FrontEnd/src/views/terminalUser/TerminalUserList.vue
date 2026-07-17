@@ -116,10 +116,10 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="角色" width="120" align="center">
+        <el-table-column label="角色" min-width="140" align="center">
           <template #default="{ row }">
-            <el-tag :type="getRoleTagType(row.role)" size="small">
-              {{ getRoleLabel(row.role) }}
+            <el-tag :type="getRoleTagType(row)" size="small">
+              {{ getRoleLabel(row) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -513,21 +513,37 @@ function getAvatarColor(email) {
   return colors[Math.abs(hash) % colors.length]
 }
 
-// 角色标签
-function getRoleTagType(role) {
+// 角色标签：优先展示套餐有效客户端角色，其次回退 users.role
+function getRoleKey(row) {
+  return row?.effectiveClientRole?.roleKey || row?.role || ''
+}
+
+function getRoleTagType(row) {
   const map = {
+    enterprise_team_user: 'danger',
+    package_paid_user: 'success',
+    software_paid_user: 'success',
+    software_trial_user: 'warning',
     user: 'primary',
     basic_user: 'info'
   }
-  return map[role] || 'info'
+  return map[getRoleKey(row)] || 'info'
 }
 
-function getRoleLabel(role) {
+function getRoleLabel(row) {
+  if (row?.effectiveClientRole?.name) {
+    return row.effectiveClientRole.name
+  }
   const map = {
+    enterprise_team_user: '企业团队用户',
+    package_paid_user: '套餐付费用户',
+    software_paid_user: '软件付费用户',
+    software_trial_user: '软件试用用户',
     user: '正式用户',
     basic_user: '基础用户'
   }
-  return map[role] || role
+  const key = getRoleKey(row)
+  return map[key] || key || '无套餐角色'
 }
 
 // 状态显示

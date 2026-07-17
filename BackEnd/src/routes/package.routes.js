@@ -11,10 +11,12 @@ const {
     duplicatePackageValidator
 } = require('../validators/package.validator');
 const { ROLES } = require('../constants/roles');
+const { requireBackendMenuPermission, requireAnyBackendMenuPermission } = require('../middleware/backendPermission');
 const { body, param, query } = require('express-validator');
 
 // 所有路由需要认证
 router.use(authenticate);
+router.use(requireAnyBackendMenuPermission('packages', 'user-package'));
 
 /**
  * @swagger

@@ -15,9 +15,11 @@ const {
     batchDeleteValidator
 } = require('../validators/admin.validator');
 const { ROLES } = require('../constants/roles');
+const { requireBackendMenuPermission } = require('../middleware/backendPermission');
 
 // 所有路由需要认证
 router.use(authenticate);
+router.use(requireBackendMenuPermission('system-user-list'));
 
 /**
  * @swagger

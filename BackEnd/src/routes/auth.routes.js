@@ -22,11 +22,21 @@ const sendUserRegisterCodeValidator = [
  * 终端用户注册验证
  */
 const registerUserValidator = [
+    body('activationCode')
+        .notEmpty()
+        .withMessage('Activation code is required')
+        .isString()
+        .withMessage('Activation code must be a string'),
     body('email')
         .notEmpty()
         .withMessage('Email is required')
         .isEmail()
         .withMessage('Invalid email format'),
+    body('phone')
+        .optional({ checkFalsy: true })
+        .isString()
+        .isLength({ min: 5, max: 32 })
+        .withMessage('Phone must be between 5 and 32 characters'),
     body('password')
         .notEmpty()
         .withMessage('Password is required')
@@ -319,19 +329,23 @@ router.post(
  * @swagger
  * /api/auth/user/login:
  *   post:
- *     summary: 终端用户登录（使用邮箱 + 密码 + 设备指纹）
+ *     summary: 终端用户登录（邮箱 + 密码，设备指纹可选）
  *     description: |
- *       终端用户（C端用户）登录接口，需要邮箱、密码和设备指纹。
+ *       终端用户（C 端）登录接口，**必填**：`email`、`password`；**可选**：`deviceFingerprint`。
  *
- *       **注意**：终端用户登录不需要图形验证码，使用设备指纹进行安全验证。
+ *       **注意**：不需要图形验证码。
  *
- *       **设备指纹**：可选参数，桌面端程序可以获取设备指纹并传入
- *       - 用于设备管理和数量限制控制
- *       - 如果提供设备指纹：
- *         - 如果设备已存在，会更新最后使用时间
- *         - 如果设备不存在，会检查用户套餐的设备数量限制
- *         - 超过设备数量限制时会返回错误
- *       - 如果不提供设备指纹，登录成功但不会创建设备记录
+ *       **返回令牌说明**（均在 `data` 内）：
+ *       - `accessToken`：访问令牌，有效期 **10 分钟**，请求受保护接口时使用 `Authorization: Bearer <accessToken>`
+ *       - `refreshToken`：刷新令牌，有效期 **30 天**，用于调用 `POST /api/auth/refresh` 换取新的 `accessToken` 与 `refreshToken`（旧 refreshToken 会作废）
+ *       - `token`：与 `accessToken` 相同，仅为兼容旧客户端保留，新接入请使用 `accessToken`
+ *
+ *       **无感续期**：客户端应在 `accessToken` 过期或收到 401 时，使用 `refreshToken` 调用 `/api/auth/refresh` 更新本地令牌并重试请求；`refreshToken` 过期后需重新登录。
+ *
+ *       **设备指纹**（可选）：
+ *       - 用于设备管理与数量限制
+ *       - 提供时：已存在设备则更新使用时间；新设备则校验套餐设备上限
+ *       - 不提供：登录成功，但不创建设备记录；刷新令牌时一般无需传 `deviceId`
  *     tags: [认证]
  *     requestBody:
  *       required: true
@@ -361,18 +375,68 @@ router.post(
  *                 description: 设备指纹（可选，桌面端程序生成，用于设备管理和数量限制。如果提供，登录时会自动创建设备记录）
  *     responses:
  *       200:
- *         description: 登录成功
+ *         description: 登录成功，返回访问令牌、刷新令牌及用户信息
  *         content:
  *           application/json:
  *             schema:
- *               $ref: '#/components/schemas/Success'
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Login successful
+ *                 data:
+ *                   type: object
+ *                   required:
+ *                     - accessToken
+ *                     - refreshToken
+ *                     - token
+ *                     - user
+ *                   properties:
+ *                     accessToken:
+ *                       type: string
+ *                       description: 访问令牌（JWT，10 分钟有效）
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.access...
+ *                     refreshToken:
+ *                       type: string
+ *                       description: 刷新令牌（JWT，30 天有效，用于 POST /api/auth/refresh）
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh...
+ *                     token:
+ *                       type: string
+ *                       description: 与 accessToken 相同（向后兼容）
+ *                       example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.access...
+ *                     user:
+ *                       type: object
+ *                       properties:
+ *                         id:
+ *                           type: string
+ *                           example: clx123456789
+ *                         email:
+ *                           type: string
+ *                           format: email
+ *                           example: user@example.com
+ *                         phone:
+ *                           type: string
+ *                           nullable: true
+ *                           example: null
+ *                         role:
+ *                           type: string
+ *                           example: basic_user
+ *                         status:
+ *                           type: string
+ *                           example: normal
  *             examples:
  *               success:
+ *                 summary: 登录成功（含双令牌）
  *                 value:
  *                   success: true
  *                   message: Login successful
  *                   data:
- *                     token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+ *                     accessToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.access...
+ *                     refreshToken: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.refresh...
+ *                     token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.access...
  *                     user:
  *                       id: clx123456789
  *                       email: user@example.com
@@ -398,6 +462,18 @@ router.post(
     loginUserValidator,
     validate,
     authController.loginUser.bind(authController)
+);
+
+router.get(
+    '/user/entitlement',
+    authenticate,
+    authController.getUserEntitlement.bind(authController)
+);
+
+router.get(
+    '/user/my-permissions',
+    authenticate,
+    authController.getUserMyPermissions.bind(authController)
 );
 
 /**
@@ -786,6 +862,12 @@ router.get(
     '/me',
     authenticate,
     authController.getCurrentAdmin.bind(authController)
+);
+
+router.get(
+    '/my-permissions',
+    authenticate,
+    authController.getMyFrontendPermissions.bind(authController)
 );
 
 /**

@@ -1,6 +1,31 @@
 const modelRepository = require('../repositories/model.repository')
+const prisma = require('../config/database')
+const userEntitlementService = require('./userEntitlement.service')
+const {
+  TARGET_TYPES,
+  buildVisibleWhereForRole,
+  enrichItemsWithRoleBindings,
+  enrichItemWithRoleBindings,
+  parseOptionalRoleBindingInput,
+  resolveBindingForCreate,
+  applyRoleBindingFields,
+  mergeWhereWithRoleVisibility,
+} = require('../utils/catalogRoleBinding')
 const { NotFoundError, ConflictError, BadRequestError } = require('../utils/errors')
 const { MODEL_TYPE } = require('../constants/modelType')
+
+async function buildTerminalModelVisibilityWhere(catalogRoleContext) {
+  if (!catalogRoleContext) return null
+
+  const roleVisibilityWhere = await buildVisibleWhereForRole(
+    TARGET_TYPES.AI_MODEL,
+    catalogRoleContext.effectiveRoleId,
+  )
+  const availableWhere = await userEntitlementService.getAvailableModelsWhereForUser(
+    catalogRoleContext.userId,
+  )
+  return mergeWhereWithRoleVisibility(roleVisibilityWhere || {}, availableWhere)
+}
 
 async function syncVoiceProfilesSupportsVoiceCommandForModel(model) {
   const prisma = require('../config/database')
@@ -18,19 +43,33 @@ class ModelService {
   /**
    * 获取模型列表
    */
-  async getModels(filters = {}, pagination = {}, sort = {}) {
-    return await modelRepository.findModels(filters, pagination, sort)
+  async getModels(filters = {}, pagination = {}, sort = {}, catalogRoleContext = null) {
+    const visibilityWhere = await buildTerminalModelVisibilityWhere(catalogRoleContext)
+    const result = await modelRepository.findModels(filters, pagination, sort, visibilityWhere)
+    result.data = await enrichItemsWithRoleBindings(TARGET_TYPES.AI_MODEL, result.data)
+    return result
   }
 
   /**
    * 获取模型详情
    */
-  async getModelDetail(id) {
+  async getModelDetail(id, catalogRoleContext = null) {
     const model = await modelRepository.findById(id)
     if (!model) {
       throw new NotFoundError('Model not found')
     }
-    return model
+
+    if (catalogRoleContext) {
+      const visibilityWhere = await buildTerminalModelVisibilityWhere(catalogRoleContext)
+      const visible = await prisma.aIModel.findFirst({
+        where: mergeWhereWithRoleVisibility({ id }, visibilityWhere),
+      })
+      if (!visible) {
+        throw new NotFoundError('Model not found')
+      }
+    }
+
+    return enrichItemWithRoleBindings(TARGET_TYPES.AI_MODEL, model)
   }
 
   /**
@@ -57,7 +96,46 @@ class ModelService {
       throw new ConflictError('Model with this name already exists for this provider')
     }
 
-    const model = await modelRepository.create(data)
+    const bindingInput = await resolveBindingForCreate(data, {
+      defaultBindAll: false,
+      defaultRoleKey: 'package_paid_user',
+    })
+    const model = await prisma.$transaction(async tx => {
+      const created = await tx.aIModel.create({
+        data: {
+          name: data.name,
+          displayName: data.displayName,
+          type: data.type,
+          category: data.category,
+          providerId: data.providerId,
+          baseUrl: data.baseUrl,
+          description: data.description,
+          isActive: data.isActive !== undefined ? data.isActive : true,
+          requiresKey: data.requiresKey !== undefined ? data.requiresKey : false,
+          supportsVoiceCommand:
+            data.type === MODEL_TYPE.TTS ? data.supportsVoiceCommand === true : false,
+          apiConfig: data.apiConfig || null,
+          modelTag: data.modelTag || null,
+          clientRoleBindAll: bindingInput.clientRoleBindAll,
+        },
+        include: {
+          provider: true,
+        },
+      })
+
+      await applyRoleBindingFields(
+        tx,
+        TARGET_TYPES.AI_MODEL,
+        created.id,
+        {
+          clientRoleBindAll: bindingInput.clientRoleBindAll,
+          clientRoleIds: bindingInput.clientRoleIds,
+        },
+        tx.aIModel,
+      )
+
+      return created
+    })
 
     await syncVoiceProfilesSupportsVoiceCommandForModel(model)
 
@@ -74,7 +152,7 @@ class ModelService {
       })
     }
 
-    return model
+    return enrichItemWithRoleBindings(TARGET_TYPES.AI_MODEL, model)
   }
 
   /**
@@ -99,7 +177,19 @@ class ModelService {
       throw new BadRequestError('Model provider cannot be changed')
     }
 
-    const updated = await modelRepository.update(id, data)
+    const bindingInput = parseOptionalRoleBindingInput(data)
+    const updated = await prisma.$transaction(async tx => {
+      const row = await modelRepository.update(id, {
+        ...data,
+        ...(bindingInput ? { clientRoleBindAll: bindingInput.clientRoleBindAll } : {}),
+      }, tx)
+
+      if (bindingInput) {
+        await applyRoleBindingFields(tx, TARGET_TYPES.AI_MODEL, id, data, tx.aIModel)
+      }
+
+      return row
+    })
 
     if (data.type !== undefined || data.supportsVoiceCommand !== undefined) {
       await syncVoiceProfilesSupportsVoiceCommandForModel(updated)
@@ -118,7 +208,7 @@ class ModelService {
       })
     }
 
-    return updated
+    return enrichItemWithRoleBindings(TARGET_TYPES.AI_MODEL, updated)
   }
 
   /**

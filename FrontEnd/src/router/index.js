@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { hasMenuPermission, resolveRoutePermission, isSuperAdminUser } from '@/utils/permission'
 
 const routes = [
   {
@@ -60,7 +61,7 @@ const routes = [
     path: '/voice',
     name: 'Voice',
     component: () => import('@/layouts/MainLayout.vue'),
-    meta: { title: '语音管理', requiresAuth: true },
+    meta: { title: '资源库', requiresAuth: true },
     children: [
       {
         path: '/voice/profiles',
@@ -71,22 +72,54 @@ const routes = [
     ]
   },
   {
+    path: '/system',
+    name: 'System',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { title: '系统管理', requiresAuth: true },
+    children: [
+      {
+        path: '/system/backend-menu',
+        name: 'BackendMenuManage',
+        component: () => import('@/views/system/BackendMenuManage.vue'),
+        meta: { title: '后台菜单管理', requiresAuth: true }
+      },
+      {
+        path: '/system/client-menu',
+        name: 'ClientMenuManage',
+        component: () => import('@/views/system/ClientMenuManage.vue'),
+        meta: { title: '客户端菜单管理', requiresAuth: true }
+      },
+      {
+        path: '/system/backend-role',
+        name: 'BackendRolePermission',
+        component: () => import('@/views/system/BackendRolePermission.vue'),
+        meta: { title: '后台角色权限管理', requiresAuth: true }
+      },
+      {
+        path: '/system/client-role',
+        name: 'ClientRolePermission',
+        component: () => import('@/views/system/ClientRolePermission.vue'),
+        meta: { title: '客户端角色权限管理', requiresAuth: true }
+      },
+      {
+        path: '/system/ota-releases',
+        name: 'OtaReleases',
+        component: () => import('@/views/ota/OtaReleaseList.vue'),
+        meta: { title: 'OTA 发布管理', requiresAuth: true }
+      }
+    ]
+  },
+  {
     path: '/system-user',
     name: 'SystemUser',
     component: () => import('@/layouts/MainLayout.vue'),
-    meta: { title: '系统用户管理', requiresAuth: true },
+    meta: { title: '系统管理', requiresAuth: true },
     children: [
       {
         path: '/system-user/list',
         name: 'SystemUserList',
         component: () => import('@/views/systemUser/SystemUserList.vue'),
         meta: { title: '系统用户列表', requiresAuth: true }
-      },
-      {
-        path: '/system-user/status',
-        name: 'SystemUserStatus',
-        component: () => import('@/views/systemUser/SystemUserStatus.vue'),
-        meta: { title: '权限状态管控', requiresAuth: true }
       }
     ]
   },
@@ -94,7 +127,7 @@ const routes = [
     path: '/terminal-user',
     name: 'TerminalUser',
     component: () => import('@/layouts/MainLayout.vue'),
-    meta: { title: '终端用户管理', requiresAuth: true },
+    meta: { title: '用户管理', requiresAuth: true },
     children: [
       {
         path: '/terminal-user/list',
@@ -119,6 +152,12 @@ const routes = [
         name: 'TerminalUserQuota',
         component: () => import('@/views/terminalUser/TerminalUserQuota.vue'),
         meta: { title: '用户额度管理', requiresAuth: true }
+      },
+      {
+        path: '/terminal-user/activation-codes',
+        name: 'ActivationCodeList',
+        component: () => import('@/views/terminalUser/ActivationCodeList.vue'),
+        meta: { title: '激活码管理', requiresAuth: true }
       }
     ]
   },
@@ -152,7 +191,7 @@ const routes = [
     path: '/prompt',
     name: 'Prompt',
     component: () => import('@/layouts/MainLayout.vue'),
-    meta: { title: '提示词管理', requiresAuth: true },
+    meta: { title: '资源库', requiresAuth: true },
     children: [
       {
         path: '/prompt/system-prompt-list',
@@ -171,6 +210,26 @@ const routes = [
         name: 'PromptCategory',
         component: () => import('@/views/prompt/PromptCategory.vue'),
         meta: { title: '提示词分类管理', requiresAuth: true }
+      }
+    ]
+  },
+  {
+    path: '/resource',
+    name: 'Resource',
+    component: () => import('@/layouts/MainLayout.vue'),
+    meta: { title: '资源库', requiresAuth: true },
+    children: [
+      {
+        path: '/resource/style-library',
+        name: 'StyleLibrary',
+        component: () => import('@/views/style/StyleLibraryList.vue'),
+        meta: { title: '风格库', requiresAuth: true }
+      },
+      {
+        path: '/resource/camera-movement-library',
+        name: 'CameraMovementLibrary',
+        component: () => import('@/views/cameraMovement/CameraMovementLibraryList.vue'),
+        meta: { title: '运镜库', requiresAuth: true }
       }
     ]
   },
@@ -222,7 +281,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
 
   // 如果访问登录页且已认证，重定向到首页
@@ -237,7 +296,18 @@ router.beforeEach((to, from, next) => {
     return
   }
 
-  // 其他情况正常导航
+  if (to.meta.requiresAuth && authStore.isAuthenticated) {
+    await authStore.ensurePermissions()
+  }
+
+  if (to.meta.requiresAuth && authStore.isAuthenticated && !isSuperAdminUser()) {
+    const permission = to.meta.permission || resolveRoutePermission(to.path)
+    if (permission && !hasMenuPermission(permission)) {
+      next({ path: '/dashboard' })
+      return
+    }
+  }
+
   next()
 })
 

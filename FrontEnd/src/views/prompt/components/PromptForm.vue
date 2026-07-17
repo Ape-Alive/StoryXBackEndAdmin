@@ -11,7 +11,14 @@
       :rules="rules"
       label-width="120px"
       label-position="right"
+      class="catalog-binding-form"
     >
+      <CatalogRoleBindingField
+        v-model:client-role-bind-all="formData.clientRoleBindAll"
+        v-model:client-role-ids="formData.clientRoleIds"
+        required
+      />
+
       <el-form-item v-if="!isBatchStyleCreate" label="功能键" prop="functionKey">
         <el-input
           v-model="formData.functionKey"
@@ -178,6 +185,7 @@
 import { ref, reactive, watch, computed, onMounted } from 'vue'
 import { getPromptCategories, getPrompts } from '@/api/prompt'
 import { useAuthStore } from '@/stores/auth'
+import CatalogRoleBindingField from '@/views/components/CatalogRoleBindingField.vue'
 
 const props = defineProps({
   modelValue: {
@@ -235,7 +243,9 @@ const formData = reactive({
   stylePromptKey: '',
   stylePromptPairs: [{ functionKey: '', systemId: '' }],
   tags: [],
-  isActive: true
+  isActive: true,
+  clientRoleBindAll: true,
+  clientRoleIds: []
 })
 
 const isBatchStyleCreate = computed(() => {
@@ -367,6 +377,8 @@ watch(
       } catch {
         formData.tags = []
       }
+      formData.clientRoleBindAll = val.clientRoleBindAll !== false
+      formData.clientRoleIds = Array.isArray(val.clientRoleIds) ? [...val.clientRoleIds] : []
     } else {
       resetForm()
     }
@@ -409,6 +421,8 @@ function resetForm() {
   formData.stylePromptPairs = [{ functionKey: '', systemId: '' }]
   formData.tags = []
   formData.isActive = true
+  formData.clientRoleBindAll = true
+  formData.clientRoleIds = []
   formRef.value?.clearValidate()
 }
 
@@ -441,7 +455,9 @@ async function handleSubmit() {
           type: formData.type,
           systemId,
           tags: formData.tags,
-          isActive: formData.isActive
+          isActive: formData.isActive,
+          clientRoleBindAll: formData.clientRoleBindAll,
+          clientRoleIds: formData.clientRoleIds
         }
         if (formData.type === 'system_user' || formData.type === 'user') {
           data.isStylePrompt = formData.isStylePrompt
@@ -475,6 +491,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.catalog-binding-form {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 :deep(.el-dialog__body) {
   padding: 20px;
 }

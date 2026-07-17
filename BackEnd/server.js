@@ -3,6 +3,7 @@ const app = require('./app');
 const authorizationCleanupJob = require('./src/jobs/authorizationCleanup.job');
 const apiKeyExpirationJob = require('./src/jobs/apiKeyExpiration.job');
 const packageExpirationJob = require('./src/jobs/packageExpiration.job');
+const activationCodeExpirationJob = require('./src/jobs/activationCodeExpiration.job');
 
 const PORT = process.env.PORT || 5800;
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -38,6 +39,14 @@ if (packageExpirationEnabled) {
   console.log('⚠️  Package expiration job is disabled');
 }
 
+const activationCodeExpirationEnabled = process.env.ENABLE_ACTIVATION_CODE_EXPIRATION_JOB !== 'false';
+if (activationCodeExpirationEnabled) {
+  activationCodeExpirationJob.start();
+  console.log('✅ Activation code expiration job started');
+} else {
+  console.log('⚠️  Activation code expiration job is disabled');
+}
+
 app.listen(PORT, () => {
   console.log('');
   console.log('═══════════════════════════════════════════════════════════');
@@ -61,6 +70,9 @@ process.on('SIGINT', () => {
   if (packageExpirationEnabled) {
     packageExpirationJob.stop();
   }
+  if (activationCodeExpirationEnabled) {
+    activationCodeExpirationJob.stop();
+  }
   process.exit(0);
 });
 
@@ -74,6 +86,9 @@ process.on('SIGTERM', () => {
   }
   if (packageExpirationEnabled) {
     packageExpirationJob.stop();
+  }
+  if (activationCodeExpirationEnabled) {
+    activationCodeExpirationJob.stop();
   }
   process.exit(0);
 });

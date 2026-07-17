@@ -45,11 +45,12 @@
           placeholder="请选择角色"
           style="width: 100%"
         >
-          <el-option label="平台管理员" value="platform_admin" />
-          <el-option label="运营人员" value="operator" />
-          <el-option label="风控人员" value="risk_control" />
-          <el-option label="财务人员" value="finance" />
-          <el-option label="只读角色" value="read_only" />
+          <el-option
+            v-for="role in roleOptions"
+            :key="role.roleKey"
+            :label="role.name"
+            :value="role.roleKey"
+          />
         </el-select>
         <div class="form-tip">不能创建超级管理员角色</div>
       </el-form-item>
@@ -88,6 +89,10 @@ const props = defineProps({
   admin: {
     type: Object,
     default: null
+  },
+  roleOptions: {
+    type: Array,
+    default: () => []
   }
 })
 

@@ -231,13 +231,16 @@ class UserPackageRepository {
     return await prisma.userPackage.findMany({
       where: {
         userId,
+        startedAt: { lte: now },
         OR: [
           { expiresAt: null },
           { expiresAt: { gt: now } }
         ]
       },
       include: {
-        package: true
+        package: {
+          include: { clientRole: true }
+        }
       },
       orderBy: {
         priority: 'desc'

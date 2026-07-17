@@ -18,9 +18,13 @@ const {
   postProviderApiKeyDecryptedTokenValidator,
 } = require('../validators/userApiKey.validator')
 const { ROLES } = require('../constants/roles')
+const { requireEntitlement } = require('../middleware/entitlement')
+const { requireBackendMenuPermission } = require('../middleware/backendPermission')
 
 // 所有路由需要认证
 router.use(authenticate)
+router.use(requireEntitlement)
+router.use(requireBackendMenuPermission('provider'))
 
 /**
  * @swagger

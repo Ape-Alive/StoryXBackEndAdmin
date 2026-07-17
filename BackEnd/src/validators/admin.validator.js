@@ -1,5 +1,4 @@
 const { body, query, param } = require('express-validator');
-const { ROLES } = require('../constants/roles');
 
 /**
  * 管理员列表查询验证
@@ -27,8 +26,8 @@ const getAdminsValidator = [
     .withMessage('Invalid email format'),
   query('role')
     .optional()
-    .isIn([ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.OPERATOR, ROLES.RISK_CONTROL, ROLES.FINANCE, ROLES.READ_ONLY])
-    .withMessage('Invalid role'),
+    .isString()
+    .withMessage('Role must be a string'),
   query('status')
     .optional()
     .isIn(['active', 'inactive'])
@@ -92,8 +91,8 @@ const createAdminValidator = [
   body('role')
     .notEmpty()
     .withMessage('Role is required')
-    .isIn([ROLES.PLATFORM_ADMIN, ROLES.OPERATOR, ROLES.RISK_CONTROL, ROLES.FINANCE, ROLES.READ_ONLY])
-    .withMessage('Invalid role. Super admin cannot be created.'),
+    .isString()
+    .withMessage('Role must be a string'),
   body('status')
     .optional()
     .isIn(['active', 'inactive'])
@@ -123,8 +122,8 @@ const updateAdminValidator = [
     .withMessage('Password must be between 6 and 50 characters'),
   body('role')
     .optional()
-    .isIn([ROLES.PLATFORM_ADMIN, ROLES.OPERATOR, ROLES.RISK_CONTROL, ROLES.FINANCE, ROLES.READ_ONLY])
-    .withMessage('Invalid role. Cannot change to super_admin.'),
+    .isString()
+    .withMessage('Role must be a string'),
   body('status')
     .optional()
     .isIn(['active', 'inactive'])
@@ -155,8 +154,8 @@ const updateAdminRoleValidator = [
   body('role')
     .notEmpty()
     .withMessage('Role is required')
-    .isIn([ROLES.PLATFORM_ADMIN, ROLES.OPERATOR, ROLES.RISK_CONTROL, ROLES.FINANCE, ROLES.READ_ONLY])
-    .withMessage('Invalid role. Cannot change to super_admin.')
+    .isString()
+    .withMessage('Role must be a string'),
 ];
 
 /**

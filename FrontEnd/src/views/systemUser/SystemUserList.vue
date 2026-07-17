@@ -15,7 +15,7 @@
 
     <!-- 搜索和统计 -->
     <div class="filter-section">
-      <SystemUserFilter v-model="filters" @search="handleSearch" />
+      <SystemUserFilter v-model="filters" :role-options="filterRoleOptions" @search="handleSearch" />
       <div class="statistics">
         <span class="stat-item">全部: {{ statistics.total }}</span>
         <span class="stat-item">活跃: {{ statistics.active }}</span>
@@ -26,6 +26,7 @@
     <SystemUserTable
       :table-data="tableData"
       :loading="loading"
+      :role-label-map="roleLabelMap"
       @edit="handleEdit"
       @delete="handleDelete"
     />
@@ -59,6 +60,7 @@
     <SystemUserForm
       v-model="formVisible"
       :admin="currentAdmin"
+      :role-options="roleOptions"
       @success="handleFormSuccess"
     />
   </div>
@@ -77,6 +79,9 @@ import {
   updateAdmin,
   deleteAdmin
 } from '@/api/admin'
+import { useAdminRoleOptions } from './composables/useAdminRoleOptions'
+
+const { roleOptions, roleLabelMap, filterRoleOptions, fetchRoleOptions } = useAdminRoleOptions()
 
 // 数据
 const loading = ref(false)
@@ -233,6 +238,7 @@ function handleSizeChange(size) {
 }
 
 onMounted(() => {
+  fetchRoleOptions()
   fetchData()
 })
 </script>

@@ -5,9 +5,13 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { body, param, query } = require('express-validator');
 const { ROLES } = require('../constants/roles');
+const { requireAnyBackendMenuPermission } = require('../middleware/backendPermission');
+const { requireEntitlement } = require('../middleware/entitlement');
 
 // 所有路由需要认证
 router.use(authenticate);
+router.use(requireEntitlement);
+router.use(requireAnyBackendMenuPermission('system-prompt-list', 'user-prompt-list', 'prompt-category'));
 
 /**
  * @swagger

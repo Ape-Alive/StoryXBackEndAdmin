@@ -2,11 +2,15 @@ const express = require('express');
 const router = express.Router();
 const quotaController = require('../controllers/quota.controller');
 const { authenticate } = require('../middleware/auth');
+const { requireEntitlement } = require('../middleware/entitlement');
+const { requireTerminalUser } = require('../middleware/terminalUser');
 const validate = require('../middleware/validate');
 const { query, param } = require('express-validator');
 
 // 所有路由需要认证（终端用户）
 router.use(authenticate);
+router.use(requireTerminalUser);
+router.use(requireEntitlement);
 
 /**
  * @swagger

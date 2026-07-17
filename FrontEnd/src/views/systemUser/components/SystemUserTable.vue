@@ -93,6 +93,10 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  roleLabelMap: {
+    type: Object,
+    default: () => ({})
   }
 })
 
@@ -140,15 +144,7 @@ function getRoleTagType(role) {
 
 // 获取角色标签文本
 function getRoleLabel(role) {
-  const roleLabelMap = {
-    super_admin: '超级管理员',
-    platform_admin: '平台管理员',
-    operator: '运营人员',
-    risk_control: '风控人员',
-    finance: '财务人员',
-    read_only: '只读角色'
-  }
-  return roleLabelMap[role] || role
+  return props.roleLabelMap[role] || role
 }
 
 // 格式化日期

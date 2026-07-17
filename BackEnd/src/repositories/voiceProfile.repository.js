@@ -1,10 +1,11 @@
 const prisma = require('../config/database')
+const { mergeWhereWithRoleVisibility } = require('../utils/catalogRoleBinding')
 
 /**
  * 音色数据访问层
  */
 class VoiceProfileRepository {
-  async findVoiceProfiles(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}) {
+  async findVoiceProfiles(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}, roleVisibilityWhere = null) {
     const { page = 1, pageSize = 20 } = pagination
     const skip = (page - 1) * pageSize
 
@@ -21,13 +22,15 @@ class VoiceProfileRepository {
       where.isActive = filters.isActive === 'true' || filters.isActive === true
     }
 
+    const mergedWhere = mergeWhereWithRoleVisibility(where, roleVisibilityWhere)
+
     const orderBy = {}
     if (sort.createdAt) orderBy.createdAt = sort.createdAt
     else orderBy.createdAt = 'desc'
 
     const [data, total] = await Promise.all([
       prisma.voiceProfile.findMany({
-        where,
+        where: mergedWhere,
         skip,
         take: pageSize,
         orderBy,
@@ -40,7 +43,7 @@ class VoiceProfileRepository {
           }
         },
       }),
-      prisma.voiceProfile.count({ where }),
+      prisma.voiceProfile.count({ where: mergedWhere }),
     ])
 
     return { data, total, page, pageSize }
@@ -64,8 +67,9 @@ class VoiceProfileRepository {
     return prisma.voiceProfile.create({ data })
   }
 
-  async update(id, data) {
-    return prisma.voiceProfile.update({ where: { id }, data })
+  async update(id, data, tx = null) {
+    const db = tx || prisma
+    return db.voiceProfile.update({ where: { id }, data })
   }
 
   async delete(id) {

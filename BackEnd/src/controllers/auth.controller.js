@@ -1,5 +1,6 @@
 const authService = require('../services/auth.service');
 const userAuthService = require('../services/userAuth.service');
+const userEntitlementService = require('../services/userEntitlement.service');
 const verificationService = require('../services/verification.service');
 const ExcelUtils = require('../utils/excel');
 const ResponseHandler = require('../utils/response');
@@ -49,6 +50,45 @@ class AuthController {
       const ipAddress = req.realIp || req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
       const result = await userAuthService.login(email, password, deviceFingerprint, ipAddress);
       return ResponseHandler.success(res, result, 'Login successful');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUserEntitlement(req, res, next) {
+    try {
+      if (!req.user || req.user.type !== 'user') {
+        return res.status(403).json({
+          success: false,
+          message: 'This endpoint is only available for terminal users',
+        });
+      }
+      const entitlement = await userEntitlementService.computeForUser(req.user.id);
+      return ResponseHandler.success(res, entitlement, 'Entitlement retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUserMyPermissions(req, res, next) {
+    try {
+      if (!req.user || req.user.type !== 'user') {
+        return res.status(403).json({
+          success: false,
+          message: 'This endpoint is only available for terminal users',
+        });
+      }
+      const entitlement = await userEntitlementService.computeForUser(req.user.id);
+      return ResponseHandler.success(
+        res,
+        {
+          effectiveClientRoleKey: entitlement.effectiveClientRoleKey,
+          menuPermissionCodes: entitlement.menuPermissionCodes,
+          buttonPermissionCodes: entitlement.buttonPermissionCodes,
+          hasAccess: entitlement.hasAccess,
+        },
+        'Frontend permission codes retrieved successfully',
+      );
     } catch (error) {
       next(error);
     }
@@ -153,6 +193,15 @@ class AuthController {
     try {
       const admin = await authService.getCurrentAdmin(req.user.id);
       return ResponseHandler.success(res, admin, 'Admin info retrieved successfully');
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getMyFrontendPermissions(req, res, next) {
+    try {
+      const data = await authService.getMyFrontendPermissions(req.user.id);
+      return ResponseHandler.success(res, data, 'Frontend permission codes retrieved successfully');
     } catch (error) {
       next(error);
     }

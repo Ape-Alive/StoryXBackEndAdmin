@@ -8,8 +8,10 @@ const {
   getRealtimeRiskTriggersValidator
 } = require('../validators/dashboard.validator');
 const { ROLES } = require('../constants/roles');
+const { requireBackendMenuPermission } = require('../middleware/backendPermission');
 
 router.use(authenticate);
+router.use(requireBackendMenuPermission('dashboard'));
 router.use(authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.RISK_CONTROL, ROLES.FINANCE, ROLES.READ_ONLY));
 
 /**

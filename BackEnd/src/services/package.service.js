@@ -1,5 +1,27 @@
-const packageRepository = require('../repositories/package.repository');
-const { NotFoundError, ConflictError, BadRequestError } = require('../utils/errors');
+const packageRepository = require('../repositories/package.repository')
+const clientRoleRepository = require('../repositories/clientRole.repository')
+const { ROLE_KEY_TO_PACKAGE_TYPE } = require('../constants/clientRole')
+const { NotFoundError, ConflictError, BadRequestError } = require('../utils/errors')
+
+async function resolvePackageType(data) {
+  if (data.type) return data.type
+  if (!data.clientRoleId) return 'paid'
+
+  const role = await clientRoleRepository.findById(data.clientRoleId)
+  if (!role) return 'paid'
+  return ROLE_KEY_TO_PACKAGE_TYPE[role.roleKey] || 'paid'
+}
+
+async function assertClientRoleId(clientRoleId) {
+  if (!clientRoleId) {
+    throw new BadRequestError('clientRoleId is required')
+  }
+  const role = await clientRoleRepository.findById(clientRoleId)
+  if (!role) {
+    throw new BadRequestError('Invalid clientRoleId')
+  }
+  return role
+}
 
 /**
  * 套餐业务逻辑层
@@ -9,265 +31,283 @@ class PackageService {
    * 获取套餐列表
    */
   async getPackages(filters = {}, pagination = {}, sort = {}) {
-    const result = await packageRepository.findPackages(filters, pagination, sort);
-    
+    const result = await packageRepository.findPackages(filters, pagination, sort)
+
     // 解析每个套餐的 availableModels JSON 字符串
     if (result.data && Array.isArray(result.data)) {
-      result.data = result.data.map(pkg => {
+      result.data = result.data.map((pkg) => {
         // 创建一个新对象，确保不修改原始对象
-        const processedPkg = { ...pkg };
-        
+        const processedPkg = { ...pkg }
+
         // 解析 availableModels JSON
         // null、undefined 或空字符串表示所有模型都可用
-        const availableModelsValue = processedPkg.availableModels;
-        
+        const availableModelsValue = processedPkg.availableModels
+
         // 确保 availableModels 字段存在（即使是 null）
-        if (availableModelsValue && 
-            typeof availableModelsValue === 'string' && 
-            availableModelsValue.trim() !== '') {
+        if (availableModelsValue && typeof availableModelsValue === 'string' && availableModelsValue.trim() !== '') {
           try {
-            const parsed = JSON.parse(availableModelsValue);
+            const parsed = JSON.parse(availableModelsValue)
             // 如果是数组且长度大于0，返回数组；否则返回 null
-            processedPkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+            processedPkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null
           } catch (e) {
             // 解析失败时视为所有模型都可用
-            processedPkg.availableModels = null;
+            processedPkg.availableModels = null
           }
         } else {
           // null、undefined、空字符串都统一为 null（表示所有模型都可用）
           // 确保字段存在，即使是 null
-          processedPkg.availableModels = null;
+          processedPkg.availableModels = null
         }
-        
-        return processedPkg;
-      });
+
+        return processedPkg
+      })
     }
-    
-    return result;
+
+    return result
   }
 
   /**
    * 获取套餐详情
    */
   async getPackageDetail(id) {
-    const pkg = await packageRepository.findById(id);
+    const pkg = await packageRepository.findById(id)
     if (!pkg) {
-      throw new NotFoundError('Package not found');
+      throw new NotFoundError('Package not found')
     }
 
     // 解析 availableModels JSON
     // null 或空数组表示所有模型都可用
     if (pkg.availableModels) {
       try {
-        const parsed = JSON.parse(pkg.availableModels);
-        pkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+        const parsed = JSON.parse(pkg.availableModels)
+        pkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null
       } catch (e) {
-        pkg.availableModels = null; // 解析失败时视为所有模型都可用
+        pkg.availableModels = null // 解析失败时视为所有模型都可用
       }
     } else {
-      pkg.availableModels = null; // 明确设置为 null 表示所有模型都可用
+      pkg.availableModels = null // 明确设置为 null 表示所有模型都可用
     }
 
-    return pkg;
+    return pkg
   }
 
   /**
    * 创建套餐
    */
   async createPackage(data, adminId = null, ipAddress = null) {
-    // 验证套餐类型
-    const validTypes = ['free', 'paid', 'trial'];
-    if (data.type && !validTypes.includes(data.type)) {
-      throw new BadRequestError('Invalid package type');
+    await assertClientRoleId(data.clientRoleId)
+
+    const packageType = await resolvePackageType(data)
+    const validTypes = ['free', 'paid', 'trial']
+    if (packageType && !validTypes.includes(packageType)) {
+      throw new BadRequestError('Invalid package type')
     }
 
     // 检查名称是否已存在
-    const existing = await packageRepository.findByName(data.name);
+    const existing = await packageRepository.findByName(data.name)
     if (existing) {
-      throw new ConflictError('Package name already exists');
+      throw new ConflictError('Package name already exists')
     }
 
     // 验证额度
     if (data.quota !== null && data.quota !== undefined && data.quota < 0) {
-      throw new BadRequestError('Quota cannot be negative');
+      throw new BadRequestError('Quota cannot be negative')
     }
 
-    const pkg = await packageRepository.create(data);
+    const pkg = await packageRepository.create({
+      ...data,
+      type: packageType,
+    })
 
     // 解析返回的 availableModels JSON 字符串
     if (pkg.availableModels && typeof pkg.availableModels === 'string' && pkg.availableModels.trim() !== '') {
       try {
-        const parsed = JSON.parse(pkg.availableModels);
-        pkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+        const parsed = JSON.parse(pkg.availableModels)
+        pkg.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null
       } catch (e) {
-        pkg.availableModels = null;
+        pkg.availableModels = null
       }
     } else {
-      pkg.availableModels = null;
+      pkg.availableModels = null
     }
 
     // 记录操作日志
     if (adminId) {
-      const logService = require('./log.service');
+      const logService = require('./log.service')
       await logService.logAdminAction({
         adminId,
         action: 'CREATE_PACKAGE',
         targetType: 'package',
         targetId: pkg.id,
         details: data,
-        ipAddress
-      });
+        ipAddress,
+      })
     }
 
-    return pkg;
+    return pkg
   }
 
   /**
    * 更新套餐
    */
   async updatePackage(id, data, adminId = null, ipAddress = null) {
-    const pkg = await packageRepository.findById(id);
+    const pkg = await packageRepository.findById(id)
     if (!pkg) {
-      throw new NotFoundError('Package not found');
+      throw new NotFoundError('Package not found')
     }
 
     // 验证套餐类型
-    const validTypes = ['free', 'paid', 'trial'];
+    const validTypes = ['free', 'paid', 'trial']
+    if (data.clientRoleId) {
+      await assertClientRoleId(data.clientRoleId)
+    }
     if (data.type && !validTypes.includes(data.type)) {
-      throw new BadRequestError('Invalid package type');
+      throw new BadRequestError('Invalid package type')
     }
 
     // name 不可修改
     if (data.name && data.name !== pkg.name) {
-      throw new BadRequestError('Package name cannot be changed');
+      throw new BadRequestError('Package name cannot be changed')
     }
 
     // 验证额度
     if (data.quota !== undefined && data.quota !== null && data.quota < 0) {
-      throw new BadRequestError('Quota cannot be negative');
+      throw new BadRequestError('Quota cannot be negative')
     }
 
-    const updated = await packageRepository.update(id, data);
+    const updatePayload = { ...data }
+    if (data.clientRoleId) {
+      const role = await assertClientRoleId(data.clientRoleId)
+      if (!data.type) {
+        updatePayload.type = ROLE_KEY_TO_PACKAGE_TYPE[role.roleKey] || pkg.type
+      }
+    }
+
+    const updated = await packageRepository.update(id, updatePayload)
 
     // 解析返回的 availableModels JSON 字符串
-    if (updated.availableModels && typeof updated.availableModels === 'string' && updated.availableModels.trim() !== '') {
+    if (
+      updated.availableModels &&
+      typeof updated.availableModels === 'string' &&
+      updated.availableModels.trim() !== ''
+    ) {
       try {
-        const parsed = JSON.parse(updated.availableModels);
-        updated.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null;
+        const parsed = JSON.parse(updated.availableModels)
+        updated.availableModels = Array.isArray(parsed) && parsed.length > 0 ? parsed : null
       } catch (e) {
-        updated.availableModels = null;
+        updated.availableModels = null
       }
     } else {
-      updated.availableModels = null;
+      updated.availableModels = null
     }
 
     // 记录操作日志
     if (adminId) {
-      const logService = require('./log.service');
+      const logService = require('./log.service')
       await logService.logAdminAction({
         adminId,
         action: 'UPDATE_PACKAGE',
         targetType: 'package',
         targetId: id,
         details: data,
-        ipAddress
-      });
+        ipAddress,
+      })
     }
 
-    return updated;
+    return updated
   }
 
   /**
    * 删除套餐
    */
   async deletePackage(id, adminId = null, ipAddress = null) {
-    const pkg = await packageRepository.findById(id);
+    const pkg = await packageRepository.findById(id)
     if (!pkg) {
-      throw new NotFoundError('Package not found');
+      throw new NotFoundError('Package not found')
     }
 
     // 检查是否有用户使用该套餐
-    const hasUsers = await packageRepository.hasUsers(id);
+    const hasUsers = await packageRepository.hasUsers(id)
     if (hasUsers) {
-      throw new ConflictError('Package is in use, cannot be deleted');
+      throw new ConflictError('Package is in use, cannot be deleted')
     }
 
-    await packageRepository.delete(id);
+    await packageRepository.delete(id)
 
     // 记录操作日志
     if (adminId) {
-      const logService = require('./log.service');
+      const logService = require('./log.service')
       await logService.logAdminAction({
         adminId,
         action: 'DELETE_PACKAGE',
         targetType: 'package',
         targetId: id,
         details: { package: pkg.name },
-        ipAddress
-      });
+        ipAddress,
+      })
     }
 
-    return { success: true };
+    return { success: true }
   }
 
   /**
    * 复制套餐
    */
   async duplicatePackage(id, newName, newDisplayName, adminId = null, ipAddress = null) {
-    const pkg = await packageRepository.findById(id);
+    const pkg = await packageRepository.findById(id)
     if (!pkg) {
-      throw new NotFoundError('Package not found');
+      throw new NotFoundError('Package not found')
     }
 
     // 检查新名称是否已存在
-    const existing = await packageRepository.findByName(newName);
+    const existing = await packageRepository.findByName(newName)
     if (existing) {
-      throw new ConflictError('Package name already exists');
+      throw new ConflictError('Package name already exists')
     }
 
-    const duplicated = await packageRepository.duplicate(id, newName, newDisplayName);
+    const duplicated = await packageRepository.duplicate(id, newName, newDisplayName)
 
     // 记录操作日志
     if (adminId) {
-      const logService = require('./log.service');
+      const logService = require('./log.service')
       await logService.logAdminAction({
         adminId,
         action: 'DUPLICATE_PACKAGE',
         targetType: 'package',
         targetId: duplicated.id,
         details: { originalId: id, newName, newDisplayName },
-        ipAddress
-      });
+        ipAddress,
+      })
     }
 
-    return duplicated;
+    return duplicated
   }
 
   /**
    * 更新套餐状态
    */
   async updatePackageStatus(id, isActive, adminId = null, ipAddress = null) {
-    const pkg = await packageRepository.findById(id);
+    const pkg = await packageRepository.findById(id)
     if (!pkg) {
-      throw new NotFoundError('Package not found');
+      throw new NotFoundError('Package not found')
     }
 
-    const updated = await packageRepository.update(id, { isActive });
+    const updated = await packageRepository.update(id, { isActive })
 
     // 记录操作日志
     if (adminId) {
-      const logService = require('./log.service');
+      const logService = require('./log.service')
       await logService.logAdminAction({
         adminId,
         action: 'UPDATE_PACKAGE_STATUS',
         targetType: 'package',
         targetId: id,
         details: { isActive },
-        ipAddress
-      });
+        ipAddress,
+      })
     }
 
-    return updated;
+    return updated
   }
 
   /**
@@ -275,28 +315,28 @@ class PackageService {
    */
   async batchUpdateStatus(ids, isActive, adminId = null, ipAddress = null) {
     if (!Array.isArray(ids) || ids.length === 0) {
-      throw new BadRequestError('IDs array is required');
+      throw new BadRequestError('IDs array is required')
     }
 
-    const result = await packageRepository.batchUpdate(ids, { isActive });
+    const result = await packageRepository.batchUpdate(ids, { isActive })
 
     // 记录操作日志
     if (adminId) {
-      const logService = require('./log.service');
+      const logService = require('./log.service')
       await logService.logAdminAction({
         adminId,
         action: 'BATCH_UPDATE_PACKAGE_STATUS',
         targetType: 'package',
         targetId: null,
         details: { ids, isActive },
-        ipAddress
-      });
+        ipAddress,
+      })
     }
 
     return {
       updated: result.count,
-      ids: result.ids
-    };
+      ids: result.ids,
+    }
   }
 
   /**
@@ -304,35 +344,35 @@ class PackageService {
    */
   async batchDeletePackages(ids, adminId = null, ipAddress = null) {
     if (!Array.isArray(ids) || ids.length === 0) {
-      throw new BadRequestError('IDs array is required');
+      throw new BadRequestError('IDs array is required')
     }
 
     // 检查是否有套餐正在使用
-    const packagesInUse = await packageRepository.findPackagesInUse(ids);
+    const packagesInUse = await packageRepository.findPackagesInUse(ids)
     if (packagesInUse.length > 0) {
-      throw new ConflictError(`Packages in use: ${packagesInUse.join(', ')}`);
+      throw new ConflictError(`Packages in use: ${packagesInUse.join(', ')}`)
     }
 
-    const result = await packageRepository.batchDelete(ids);
+    const result = await packageRepository.batchDelete(ids)
 
     // 记录操作日志
     if (adminId) {
-      const logService = require('./log.service');
+      const logService = require('./log.service')
       await logService.logAdminAction({
         adminId,
         action: 'BATCH_DELETE_PACKAGES',
         targetType: 'package',
         targetId: null,
         details: { ids },
-        ipAddress
-      });
+        ipAddress,
+      })
     }
 
     return {
       deleted: result.count,
-      ids: result.ids
-    };
+      ids: result.ids,
+    }
   }
 }
 
-module.exports = new PackageService();
+module.exports = new PackageService()

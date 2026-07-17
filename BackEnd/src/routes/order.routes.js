@@ -9,6 +9,7 @@ const {
   getOrderDetailValidator,
   cancelOrderValidator
 } = require('../validators/order.validator');
+const { requireBackendMenuPermission } = require('../middleware/backendPermission');
 
 /**
  * @swagger
@@ -694,6 +695,7 @@ router.post(
 router.get(
   '/admin',
   authenticate,
+  requireBackendMenuPermission('quota'),
   authorize('super_admin', 'platform_admin', 'finance', 'operator'),
   getOrdersValidator,
   validate,
@@ -742,6 +744,7 @@ router.get(
 router.get(
   '/admin/:id',
   authenticate,
+  requireBackendMenuPermission('quota'),
   authorize('super_admin', 'platform_admin', 'finance', 'operator'),
   getOrderDetailValidator,
   validate,

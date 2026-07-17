@@ -5,13 +5,19 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "nodemon server.js",
+    "dev": "prisma generate && nodemon server.js",
     "test": "jest",
     "lint": "eslint .",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
-    "prisma:seed": "node prisma/seed.js"
+    "prisma:seed": "node prisma/seed.js",
+    "seed:camera-movements": "node scripts/seedCameraMovements.js",
+    "seed:menus": "node scripts/seedMenus.js",
+    "seed:backend-roles": "node scripts/seedBackendRoles.js",
+    "seed:client-roles": "node scripts/seedClientRoles.js",
+    "generate:ota-keys": "node scripts/generate-ota-signing-keys.js",
+    "test:ota-e2e": "node scripts/test-ota-e2e.js"
   },
   "keywords": [
     "ai",

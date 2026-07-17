@@ -182,12 +182,12 @@ class UserPackageService {
         // 重新初始化用户额度
         await this.initializeUserQuota(data.userId, data.packageId, pkg)
 
-        // 重新创建API Key（如果提供商支持）
+        // 重新创建API Key（轮换旧 Key，避免上游已过期但本地仍 active）
         try {
-          await this.createApiKeysForPackage(data.userId, data.packageId, pkg)
+          await this.rotatePackageApiKeys(data.userId, data.packageId, pkg)
         } catch (error) {
           const logger = require('../utils/logger')
-          logger.warn(`Failed to create API keys for package ${data.packageId}:`, error)
+          logger.warn(`Failed to rotate API keys for package ${data.packageId}:`, error)
         }
 
         // 记录操作日志
@@ -258,23 +258,21 @@ class UserPackageService {
   }
 
   /**
-   * 为套餐创建API Key（自动创建）
+   * 解析套餐关联且支持自动创建子 Key 的提供商（如 Grsai）
    */
-  async createApiKeysForPackage(userId, packageId, pkg) {
-    // 获取套餐关联的模型列表
+  async resolvePackageKeyCreationProviders(packageId, pkg) {
     let modelIds = []
-    if (pkg.availableModels) {
+    if (pkg?.availableModels) {
       try {
         const models = JSON.parse(pkg.availableModels)
         if (Array.isArray(models)) {
           modelIds = models
         }
-      } catch (error) {
-        // 忽略解析错误
+      } catch {
+        // ignore
       }
     }
 
-    // 如果套餐没有指定模型，获取所有活跃模型
     if (modelIds.length === 0) {
       const allModels = await prisma.aIModel.findMany({
         where: { isActive: true },
@@ -283,51 +281,79 @@ class UserPackageService {
       modelIds = allModels.map((m) => m.id)
     }
 
-    if (modelIds.length === 0) {
-      const logger = require('../utils/logger')
-      logger.warn(`No models found for package ${packageId}, skipping API key creation`)
-      return // 没有可用模型，不创建API Key
-    }
+    if (modelIds.length === 0) return []
 
-    // 获取模型所属的提供商（去重）
     const models = await prisma.aIModel.findMany({
-      where: {
-        id: { in: modelIds },
-        isActive: true,
-      },
-      include: {
-        provider: true,
-      },
+      where: { id: { in: modelIds }, isActive: true },
+      include: { provider: true },
     })
-
-    if (models.length === 0) {
-      logger.warn(`No active models found for package ${packageId}, skipping API key creation`)
-      return
-    }
 
     const providers = new Map()
-    models.forEach((model) => {
-      if (model.provider && !providers.has(model.providerId)) {
-        providers.set(model.providerId, model.provider)
+    for (const model of models) {
+      const provider = model.provider
+      if (
+        provider &&
+        !providers.has(model.providerId) &&
+        provider.supportsApiKeyCreation &&
+        provider.mainAccountToken
+      ) {
+        providers.set(model.providerId, provider)
       }
+    }
+
+    return Array.from(providers.entries())
+  }
+
+  /**
+   * 续期/重新开通：作废旧系统子 Key 并在上游创建新 Key（解决 Grsai 侧已过期但本地仍 active）
+   */
+  async rotatePackageApiKeys(userId, packageId, pkg) {
+    const logger = require('../utils/logger')
+    const providerEntries = await this.resolvePackageKeyCreationProviders(packageId, pkg)
+    if (providerEntries.length === 0) {
+      logger.info(`No key-creation providers for package ${packageId}, skip rotate`)
+      return { revoked: 0, created: 0 }
+    }
+
+    const providerIds = providerEntries.map(([id]) => id)
+    const { revoked } = await userApiKeyService.rotateSystemApiKeysForPackage(userId, packageId, providerIds)
+
+    let created = 0
+    for (const [providerId] of providerEntries) {
+      try {
+        const key = await userApiKeyService.createSystemApiKeyForPackage(userId, packageId, providerId)
+        if (key) created++
+      } catch (error) {
+        logger.warn(`Failed to create API key after rotate for provider ${providerId}:`, error)
+      }
+    }
+
+    logger.info(`Rotated package API keys userId=${userId} packageId=${packageId}`, {
+      revoked,
+      created,
+      providers: providerIds,
     })
 
-    if (providers.size === 0) {
-      logger.warn(`No providers found for package ${packageId}, skipping API key creation`)
+    return { revoked, created }
+  }
+
+  /**
+   * 为套餐创建API Key（自动创建）
+   */
+  async createApiKeysForPackage(userId, packageId, pkg) {
+    const providerEntries = await this.resolvePackageKeyCreationProviders(packageId, pkg)
+    if (providerEntries.length === 0) {
+      const logger = require('../utils/logger')
+      logger.warn(`No key-creation providers for package ${packageId}, skipping API key creation`)
       return
     }
 
-    // 为每个支持创建API Key的提供商创建API Key
-    for (const [providerId, provider] of providers) {
-      // 检查提供商是否支持API Key创建，并且已配置主账户Token
-      if (provider.supportsApiKeyCreation && provider.mainAccountToken) {
-        try {
-          await userApiKeyService.createSystemApiKeyForPackage(userId, packageId, providerId)
-        } catch (error) {
-          // 单个提供商创建失败不影响其他提供商，只记录日志
-          const logger = require('../utils/logger')
-          logger.warn(`Failed to create API key for provider ${providerId}:`, error)
-        }
+    for (const [providerId] of providerEntries) {
+      try {
+        await userApiKeyService.createSystemApiKeyForPackage(userId, packageId, providerId)
+      } catch (error) {
+        const logger = require('../utils/logger')
+        logger.warn(`Failed to create API key for provider ${providerId}:`, error)
       }
     }
   }
@@ -455,42 +481,14 @@ class UserPackageService {
 
     const updated = await userPackageRepository.extendExpiry(id, days)
 
-    // 同步更新关联的API Key过期时间
-    try {
-      const userApiKeyRepository = require('../repositories/userApiKey.repository')
-      const newExpireTime = updated.expiresAt ? Math.floor(updated.expiresAt.getTime() / 1000) : 0 // 如果套餐永久有效，API Key也设为永久（0表示永不过期）
-
-      const updateResult = await userApiKeyRepository.updateExpireTimeByPackage(
-        userPackage.userId,
-        userPackage.packageId,
-        newExpireTime
-      )
-
-      const logger = require('../utils/logger')
-      logger.info(`Extended package ${id} by ${days} days, updated ${updateResult.count} API keys`)
-
-      // 如果API Key之前是过期状态，延期后需要重新激活
-      if (updateResult.count > 0 && newExpireTime > 0) {
-        const now = Math.floor(Date.now() / 1000)
-        if (newExpireTime > now) {
-          // 如果新的过期时间在未来，将已过期的API Key重新激活
-          await prisma.userApiKey.updateMany({
-            where: {
-              userId: userPackage.userId,
-              packageId: userPackage.packageId,
-              status: 'expired',
-              expireTime: newExpireTime,
-            },
-            data: {
-              status: 'active',
-            },
-          })
-        }
+    const pkg = await packageRepository.findById(userPackage.packageId)
+    if (pkg) {
+      try {
+        await this.rotatePackageApiKeys(userPackage.userId, userPackage.packageId, pkg)
+      } catch (error) {
+        const logger = require('../utils/logger')
+        logger.error(`Failed to rotate API keys after extending package ${id}:`, error)
       }
-    } catch (error) {
-      // API Key更新失败不影响套餐延期，只记录日志
-      const logger = require('../utils/logger')
-      logger.error(`Failed to update API key expiry for package ${id}:`, error)
     }
 
     // 记录操作日志
@@ -585,6 +583,7 @@ class UserPackageService {
 
     const packages = await prisma.package.findMany({
       where,
+      include: { clientRole: true },
       orderBy: [{ priority: 'desc' }, { createdAt: 'desc' }],
     })
 
@@ -629,7 +628,7 @@ class UserPackageService {
     // 如果是付费套餐，必须走订单流程
     if (pkg.type === 'paid' && pkg.price) {
       throw new BadRequestError(
-        'Paid packages must be purchased through the order process. Please create an order first.'
+        'Paid packages must be purchased through the order process. Please create an order first.',
       )
     }
 
@@ -678,12 +677,12 @@ class UserPackageService {
         // 重新初始化用户额度（会重置或增加额度）
         await this.initializeUserQuota(userId, packageId, pkg)
 
-        // 重新创建API Key（如果提供商支持）
+        // 重新轮换 API Key
         try {
-          await this.createApiKeysForPackage(userId, packageId, pkg)
+          await this.rotatePackageApiKeys(userId, packageId, pkg)
         } catch (error) {
           const logger = require('../utils/logger')
-          logger.warn(`Failed to create API keys for package ${packageId}:`, error)
+          logger.warn(`Failed to rotate API keys for package ${packageId}:`, error)
         }
 
         const logger = require('../utils/logger')
@@ -764,6 +763,12 @@ class UserPackageService {
       throw new NotFoundError('Package not found')
     }
 
+    if (pkg.type === 'paid' && pkg.price) {
+      throw new BadRequestError(
+        'Paid packages must be renewed through the order/payment flow. Please create an order first.',
+      )
+    }
+
     // 计算续费天数
     let renewalDays = days
     if (!renewalDays && pkg.duration && pkg.durationUnit) {
@@ -776,6 +781,13 @@ class UserPackageService {
     // 延长有效期
     const updated = await userPackageRepository.extendExpiry(id, renewalDays)
 
+    try {
+      await this.rotatePackageApiKeys(userId, userPackage.packageId, pkg)
+    } catch (error) {
+      const logger = require('../utils/logger')
+      logger.warn(`Failed to rotate API keys after user renew package ${id}:`, error)
+    }
+
     // 如果是叠加额度，增加用户额度
     if (pkg.isStackable && pkg.quota) {
       const quotaService = require('./quota.service')
@@ -785,7 +797,7 @@ class UserPackageService {
         parseFloat(pkg.quota),
         'Package renewal',
         null, // 终端用户操作，不记录管理员ID
-        ipAddress
+        ipAddress,
       )
     }
 

@@ -1,7 +1,11 @@
 const express = require('express')
 const router = express.Router()
 const userApiController = require('../controllers/userApi.controller')
-const { authenticate, authorize } = require('../middleware/auth')
+const { authenticate } = require('../middleware/auth')
+const { requireEntitlement } = require('../middleware/entitlement')
+const { requireTerminalUser } = require('../middleware/terminalUser')
+const { requireAnyClientPermission } = require('../middleware/clientPermission')
+const { CLIENT_API_PERMISSIONS } = require('../constants/clientApiPermissions')
 const validate = require('../middleware/validate')
 const {
   requestAuthorizationValidator,
@@ -11,11 +15,12 @@ const {
   getCallLogDetailValidator,
   cancelAuthorizationValidator,
 } = require('../validators/userApi.validator')
-const { ROLES } = require('../constants/roles')
 
 // 所有路由需要认证（终端用户）
 router.use(authenticate)
-router.use(authorize(ROLES.USER, ROLES.BASIC_USER))
+router.use(requireTerminalUser)
+router.use(requireEntitlement)
+router.use(requireAnyClientPermission(...CLIENT_API_PERMISSIONS.AI_INVOKE))
 
 /**
  * @swagger

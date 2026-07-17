@@ -1,4 +1,5 @@
 const prisma = require('../config/database');
+const { mergeWhereWithRoleVisibility } = require('../utils/catalogRoleBinding');
 
 /**
  * 提示词数据访问层
@@ -7,7 +8,7 @@ class PromptRepository {
   /**
    * 获取提示词列表
    */
-  async findPrompts(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}) {
+  async findPrompts(filters = {}, pagination = { page: 1, pageSize: 20 }, sort = {}, roleVisibilityWhere = null) {
     const { page = 1, pageSize = 20 } = pagination;
     const skip = (page - 1) * pageSize;
 
@@ -62,6 +63,8 @@ class PromptRepository {
       }
     }
 
+    const mergedWhere = mergeWhereWithRoleVisibility(where, roleVisibilityWhere);
+
     const orderBy = {};
     if (sort.createdAt) {
       orderBy.createdAt = sort.createdAt;
@@ -73,7 +76,7 @@ class PromptRepository {
 
     const [data, total] = await Promise.all([
       prisma.prompt.findMany({
-        where,
+        where: mergedWhere,
         skip,
         take: pageSize,
         orderBy,
@@ -94,7 +97,7 @@ class PromptRepository {
           }
         }
       }),
-      prisma.prompt.count({ where })
+      prisma.prompt.count({ where: mergedWhere })
     ]);
 
     const formattedData = data.map(item => ({
@@ -188,9 +191,10 @@ class PromptRepository {
   /**
    * 更新提示词（同时创建新版本）
    */
-  async update(id, data, updatedBy = null) {
+  async update(id, data, updatedBy = null, tx = null) {
+    const db = tx || prisma;
     // 获取当前提示词
-    const prompt = await prisma.prompt.findUnique({
+    const prompt = await db.prompt.findUnique({
       where: { id },
       include: {
         versions: {
@@ -206,7 +210,7 @@ class PromptRepository {
 
     // 保存当前版本到版本表（如果该版本不存在）
     // 检查当前版本是否已经在版本表中
-    const existingVersion = await prisma.promptVersion.findUnique({
+    const existingVersion = await db.promptVersion.findUnique({
       where: {
         promptId_version: {
           promptId: id,
@@ -217,7 +221,7 @@ class PromptRepository {
 
     // 如果版本不存在，才创建新版本记录
     if (!existingVersion) {
-      await prisma.promptVersion.create({
+      await db.promptVersion.create({
         data: {
           promptId: id,
           version: prompt.version,
@@ -244,11 +248,12 @@ class PromptRepository {
     } else if (data.stylePromptKey !== undefined) {
       updateData.stylePromptKey = data.stylePromptKey || null;
     }
+    if (data.clientRoleBindAll !== undefined) updateData.clientRoleBindAll = data.clientRoleBindAll;
 
     updateData.version = prompt.version + 1;
     updateData.updatedAt = new Date();
 
-    return await prisma.prompt.update({
+    return await db.prompt.update({
       where: { id },
       data: updateData,
       include: {

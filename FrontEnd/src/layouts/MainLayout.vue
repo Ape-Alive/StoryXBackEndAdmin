@@ -145,6 +145,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 // Element Plus 图标已全局注册，直接使用组件名
 import { useAuthStore } from '@/stores/auth'
 import { MENU_STRUCTURE, TOP_NAV_MENU } from '@/config/menu'
+import { hasMenuPermission, isSuperAdminUser } from '@/utils/permission'
 import Breadcrumb from './components/Breadcrumb.vue'
 
 const route = useRoute()
@@ -164,8 +165,24 @@ const menuListRef = ref(null)
 const menuListHeight = ref(0)
 const isCalculating = ref(false) // 防止重复计算
 
-const menuStructure = MENU_STRUCTURE
-const topNavMenu = TOP_NAV_MENU
+const menuStructure = computed(() => {
+  if (isSuperAdminUser()) {
+    return MENU_STRUCTURE
+  }
+  return MENU_STRUCTURE.map(group => ({
+    ...group,
+    children: group.children.filter(
+      child => !child.permission || hasMenuPermission(child.permission),
+    ),
+  })).filter(group => group.children.length > 0)
+})
+
+const topNavMenu = computed(() => {
+  if (isSuperAdminUser()) {
+    return TOP_NAV_MENU
+  }
+  return TOP_NAV_MENU.filter(item => !item.permission || hasMenuPermission(item.permission))
+})
 
 // 计算菜单列表高度
 function calculateMenuListHeight() {
@@ -675,11 +692,11 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  padding: 0 8px;
 }
 
 /* 菜单项 */
 .menu-item {
-  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -698,7 +715,9 @@ onUnmounted(() => {
 
 .sidebar:not(.collapsed) .menu-item {
   justify-content: flex-start;
-  padding: 12px 20px;
+  padding: 10px 14px;
+  width: fit-content;
+  max-width: 100%;
 }
 
 .menu-item:hover {

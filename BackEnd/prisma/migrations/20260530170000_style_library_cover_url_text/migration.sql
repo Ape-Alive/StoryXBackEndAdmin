@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `style_library_items` MODIFY COLUMN `coverUrl` TEXT NULL;

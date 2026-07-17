@@ -3,6 +3,8 @@ const priceCalculatorService = require('./priceCalculator.service');
 const quotaService = require('./quota.service');
 const deviceService = require('./device.service');
 const apiKeyCreationService = require('./apiKeyCreation.service');
+const userEntitlementService = require('./userEntitlement.service');
+const { TARGET_TYPES, isTargetVisibleForRole } = require('../utils/catalogRoleBinding');
 const { NotFoundError, BadRequestError, ForbiddenError } = require('../utils/errors');
 const prisma = require('../config/database');
 const crypto = require('crypto');
@@ -163,56 +165,41 @@ class AuthorizationService {
       throw new BadRequestError('Service provider is currently unavailable');
     }
 
-    // 3. 检查用户套餐权限
-    const userPackages = await prisma.userPackage.findMany({
-      where: {
-        userId,
-        OR: [
-          { expiresAt: null },
-          { expiresAt: { gt: new Date() } }
-        ]
-      },
-      include: {
-        package: true
-      },
-      orderBy: {
-        priority: 'desc'
-      }
-    });
+    // 3. 检查用户套餐权限（与权益服务判定一致）
+    await userEntitlementService.assertUserHasAccess(userId);
+    const activePackages = await userEntitlementService.getActiveUserPackagesForUser(userId);
 
-    if (userPackages.length === 0) {
+    if (activePackages.length === 0) {
       throw new ForbiddenError('No active subscription found');
     }
 
-    // 检查套餐是否包含该模型
-    let hasAccess = false;
-    for (const userPackage of userPackages) {
-      const availableModels = userPackage.package.availableModels 
-        ? JSON.parse(userPackage.package.availableModels) 
-        : null;
-      
-      // 如果availableModels为null或空数组，表示所有模型都可用
-      if (!availableModels || availableModels.length === 0 || availableModels.includes(modelId)) {
-        hasAccess = true;
-        break;
-      }
-    }
-
-    if (!hasAccess) {
+    if (!userEntitlementService.isModelIncludedInActivePackages(activePackages, modelId)) {
       throw new ForbiddenError('This model is not included in your subscription');
     }
 
-    // 4. 检查设备数量限制（使用最高优先级的套餐）
-    const highestPriorityPackage = userPackages[0].package;
-    if (highestPriorityPackage.maxDevices !== null) {
+    // 3b. 目录角色门禁：与终端模型 list/detail 一致（角色可见 ∩ availableModels）
+    const effectiveRoleId = await userEntitlementService.getEffectiveClientRoleId(userId);
+    const roleVisible = await isTargetVisibleForRole(
+      TARGET_TYPES.AI_MODEL,
+      modelId,
+      effectiveRoleId,
+    );
+    if (!roleVisible) {
+      throw new ForbiddenError('This model is not available for your client role');
+    }
+
+    // 4. 检查设备数量限制（使用有效角色对应套餐的 maxDevices）
+    const effectiveUserPackage = userEntitlementService.getEffectiveUserPackage(activePackages);
+    const maxDevices = effectiveUserPackage?.package?.maxDevices ?? null;
+    if (maxDevices !== null) {
       const deviceCount = await prisma.device.count({
         where: {
           userId,
           status: 'active'
         }
       });
-      if (deviceCount >= highestPriorityPackage.maxDevices) {
-        throw new ForbiddenError(`Device limit reached. Maximum ${highestPriorityPackage.maxDevices} devices allowed`);
+      if (deviceCount >= maxDevices) {
+        throw new ForbiddenError(`Device limit reached. Maximum ${maxDevices} devices allowed`);
       }
     }
 
@@ -253,7 +240,11 @@ class AuthorizationService {
       let remainingToFreeze = estimatedCost;
       const freezeOperations = [];
 
-      for (const userPackage of userPackages) {
+      const sortedPackages = [...activePackages].sort(
+        (a, b) => (Number(b.priority) || 0) - (Number(a.priority) || 0),
+      )
+
+      for (const userPackage of sortedPackages) {
         if (remainingToFreeze <= 0) break;
 
         const quota = userQuotas.find(q => q.packageId === userPackage.packageId);

@@ -2,7 +2,8 @@
   <el-dialog
     v-model="visible"
     :title="formData.id ? '编辑提供商' : '新增提供商'"
-    width="600px"
+    width="680px"
+    destroy-on-close
     @close="handleClose"
   >
     <el-form
@@ -11,7 +12,14 @@
       :rules="rules"
       label-width="120px"
       label-position="left"
+      class="catalog-binding-form"
     >
+      <CatalogRoleBindingField
+        v-model:client-role-bind-all="formData.clientRoleBindAll"
+        v-model:client-role-ids="formData.clientRoleIds"
+        required
+      />
+
       <el-form-item label="提供商标识" prop="name">
         <el-input v-model="formData.name" placeholder="例如：DeepSeek" :disabled="!!formData.id" />
         <div class="form-tip">唯一标识，创建后不可修改</div>
@@ -145,6 +153,7 @@
 import { ref, reactive, watch, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import CatalogRoleBindingField from '@/views/components/CatalogRoleBindingField.vue'
 
 const props = defineProps({
   modelValue: {
@@ -176,7 +185,9 @@ const formData = reactive({
   voiceCloneCreditsPerCall: 0,
   mainAccountToken: '',
   supportsApiKeyCreation: false,
-  isActive: true
+  isActive: true,
+  clientRoleBindAll: true,
+  clientRoleIds: []
 })
 
 const voiceCloneApiRows = ref([{ _key: `${Date.now()}_0`, name: '', path: '' }])
@@ -294,7 +305,11 @@ watch(
           props.provider.supportsApiKeyCreation !== undefined
             ? props.provider.supportsApiKeyCreation
             : false,
-        isActive: props.provider.isActive !== undefined ? props.provider.isActive : true
+        isActive: props.provider.isActive !== undefined ? props.provider.isActive : true,
+        clientRoleBindAll: props.provider.clientRoleBindAll !== false,
+        clientRoleIds: Array.isArray(props.provider.clientRoleIds)
+          ? [...props.provider.clientRoleIds]
+          : []
       })
       resetVoiceCloneRowsFromJson(props.provider.voiceCloneApis || '')
     } else if (val) {
@@ -313,7 +328,9 @@ watch(
         voiceCloneCreditsPerCall: 0,
         mainAccountToken: '',
         supportsApiKeyCreation: false,
-        isActive: true
+        isActive: true,
+        clientRoleBindAll: true,
+        clientRoleIds: []
       })
       resetVoiceCloneRowsFromJson('')
     }
@@ -369,6 +386,12 @@ defineExpose({
   font-size: 12px;
   color: #94a3b8;
   margin-top: 4px;
+}
+
+.catalog-binding-form {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 .dialog-footer {

@@ -1,5 +1,11 @@
 const modelService = require('../services/model.service')
 const ResponseHandler = require('../utils/response')
+const { sanitizeModelForClient } = require('../utils/providerSanitizer')
+const { resolveCatalogRoleContext } = require('../utils/resolveCatalogRoleContext')
+
+function isTerminalUser(req) {
+  return req.user?.type === 'user'
+}
 
 /**
  * 模型控制器
@@ -34,9 +40,14 @@ class ModelController {
         createdAt: req.query.order === 'asc' ? 'asc' : 'desc',
       }
 
-      const result = await modelService.getModels(filters, pagination, sort)
+      const catalogRoleContext = await resolveCatalogRoleContext(req)
+      const result = await modelService.getModels(filters, pagination, sort, catalogRoleContext)
 
-      return ResponseHandler.paginated(res, result.data, {
+      const data = isTerminalUser(req)
+        ? result.data.map(sanitizeModelForClient)
+        : result.data
+
+      return ResponseHandler.paginated(res, data, {
         page: result.page,
         pageSize: result.pageSize,
         total: result.total,
@@ -52,8 +63,10 @@ class ModelController {
   async getModelDetail(req, res, next) {
     try {
       const { id } = req.params
-      const model = await modelService.getModelDetail(id)
-      return ResponseHandler.success(res, model, 'Model detail retrieved successfully')
+      const catalogRoleContext = await resolveCatalogRoleContext(req)
+      const model = await modelService.getModelDetail(id, catalogRoleContext)
+      const data = isTerminalUser(req) ? sanitizeModelForClient(model) : model
+      return ResponseHandler.success(res, data, 'Model detail retrieved successfully')
     } catch (error) {
       next(error)
     }

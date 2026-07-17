@@ -87,8 +87,18 @@
       />
     </div>
 
-    <el-dialog v-model="formVisible" :title="formData.id ? '编辑音色' : '新增音色'" width="640px">
-      <el-form :model="formData" label-width="110px">
+    <el-dialog
+      v-model="formVisible"
+      :title="formData.id ? '编辑音色' : '新增音色'"
+      width="680px"
+      destroy-on-close
+    >
+      <el-form :model="formData" label-width="110px" class="catalog-binding-form">
+        <CatalogRoleBindingField
+          v-model:client-role-bind-all="formData.clientRoleBindAll"
+          v-model:client-role-ids="formData.clientRoleIds"
+          required
+        />
         <el-form-item label="音色ID" required>
           <el-input v-model="formData.voiceId" :disabled="!!formData.id" />
         </el-form-item>
@@ -511,6 +521,7 @@ import {
 import { getModels } from '@/api/model'
 import { getProviders } from '@/api/provider'
 import { getProviderApiKeys, revealProviderApiKeyToken } from '@/api/providerApiKey'
+import CatalogRoleBindingField from '@/views/components/CatalogRoleBindingField.vue'
 
 const loading = ref(false)
 const modelsLoading = ref(false)
@@ -580,7 +591,9 @@ const formData = reactive({
   tagAge: '',
   tagGender: '',
   tagTraits: [],
-  isActive: true
+  isActive: true,
+  clientRoleBindAll: true,
+  clientRoleIds: []
 })
 
 const providers = ref([])
@@ -989,7 +1002,9 @@ function handleAdd() {
     tagAge: '',
     tagGender: '',
     tagTraits: [],
-    isActive: true
+    isActive: true,
+    clientRoleBindAll: true,
+    clientRoleIds: []
   })
   formVisible.value = true
 }
@@ -1017,7 +1032,9 @@ function handleEdit(row) {
     tagAge,
     tagGender,
     tagTraits,
-    isActive: row.isActive === true
+    isActive: row.isActive === true,
+    clientRoleBindAll: row.clientRoleBindAll !== false,
+    clientRoleIds: Array.isArray(row.clientRoleIds) ? [...row.clientRoleIds] : []
   })
   formVisible.value = true
 }
@@ -1080,7 +1097,9 @@ async function handleSubmit() {
         { type: 'gender', value: gender },
         ...traits.map((v) => ({ type: 'trait', value: v }))
       ],
-      isActive: formData.isActive
+      isActive: formData.isActive,
+      clientRoleBindAll: formData.clientRoleBindAll,
+      clientRoleIds: formData.clientRoleIds
     }
 
     // 编辑：如果模型绑定未变化，则不传 modelIds，避免后端误判为“尝试更新绑定”
@@ -1138,6 +1157,12 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.catalog-binding-form {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .voice-page {
   padding: 0;
 }

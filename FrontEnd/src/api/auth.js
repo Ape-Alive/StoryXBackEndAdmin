@@ -25,6 +25,14 @@ export function getCurrentAdmin() {
   })
 }
 
+// 获取当前管理员前端权限码
+export function getMyPermissions() {
+  return request({
+    url: '/auth/my-permissions',
+    method: 'get'
+  })
+}
+
 // 修改密码
 export function changePassword(data) {
   return request({

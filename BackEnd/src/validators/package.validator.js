@@ -1,40 +1,31 @@
-const { body, query, param } = require('express-validator');
+const { body, query, param } = require('express-validator')
 
 /**
  * 套餐列表查询验证
  */
 const getPackagesValidator = [
-  query('page')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('Page must be a positive integer'),
-  query('pageSize')
-    .optional()
-    .isInt({ min: 1, max: 1000 })
-    .withMessage('Page size must be between 1 and 1000'),
-  query('type')
-    .optional()
-    .isIn(['free', 'paid', 'trial'])
-    .withMessage('Invalid package type'),
+  query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
+  query('pageSize').optional().isInt({ min: 1, max: 1000 }).withMessage('Page size must be between 1 and 1000'),
+  query('type').optional().isIn(['free', 'paid', 'trial']).withMessage('Invalid package type'),
   query('isActive')
     .optional()
     .custom((value) => {
       if (value === 'true' || value === 'false' || value === true || value === false) {
-        return true;
+        return true
       }
-      throw new Error('isActive must be a boolean');
+      throw new Error('isActive must be a boolean')
     })
     .withMessage('isActive must be a boolean'),
   query('isStackable')
     .optional()
     .custom((value) => {
       if (value === 'true' || value === 'false' || value === true || value === false) {
-        return true;
+        return true
       }
-      throw new Error('isStackable must be a boolean');
+      throw new Error('isStackable must be a boolean')
     })
-    .withMessage('isStackable must be a boolean')
-];
+    .withMessage('isStackable must be a boolean'),
+]
 
 /**
  * 创建套餐验证
@@ -51,15 +42,19 @@ const createPackageValidator = [
     .isString()
     .withMessage('Display name must be a string'),
   body('type')
-    .notEmpty()
-    .withMessage('Package type is required')
+    .optional()
     .isIn(['free', 'paid', 'trial'])
     .withMessage('Invalid package type'),
+  body('clientRoleId')
+    .notEmpty()
+    .withMessage('clientRoleId is required')
+    .isString()
+    .withMessage('clientRoleId must be a string'),
   body('duration')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      return Number.isInteger(value) && value >= 1;
+      if (value === null || value === undefined) return true
+      return Number.isInteger(value) && value >= 1
     })
     .withMessage('Duration must be a positive integer or null (永久)'),
   body('durationUnit')
@@ -69,17 +64,17 @@ const createPackageValidator = [
   body('quota')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= 0;
+      if (value === null || value === undefined) return true
+      const num = parseFloat(value)
+      return !isNaN(num) && num >= 0
     })
     .withMessage('Quota must be a non-negative number or null (无限)'),
   body('price')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= 0;
+      if (value === null || value === undefined) return true
+      const num = parseFloat(value)
+      return !isNaN(num) && num >= 0
     })
     .withMessage('Price must be a non-negative number'),
   body('priceUnit')
@@ -89,76 +84,65 @@ const createPackageValidator = [
   body('discount')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= 0 && num <= 100;
+      if (value === null || value === undefined) return true
+      const num = parseFloat(value)
+      return !isNaN(num) && num >= 0 && num <= 100
     })
     .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
     .optional({ nullable: true })
     .custom((value, { req }) => {
       if (value === null || value === undefined || value === '') {
-        req.body.availableModels = null;
-        return true;
+        req.body.availableModels = null
+        return true
       }
       // 如果是字符串，尝试解析为 JSON
       if (typeof value === 'string') {
         try {
-          const parsed = JSON.parse(value);
+          const parsed = JSON.parse(value)
           if (Array.isArray(parsed)) {
-            req.body.availableModels = parsed.length > 0 ? parsed : null;
-            return true;
+            req.body.availableModels = parsed.length > 0 ? parsed : null
+            return true
           }
-          throw new Error('Available models must be an array');
+          throw new Error('Available models must be an array')
         } catch (e) {
-          throw new Error('Available models must be a valid JSON array string or null');
+          throw new Error('Available models must be a valid JSON array string or null')
         }
       }
       // 如果已经是数组
       if (Array.isArray(value)) {
-        req.body.availableModels = value.length > 0 ? value : null;
-        return true;
+        req.body.availableModels = value.length > 0 ? value : null
+        return true
       }
-      throw new Error('Available models must be an array or null');
+      throw new Error('Available models must be an array or null')
     })
     .withMessage('Available models must be an array, JSON array string, or null'),
   body('maxDevices')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      return Number.isInteger(value) && value >= 1;
+      if (value === null || value === undefined) return true
+      return Number.isInteger(value) && value >= 1
     })
     .withMessage('Max devices must be a positive integer or null (无限)'),
-  body('isStackable')
-    .optional()
-    .isBoolean()
-    .withMessage('isStackable must be a boolean'),
-  body('priority')
-    .optional()
-    .isInt()
-    .withMessage('Priority must be an integer')
-];
+  body('isStackable').optional().isBoolean().withMessage('isStackable must be a boolean'),
+  body('priority').optional().isInt().withMessage('Priority must be an integer'),
+  body('isRecommend').optional().isBoolean().withMessage('isRecommend must be a boolean'),
+  body('guideScene').optional({ nullable: true }).isString().withMessage('guideScene must be a string'),
+]
 
 /**
  * 更新套餐验证
  */
 const updatePackageValidator = [
-  param('id')
-    .notEmpty()
-    .withMessage('Package ID is required'),
-  body('displayName')
-    .optional()
-    .isString()
-    .withMessage('Display name must be a string'),
-  body('type')
-    .optional()
-    .isIn(['free', 'paid', 'trial'])
-    .withMessage('Invalid package type'),
+  param('id').notEmpty().withMessage('Package ID is required'),
+  body('displayName').optional().isString().withMessage('Display name must be a string'),
+  body('type').optional().isIn(['free', 'paid', 'trial']).withMessage('Invalid package type'),
+  body('clientRoleId').optional().isString().withMessage('clientRoleId must be a string'),
   body('duration')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      return Number.isInteger(value) && value >= 1;
+      if (value === null || value === undefined) return true
+      return Number.isInteger(value) && value >= 1
     })
     .withMessage('Duration must be a positive integer or null (永久)'),
   body('durationUnit')
@@ -168,17 +152,17 @@ const updatePackageValidator = [
   body('quota')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= 0;
+      if (value === null || value === undefined) return true
+      const num = parseFloat(value)
+      return !isNaN(num) && num >= 0
     })
     .withMessage('Quota must be a non-negative number or null (无限)'),
   body('price')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= 0;
+      if (value === null || value === undefined) return true
+      const num = parseFloat(value)
+      return !isNaN(num) && num >= 0
     })
     .withMessage('Price must be a non-negative number'),
   body('priceUnit')
@@ -188,67 +172,58 @@ const updatePackageValidator = [
   body('discount')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      const num = parseFloat(value);
-      return !isNaN(num) && num >= 0 && num <= 100;
+      if (value === null || value === undefined) return true
+      const num = parseFloat(value)
+      return !isNaN(num) && num >= 0 && num <= 100
     })
     .withMessage('Discount must be between 0 and 100 (percentage)'),
   body('availableModels')
     .optional({ nullable: true })
     .custom((value, { req }) => {
       if (value === null || value === undefined || value === '') {
-        req.body.availableModels = null;
-        return true;
+        req.body.availableModels = null
+        return true
       }
       // 如果是字符串，尝试解析为 JSON
       if (typeof value === 'string') {
         try {
-          const parsed = JSON.parse(value);
+          const parsed = JSON.parse(value)
           if (Array.isArray(parsed)) {
-            req.body.availableModels = parsed.length > 0 ? parsed : null;
-            return true;
+            req.body.availableModels = parsed.length > 0 ? parsed : null
+            return true
           }
-          throw new Error('Available models must be an array');
+          throw new Error('Available models must be an array')
         } catch (e) {
-          throw new Error('Available models must be a valid JSON array string or null');
+          throw new Error('Available models must be a valid JSON array string or null')
         }
       }
       // 如果已经是数组
       if (Array.isArray(value)) {
-        req.body.availableModels = value.length > 0 ? value : null;
-        return true;
+        req.body.availableModels = value.length > 0 ? value : null
+        return true
       }
-      throw new Error('Available models must be an array or null');
+      throw new Error('Available models must be an array or null')
     })
     .withMessage('Available models must be an array, JSON array string, or null'),
   body('maxDevices')
     .optional({ nullable: true })
     .custom((value) => {
-      if (value === null || value === undefined) return true;
-      return Number.isInteger(value) && value >= 1;
+      if (value === null || value === undefined) return true
+      return Number.isInteger(value) && value >= 1
     })
     .withMessage('Max devices must be a positive integer or null (无限)'),
-  body('isStackable')
-    .optional()
-    .isBoolean()
-    .withMessage('isStackable must be a boolean'),
-  body('priority')
-    .optional()
-    .isInt()
-    .withMessage('Priority must be an integer'),
-  body('isActive')
-    .optional()
-    .isBoolean()
-    .withMessage('isActive must be a boolean')
-];
+  body('isStackable').optional().isBoolean().withMessage('isStackable must be a boolean'),
+  body('priority').optional().isInt().withMessage('Priority must be an integer'),
+  body('isActive').optional().isBoolean().withMessage('isActive must be a boolean'),
+  body('isRecommend').optional().isBoolean().withMessage('isRecommend must be a boolean'),
+  body('guideScene').optional({ nullable: true }).isString().withMessage('guideScene must be a string'),
+]
 
 /**
  * 复制套餐验证
  */
 const duplicatePackageValidator = [
-  param('id')
-    .notEmpty()
-    .withMessage('Package ID is required'),
+  param('id').notEmpty().withMessage('Package ID is required'),
   body('newName')
     .notEmpty()
     .withMessage('New package name is required')
@@ -258,12 +233,12 @@ const duplicatePackageValidator = [
     .notEmpty()
     .withMessage('New display name is required')
     .isString()
-    .withMessage('New display name must be a string')
-];
+    .withMessage('New display name must be a string'),
+]
 
 module.exports = {
   getPackagesValidator,
   createPackageValidator,
   updatePackageValidator,
-  duplicatePackageValidator
-};
+  duplicatePackageValidator,
+}

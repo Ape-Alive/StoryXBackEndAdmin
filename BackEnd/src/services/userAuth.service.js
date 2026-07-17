@@ -3,11 +3,27 @@ const jwt = require('jsonwebtoken')
 const prisma = require('../config/database')
 const { UnauthorizedError, NotFoundError, BadRequestError, ConflictError } = require('../utils/errors')
 const { ROLES } = require('../constants/roles')
+const userEntitlementService = require('./userEntitlement.service')
 
 /**
  * 终端用户认证服务（C端用户）
  */
 class UserAuthService {
+  async buildAuthPayload(user, tokens = {}) {
+    const entitlement = await userEntitlementService.computeForUser(user.id)
+    return {
+      ...tokens,
+      user: {
+        id: user.id,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        status: user.status,
+      },
+      entitlement,
+    }
+  }
+
   /**
    * 发送注册验证码（终端用户注册）
    */
@@ -126,21 +142,8 @@ class UserAuthService {
    * 检查用户设备数量限制
    */
   async checkDeviceLimit(userId) {
-    // 获取用户的所有有效套餐
-    const userPackages = await prisma.userPackage.findMany({
-      where: {
-        userId,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
-      },
-      include: {
-        package: true,
-      },
-      orderBy: {
-        priority: 'desc',
-      },
-    })
+    const activePackages = await userEntitlementService.getActiveUserPackagesForUser(userId)
 
-    // 获取用户当前活跃设备数量（只统计 active 状态的设备）
     const deviceCount = await prisma.device.count({
       where: {
         userId,
@@ -148,20 +151,13 @@ class UserAuthService {
       },
     })
 
-    // 查找最高优先级的套餐，获取最大设备数限制
-    let maxDevices = null
-    if (userPackages.length > 0) {
-      // 按优先级排序，取最高优先级的套餐
-      const highestPriorityPackage = userPackages[0]
-      maxDevices = highestPriorityPackage.package.maxDevices
-    }
+    const effectiveUserPackage = userEntitlementService.getEffectiveUserPackage(activePackages)
+    const maxDevices = effectiveUserPackage?.package?.maxDevices ?? null
 
-    // 如果套餐没有设置设备限制（null），则允许无限设备
     if (maxDevices === null) {
       return { allowed: true, currentCount: deviceCount, maxDevices: null }
     }
 
-    // 检查是否超过限制
     if (deviceCount >= maxDevices) {
       return {
         allowed: false,
@@ -249,51 +245,113 @@ class UserAuthService {
   }
 
   /**
-   * 终端用户注册（邮箱验证码注册 + 设备指纹）
-   * 注册时创建 User 账号，分配基础角色 basic_user（未认证用户）
+   * 终端用户注册（激活码 + 邮箱验证码 + 可选手机 + 设备指纹）
+   * 注册成功后核销激活码并绑定其指定套餐
    */
   async register(data) {
-    // 检查邮箱是否已存在（检查 User 表）
-    const existingUser = await prisma.user.findUnique({
-      where: { email: data.email },
+    const activationCodeService = require('./activationCode.service')
+    const userPackageService = require('./userPackage.service')
+
+    const email = String(data.email || '').trim().toLowerCase()
+    const phone =
+      data.phone != null && String(data.phone).trim() !== '' ? String(data.phone).trim() : null
+
+    const redeemable = await activationCodeService.assertRedeemable(data.activationCode, {
+      email,
+      phone,
     })
+
+    const existingUser = await prisma.user.findUnique({ where: { email } })
     if (existingUser) {
       throw new ConflictError('Email already registered')
     }
 
-    // 验证验证码
-    await this.verifyRegisterCode(data.email, data.verificationCode)
+    if (phone) {
+      const existingPhone = await prisma.user.findUnique({ where: { phone } })
+      if (existingPhone) {
+        throw new ConflictError('Phone already registered')
+      }
+    }
 
-    // 加密密码
+    await this.verifyRegisterCode(email, data.verificationCode)
+
     const hashedPassword = await bcrypt.hash(data.password, 10)
 
-    // 创建普通用户账号（分配基础角色 basic_user）
-    const user = await prisma.user.create({
-      data: {
-        email: data.email,
-        password: hashedPassword,
-        role: ROLES.BASIC_USER, // 注册时固定为基础角色（未认证用户）
-        status: 'normal',
-      },
-    })
+    let user
+    try {
+      user = await prisma.$transaction(async (tx) => {
+        const created = await tx.user.create({
+          data: {
+            email,
+            phone,
+            password: hashedPassword,
+            role: ROLES.BASIC_USER,
+            status: 'normal',
+          },
+        })
+        await activationCodeService.markUsed(redeemable.id, created.id, tx)
+        return created
+      })
+    } catch (error) {
+      if (error.code === 'P2002') {
+        throw new ConflictError('Email or phone already registered')
+      }
+      throw error
+    }
 
-    // 如果提供了设备指纹，创建设备记录（可选）
+    try {
+      await userPackageService.assignPackage(
+        {
+          userId: user.id,
+          packageId: redeemable.packageId,
+        },
+        redeemable.createdBy,
+        data.ipAddress || null,
+      )
+
+      // 确认套餐已落到当前用户
+      const bound = await prisma.userPackage.findFirst({
+        where: {
+          userId: user.id,
+          packageId: redeemable.packageId,
+        },
+      })
+      if (!bound) {
+        throw new BadRequestError('套餐绑定失败，请联系管理员')
+      }
+    } catch (error) {
+      // 补偿：套餐发放失败则回滚用户与激活码，避免半成功账号
+      try {
+        await prisma.activationCode.update({
+          where: { id: redeemable.id },
+          data: {
+            status: 'unused',
+            usedAt: null,
+            usedByUserId: null,
+          },
+        })
+        await prisma.user.delete({ where: { id: user.id } })
+      } catch (_) {
+        /* ignore */
+      }
+      throw error
+    }
+
     if (data.deviceFingerprint) {
       await this.addOrUpdateDevice(user.id, data.deviceFingerprint, data.ipAddress || null)
     }
 
-    // 注册成功后自动登录并返回 JWT Token
     const token = jwt.sign(
       {
         id: user.id,
         email: user.email,
         role: user.role,
-        type: 'user', // 标识这是用户 token，不是管理员 token
+        type: 'user',
       },
       process.env.JWT_SECRET,
       {
         expiresIn: process.env.JWT_EXPIRES_IN || '24h',
-      }
+      },
     )
 
     return {
@@ -301,9 +359,11 @@ class UserAuthService {
       user: {
         id: user.id,
         email: user.email,
+        phone: user.phone,
         role: user.role,
         status: user.status,
       },
+      entitlement: await userEntitlementService.computeForUser(user.id),
     }
   }
 
@@ -366,18 +426,11 @@ class UserAuthService {
     // 生成访问令牌和刷新令牌
     const tokens = await this.generateTokens(user, deviceId, ipAddress)
 
-    return {
+    return this.buildAuthPayload(user, {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      token: tokens.accessToken, // 保持向后兼容
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        status: user.status,
-      },
-    }
+      token: tokens.accessToken,
+    })
   }
 
   /**
@@ -545,17 +598,11 @@ class UserAuthService {
       data: { lastLoginAt: new Date() },
     })
 
-    return {
+    return this.buildAuthPayload(oneTimeTokenRecord.user, {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
-      user: {
-        id: oneTimeTokenRecord.user.id,
-        email: oneTimeTokenRecord.user.email,
-        phone: oneTimeTokenRecord.user.phone,
-        role: oneTimeTokenRecord.user.role,
-        status: oneTimeTokenRecord.user.status,
-      },
-    }
+      token: tokens.accessToken,
+    })
   }
 
   /**
@@ -653,6 +700,7 @@ class UserAuthService {
     return {
       accessToken: newTokens.accessToken,
       refreshToken: newTokens.refreshToken,
+      entitlement: await userEntitlementService.computeForUser(refreshTokenRecord.user.id),
     }
   }
 

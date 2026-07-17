@@ -30,12 +30,12 @@
       @change="handleSearch"
     >
       <el-option label="全部角色" value="" />
-      <el-option label="超级管理员" value="super_admin" />
-      <el-option label="平台管理员" value="platform_admin" />
-      <el-option label="运营人员" value="operator" />
-      <el-option label="风控人员" value="risk_control" />
-      <el-option label="财务人员" value="finance" />
-      <el-option label="只读角色" value="read_only" />
+      <el-option
+        v-for="role in roleOptions"
+        :key="role.roleKey"
+        :label="role.name"
+        :value="role.roleKey"
+      />
     </el-select>
     <el-select
       v-model="localFilters.status"
@@ -64,6 +64,10 @@ const props = defineProps({
       role: '',
       status: ''
     })
+  },
+  roleOptions: {
+    type: Array,
+    default: () => []
   }
 })
 

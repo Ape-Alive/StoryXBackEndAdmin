@@ -1,7 +1,32 @@
 const voiceProfileRepository = require('../repositories/voiceProfile.repository')
 const modelRepository = require('../repositories/model.repository')
+const {
+  TARGET_TYPES,
+  buildVisibleWhereForRole,
+  mergeWhereWithRoleVisibility,
+  enrichItemsWithRoleBindings,
+  enrichItemWithRoleBindings,
+  parseOptionalRoleBindingInput,
+  applyRoleBindingFields,
+} = require('../utils/catalogRoleBinding')
 const { NotFoundError, ConflictError, BadRequestError, ForbiddenError } = require('../utils/errors')
 const { ROLES } = require('../constants/roles')
+
+async function withVoiceCatalogRoleFilter(baseWhere, catalogRoleContext, userId) {
+  if (!catalogRoleContext) {
+    return baseWhere
+  }
+
+  const roleWhere = await buildVisibleWhereForRole(
+    TARGET_TYPES.VOICE_PROFILE,
+    catalogRoleContext.effectiveRoleId,
+  )
+  const accessWhere = userId
+    ? { OR: [{ scope: 'user', userId }, roleWhere] }
+    : roleWhere
+
+  return mergeWhereWithRoleVisibility(baseWhere, accessWhere)
+}
 
 function isAdminRole(role) {
   return [
@@ -104,7 +129,8 @@ class VoiceProfileService {
     sort = {},
     userRole = null,
     userId = null,
-    includeAll = false
+    includeAll = false,
+    catalogRoleContext = null,
   ) {
     const isAdmin = userRole && isAdminRole(userRole)
     const includeAllOn = parseIncludeAllFlag(includeAll)
@@ -114,16 +140,23 @@ class VoiceProfileService {
       const effectiveFilters = { ...(filters || {}) }
       delete effectiveFilters.scope
       delete effectiveFilters.userId
-      return voiceProfileRepository.findVoiceProfiles(effectiveFilters, pagination, sort)
+      const result = await voiceProfileRepository.findVoiceProfiles(effectiveFilters, pagination, sort)
+      result.data = await enrichItemsWithRoleBindings(TARGET_TYPES.VOICE_PROFILE, result.data)
+      return result
     }
 
     // 终端用户：只能看到 system 音色 + 自己的 user 音色
     if (!isAdmin) {
+      const prisma = require('../config/database')
+      const orderBy = { createdAt: sort.createdAt || 'desc' }
+
       // includeAll=true：一次性返回全部「system + 自己的 user」（仍受 voiceId/name/modelId/isActive 筛选）
       if (includeAllOn) {
-        const prisma = require('../config/database')
-        const orderBy = { createdAt: sort.createdAt || 'desc' }
-        const baseWhere = endUserAccessibleVoiceWhere(filters, userId)
+        const baseWhere = await withVoiceCatalogRoleFilter(
+          endUserAccessibleVoiceWhere(filters, userId),
+          catalogRoleContext,
+          userId,
+        )
 
         const [data, total] = await Promise.all([
           prisma.voiceProfile.findMany({
@@ -137,7 +170,12 @@ class VoiceProfileService {
           prisma.voiceProfile.count({ where: baseWhere }),
         ])
 
-        return { data, total, page: 1, pageSize: Math.max(total, 1) }
+        return {
+          data: await enrichItemsWithRoleBindings(TARGET_TYPES.VOICE_PROFILE, data),
+          total,
+          page: 1,
+          pageSize: Math.max(total, 1),
+        }
       }
 
       // 若明确筛 scope=user，则强制 userId=自己
@@ -146,15 +184,14 @@ class VoiceProfileService {
       } else if (filters.scope === 'system') {
         filters.userId = null
       } else {
-        // 不传 scope：同时返回 system + 自己的 user
-        // Prisma where 需要 OR，这里转成 repository 可识别的直接 where
-        // 为了保持 repository 简单，这里直接走 prisma
-        const prisma = require('../config/database')
         const { page = 1, pageSize = 20 } = pagination
         const skip = (page - 1) * pageSize
-        const orderBy = { createdAt: sort.createdAt || 'desc' }
 
-        const baseWhere = endUserAccessibleVoiceWhere(filters, userId)
+        const baseWhere = await withVoiceCatalogRoleFilter(
+          endUserAccessibleVoiceWhere(filters, userId),
+          catalogRoleContext,
+          userId,
+        )
 
         const [data, total] = await Promise.all([
           prisma.voiceProfile.findMany({
@@ -170,14 +207,34 @@ class VoiceProfileService {
           prisma.voiceProfile.count({ where: baseWhere }),
         ])
 
-        return { data, total, page, pageSize }
+        return {
+          data: await enrichItemsWithRoleBindings(TARGET_TYPES.VOICE_PROFILE, data),
+          total,
+          page,
+          pageSize,
+        }
       }
     }
 
-    return voiceProfileRepository.findVoiceProfiles(filters, pagination, sort)
+    let roleVisibilityWhere = null
+    if (catalogRoleContext) {
+      roleVisibilityWhere = await buildVisibleWhereForRole(
+        TARGET_TYPES.VOICE_PROFILE,
+        catalogRoleContext.effectiveRoleId,
+      )
+    }
+
+    const result = await voiceProfileRepository.findVoiceProfiles(
+      filters,
+      pagination,
+      sort,
+      roleVisibilityWhere,
+    )
+    result.data = await enrichItemsWithRoleBindings(TARGET_TYPES.VOICE_PROFILE, result.data)
+    return result
   }
 
-  async getVoiceProfileDetail(id, userRole = null, userId = null) {
+  async getVoiceProfileDetail(id, userRole = null, userId = null, catalogRoleContext = null) {
     const profile = await voiceProfileRepository.findById(id)
     if (!profile) throw new NotFoundError('Voice profile not found')
 
@@ -188,7 +245,27 @@ class VoiceProfileService {
       if (!canView) throw new ForbiddenError('Permission denied')
     }
 
-    return profile
+    if (catalogRoleContext) {
+      if (profile.scope === 'user') {
+        if (profile.userId !== (userId || catalogRoleContext.userId)) {
+          throw new NotFoundError('Voice profile not found')
+        }
+      } else {
+        const prisma = require('../config/database')
+        const roleWhere = await buildVisibleWhereForRole(
+          TARGET_TYPES.VOICE_PROFILE,
+          catalogRoleContext.effectiveRoleId,
+        )
+        const visible = await prisma.voiceProfile.findFirst({
+          where: mergeWhereWithRoleVisibility({ id }, roleWhere),
+        })
+        if (!visible) {
+          throw new NotFoundError('Voice profile not found')
+        }
+      }
+    }
+
+    return enrichItemWithRoleBindings(TARGET_TYPES.VOICE_PROFILE, profile)
   }
 
   async createVoiceProfile(data, userId = null, userRole = null) {

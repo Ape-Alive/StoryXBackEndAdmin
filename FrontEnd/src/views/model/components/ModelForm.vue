@@ -2,7 +2,9 @@
   <el-dialog
     v-model="visible"
     :title="formData.id ? '编辑模型' : '新增模型'"
-    width="600px"
+    width="680px"
+    class="catalog-binding-dialog"
+    destroy-on-close
     @close="handleClose"
   >
     <el-form
@@ -11,7 +13,15 @@
       :rules="rules"
       label-width="120px"
       label-position="left"
+      class="catalog-binding-form"
     >
+      <CatalogRoleBindingField
+        v-model:client-role-bind-all="formData.clientRoleBindAll"
+        v-model:client-role-ids="formData.clientRoleIds"
+        :prefer-role-key="formData.id ? '' : 'package_paid_user'"
+        required
+      />
+
       <el-form-item label="模型标识" prop="name">
         <el-input
           v-model="formData.name"
@@ -142,6 +152,7 @@
 import { ref, reactive, watch, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getProviders } from '@/api/provider'
+import CatalogRoleBindingField from '@/views/components/CatalogRoleBindingField.vue'
 
 const props = defineProps({
   modelValue: {
@@ -178,7 +189,9 @@ const formData = reactive({
   description: '',
   apiConfig: '',
   requiresKey: false,
-  isActive: true
+  isActive: true,
+  clientRoleBindAll: false,
+  clientRoleIds: []
 })
 
 const rules = {
@@ -251,7 +264,9 @@ watch(() => props.modelValue, (val) => {
       description: props.model.description || '',
       apiConfig: props.model.apiConfig || '',
       requiresKey: props.model.requiresKey !== undefined ? props.model.requiresKey : false,
-      isActive: props.model.isActive !== undefined ? props.model.isActive : true
+      isActive: props.model.isActive !== undefined ? props.model.isActive : true,
+      clientRoleBindAll: props.model.clientRoleBindAll === true,
+      clientRoleIds: Array.isArray(props.model.clientRoleIds) ? [...props.model.clientRoleIds] : []
     })
   } else if (val) {
     modelTagArr.value = []
@@ -269,7 +284,9 @@ watch(() => props.modelValue, (val) => {
       description: '',
       apiConfig: '',
       requiresKey: false,
-      isActive: true
+      isActive: true,
+      clientRoleBindAll: false,
+      clientRoleIds: []
     })
   }
 })
@@ -335,6 +352,12 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.catalog-binding-form {
+  max-height: 70vh;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 </style>
 

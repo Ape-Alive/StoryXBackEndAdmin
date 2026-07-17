@@ -1,4 +1,4 @@
-const logger = require('../utils/logger');
+const logger = require('../utils/logger')
 
 /**
  * 全局错误处理中间件
@@ -9,42 +9,45 @@ const errorHandler = (err, req, res, next) => {
     stack: err.stack,
     url: req.url,
     method: req.method,
-    ip: req.ip
-  });
+    ip: req.ip,
+  })
 
   // 默认错误信息
-  let statusCode = err.statusCode || 500;
-  let message = err.message || 'Internal Server Error';
-  let errors = null;
+  let statusCode = err.statusCode || 500
+  let message = err.message || 'Internal Server Error'
+  let errors = null
 
   // 验证错误（express-validator）
   if (err.name === 'ValidationError' || err.errors) {
-    statusCode = 400;
-    message = err.message || 'Validation Error';
+    statusCode = 400
+    message = err.message || 'Validation Error'
     if (err.errors && Array.isArray(err.errors)) {
-      errors = err.errors;
+      errors = err.errors
     }
   }
 
   // 自定义错误类
   if (err.statusCode) {
-    statusCode = err.statusCode;
+    statusCode = err.statusCode
   }
 
   // JWT 错误
   if (err.name === 'JsonWebTokenError') {
-    statusCode = 401;
-    message = 'Invalid token';
+    statusCode = 401
+    message = 'Invalid token'
   }
 
   // Token过期错误处理
-  let expiredAt = null;
-  if (err.name === 'TokenExpiredError' || (err.statusCode === 401 && err.message && err.message.includes('Token expired'))) {
-    statusCode = 401;
-    message = err.message || 'Token expired';
+  let expiredAt = null
+  if (
+    err.name === 'TokenExpiredError' ||
+    (err.statusCode === 401 && err.message && err.message.includes('Token expired'))
+  ) {
+    statusCode = 401
+    message = err.message || 'Token expired'
     // 如果错误对象包含过期时间，保存到变量中
     if (err.expiredAt) {
-      expiredAt = err.expiredAt;
+      expiredAt = err.expiredAt
     }
   }
 
@@ -54,10 +57,12 @@ const errorHandler = (err, req, res, next) => {
     message,
     ...(errors && { errors }),
     ...(expiredAt && { expiredAt }),
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
-  };
+    ...(err.code && { code: err.code }),
+    ...(err.subscriptionGuide && { subscriptionGuide: err.subscriptionGuide }),
+    ...(process.env.NODE_ENV === 'development' && { stack: err.stack }),
+  }
 
-  res.status(statusCode).json(response);
-};
+  res.status(statusCode).json(response)
+}
 
-module.exports = errorHandler;
+module.exports = errorHandler

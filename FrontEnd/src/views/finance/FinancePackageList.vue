@@ -8,7 +8,14 @@
           配置面向终端用户售卖的商业套餐，包括额度、有效期、价格、最大设备数等关键参数。
         </p>
       </div>
-      <el-button type="primary" :icon="Plus" @click="handleAdd"> 新增套餐 </el-button>
+      <el-button
+        v-if="canManagePackages"
+        type="primary"
+        :icon="Plus"
+        @click="handleAdd"
+      >
+        新增套餐
+      </el-button>
     </div>
 
     <!-- 搜索和统计 -->
@@ -108,7 +115,16 @@
           </template>
         </el-table-column>
 
-        <el-table-column label="类型" width="120" align="center">
+        <el-table-column label="客户端角色" width="150" align="center">
+          <template #default="{ row }">
+            <el-tag v-if="row.clientRole" type="info" size="small">
+              {{ row.clientRole.name }}
+            </el-tag>
+            <span v-else class="text-muted">未绑定</span>
+          </template>
+        </el-table-column>
+
+        <el-table-column label="类型" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getTypeTagType(row.type)" size="small">
               {{ getTypeLabel(row.type) }}
@@ -191,16 +207,40 @@
         <el-table-column label="操作" width="250" align="center" fixed="right">
           <template #default="{ row }">
             <div class="action-buttons">
-              <el-button type="primary" text size="small" @click="handleEdit(row)">
+              <el-button
+                v-if="canManagePackages"
+                type="primary"
+                text
+                size="small"
+                @click="handleEdit(row)"
+              >
                 编辑
               </el-button>
-              <el-button type="primary" text size="small" @click="handleDuplicate(row)">
+              <el-button
+                v-if="canManagePackages"
+                type="primary"
+                text
+                size="small"
+                @click="handleDuplicate(row)"
+              >
                 复制
               </el-button>
-              <el-button type="primary" text size="small" @click="toggleStatus(row)">
+              <el-button
+                v-if="canManagePackages"
+                type="primary"
+                text
+                size="small"
+                @click="toggleStatus(row)"
+              >
                 {{ row.isActive ? '停用' : '启用' }}
               </el-button>
-              <el-button type="danger" text size="small" @click="handleDelete(row)">
+              <el-button
+                v-if="canManagePackages"
+                type="danger"
+                text
+                size="small"
+                @click="handleDelete(row)"
+              >
                 删除
               </el-button>
             </div>
@@ -259,12 +299,40 @@
           <el-input v-model="formData.displayName" placeholder="例如：高级套餐（月付）" />
         </el-form-item>
 
+        <el-form-item label="客户端角色" prop="clientRoleId">
+          <el-select
+            v-model="formData.clientRoleId"
+            placeholder="请选择绑定的客户端角色"
+            style="width: 100%"
+            filterable
+          >
+            <el-option
+              v-for="role in clientRoleOptions"
+              :key="role.id"
+              :label="`${role.name} (${role.roleKey})`"
+              :value="role.id"
+            />
+          </el-select>
+          <div class="form-tip">套餐权益由绑定的客户端角色决定，权限从角色权限配置读取。</div>
+        </el-form-item>
+
         <el-form-item label="套餐类型" prop="type">
-          <el-select v-model="formData.type" placeholder="请选择套餐类型" style="width: 100%">
+          <el-select v-model="formData.type" placeholder="可选，不填则按角色自动推断" style="width: 100%" clearable>
             <el-option label="免费套餐" value="free" />
             <el-option label="付费套餐" value="paid" />
             <el-option label="试用套餐" value="trial" />
           </el-select>
+        </el-form-item>
+
+        <el-form-item label="订阅引导">
+          <div class="guide-row">
+            <el-checkbox v-model="formData.isRecommend">推荐套餐</el-checkbox>
+            <el-input
+              v-model="formData.guideScene"
+              placeholder="引导场景标识（可选）"
+              style="flex: 1; margin-left: 12px"
+            />
+          </div>
         </el-form-item>
 
         <el-form-item label="有效期">
@@ -412,8 +480,10 @@ import {
   batchDeletePackages
 } from '@/api/package'
 import { getModels } from '@/api/model'
+import { getClientRoles } from '@/api/clientRole'
+import { hasButtonPermission, menuKeyToManagePermission } from '@/utils/permission'
 
-// 数据
+const canManagePackages = hasButtonPermission(menuKeyToManagePermission('packages'))
 const loading = ref(false)
 const tableData = ref([])
 const selectedIds = ref([])
@@ -455,6 +525,7 @@ const formRef = ref()
 // 模型选项
 const modelOptions = ref([])
 const loadingModels = ref(false)
+const clientRoleOptions = ref([])
 
 const formData = reactive({
   id: null,
@@ -462,6 +533,7 @@ const formData = reactive({
   displayName: '',
   description: '',
   type: 'paid',
+  clientRoleId: '',
   duration: null,
   durationUnit: null,
   quota: null,
@@ -469,10 +541,12 @@ const formData = reactive({
   priceUnit: 'CNY',
   discount: null,
   maxDevices: null,
-  availableModels: [], // 改为空数组，el-select 多选需要数组类型
+  availableModels: [],
   isStackable: false,
   priority: 0,
-  isActive: true
+  isActive: true,
+  isRecommend: false,
+  guideScene: '',
 })
 
 const rules = {
@@ -481,7 +555,7 @@ const rules = {
     { min: 3, max: 50, message: '长度在 3 到 50 个字符', trigger: 'blur' }
   ],
   displayName: [{ required: true, message: '请输入显示名称', trigger: 'blur' }],
-  type: [{ required: true, message: '请选择套餐类型', trigger: 'change' }]
+  clientRoleId: [{ required: true, message: '请选择客户端角色', trigger: 'change' }],
 }
 
 // 获取列表
@@ -537,6 +611,18 @@ function handleSelectionChange(selection) {
   selectedIds.value = selection.map(item => item.id)
 }
 
+async function loadClientRoles() {
+  if (clientRoleOptions.value.length > 0) return
+  try {
+    const res = await getClientRoles()
+    if (res.success) {
+      clientRoleOptions.value = res.data || []
+    }
+  } catch (e) {
+    // 统一错误处理
+  }
+}
+
 // 加载模型列表
 async function loadModels() {
   if (modelOptions.value.length > 0) return // 已加载过
@@ -584,6 +670,7 @@ async function handleAdd() {
     displayName: '',
     description: '',
     type: 'paid',
+    clientRoleId: clientRoleOptions.value[0]?.id || '',
     duration: null,
     durationUnit: null,
     quota: null,
@@ -594,9 +681,11 @@ async function handleAdd() {
     availableModels: [], // 改为空数组
     isStackable: false,
     priority: 0,
-    isActive: true
+    isActive: true,
+    isRecommend: false,
+    guideScene: '',
   })
-  await loadModels()
+  await Promise.all([loadModels(), loadClientRoles()])
   formVisible.value = true
 }
 
@@ -624,6 +713,7 @@ async function handleEdit(row) {
     displayName: row.displayName,
     description: row.description,
     type: row.type,
+    clientRoleId: row.clientRoleId || row.clientRole?.id || '',
     duration: row.duration,
     durationUnit: row.durationUnit,
     quota: row.quota,
@@ -634,9 +724,11 @@ async function handleEdit(row) {
     availableModels: availableModels,
     isStackable: row.isStackable,
     priority: row.priority,
-    isActive: row.isActive
+    isActive: row.isActive,
+    isRecommend: row.isRecommend || false,
+    guideScene: row.guideScene || '',
   })
-  await loadModels()
+  await Promise.all([loadModels(), loadClientRoles()])
   formVisible.value = true
 }
 
@@ -770,6 +862,19 @@ function handleSubmit() {
       // 确保 boolean 类型
       payload.isStackable = Boolean(payload.isStackable)
       payload.isActive = Boolean(payload.isActive)
+      payload.isRecommend = Boolean(payload.isRecommend)
+      payload.guideScene = payload.guideScene?.trim() || null
+
+      const selectedRole = clientRoleOptions.value.find(r => r.id === payload.clientRoleId)
+      const inferredType =
+        selectedRole?.roleKey === 'software_trial_user'
+          ? 'trial'
+          : payload.price > 0
+            ? 'paid'
+            : 'free'
+      if (!payload.type) {
+        payload.type = inferredType
+      }
 
       // priority 确保是整数
       if (payload.priority !== undefined && payload.priority !== null) {
@@ -898,6 +1003,7 @@ function formatDuration(duration, durationUnit) {
 }
 
 onMounted(() => {
+  loadClientRoles()
   fetchData()
 })
 </script>

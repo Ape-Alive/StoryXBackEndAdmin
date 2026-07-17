@@ -1,5 +1,17 @@
 const promptService = require('../services/prompt.service');
 const ResponseHandler = require('../utils/response');
+const { resolveCatalogRoleContext } = require('../utils/resolveCatalogRoleContext');
+const { stripCatalogRoleMeta } = require('../utils/providerSanitizer');
+
+function isTerminalUser(req) {
+  return req.user?.type === 'user';
+}
+
+function sanitizeCatalogPayload(req, payload) {
+  if (!isTerminalUser(req) || payload == null) return payload;
+  if (Array.isArray(payload)) return payload.map(stripCatalogRoleMeta);
+  return stripCatalogRoleMeta(payload);
+}
 
 /**
  * 提示词控制器
@@ -36,10 +48,22 @@ class PromptController {
 
       const userRole = req.user?.role;
       const userId = req.user?.id;
+      const catalogRoleContext = await resolveCatalogRoleContext(req);
+      // query.userId 表示「当前用户」（角色过滤），不是提示词归属筛选项
+      if (catalogRoleContext) {
+        delete filters.userId;
+      }
 
-      const result = await promptService.getPrompts(filters, pagination, sort, userRole, userId);
+      const result = await promptService.getPrompts(
+        filters,
+        pagination,
+        sort,
+        userRole,
+        userId,
+        catalogRoleContext,
+      );
 
-      return ResponseHandler.paginated(res, result.data, {
+      return ResponseHandler.paginated(res, sanitizeCatalogPayload(req, result.data), {
         page: result.page,
         pageSize: result.pageSize,
         total: result.total
@@ -57,8 +81,18 @@ class PromptController {
       const { id } = req.params;
       const userRole = req.user?.role;
       const userId = req.user?.id;
-      const prompt = await promptService.getPromptDetail(id, userRole, userId);
-      return ResponseHandler.success(res, prompt, 'Prompt detail retrieved successfully');
+      const catalogRoleContext = await resolveCatalogRoleContext(req);
+      const prompt = await promptService.getPromptDetail(
+        id,
+        userRole,
+        userId,
+        catalogRoleContext,
+      );
+      return ResponseHandler.success(
+        res,
+        sanitizeCatalogPayload(req, prompt),
+        'Prompt detail retrieved successfully',
+      );
     } catch (error) {
       next(error);
     }
@@ -119,6 +153,14 @@ class PromptController {
   async getPromptVersions(req, res, next) {
     try {
       const { id } = req.params;
+      const catalogRoleContext = await resolveCatalogRoleContext(req);
+      // 先做可见性校验，避免仅靠 ID 拉取版本内容
+      await promptService.getPromptDetail(
+        id,
+        req.user?.role,
+        req.user?.id,
+        catalogRoleContext,
+      );
       const versions = await promptService.getPromptVersions(id);
       return ResponseHandler.success(res, versions, 'Prompt versions retrieved successfully');
     } catch (error) {

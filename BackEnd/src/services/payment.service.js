@@ -13,10 +13,13 @@ class PaymentService {
   /**
    * 创建支付
    */
-  async createPayment(orderId, paymentMethod, extra = {}) {
-    // 验证订单是否存在
+  async createPayment(orderId, userId, paymentMethod, extra = {}) {
+    // 验证订单是否存在且属于当前用户
     const order = await orderRepository.findById(orderId);
     if (!order) {
+      throw new NotFoundError('Order not found');
+    }
+    if (order.userId !== userId) {
       throw new NotFoundError('Order not found');
     }
 

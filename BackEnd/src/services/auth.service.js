@@ -102,6 +102,19 @@ class AuthService {
     }
 
     /**
+     * 获取当前管理员的前端权限码列表
+     */
+    async getMyFrontendPermissions(adminId) {
+        const admin = await this.getCurrentAdmin(adminId);
+        if (admin.status !== 'active') {
+            throw new UnauthorizedError('Account is inactive');
+        }
+
+        const backendRoleService = require('./backendRole.service');
+        return backendRoleService.getFrontendPermissionCodesByRoleKey(admin.role);
+    }
+
+    /**
      * 创建管理员（仅超级管理员可以创建）
      * @param {Object} data - 管理员数据
      * @param {String} creatorId - 创建者ID（必须是 super_admin）

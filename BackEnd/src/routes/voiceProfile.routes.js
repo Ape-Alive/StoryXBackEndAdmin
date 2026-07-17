@@ -2,6 +2,7 @@ const express = require('express')
 const router = express.Router()
 const voiceProfileController = require('../controllers/voiceProfile.controller')
 const { authenticate, authorize } = require('../middleware/auth')
+const { requireEntitlement } = require('../middleware/entitlement')
 const validate = require('../middleware/validate')
 const {
   getVoiceProfilesValidator,
@@ -12,8 +13,14 @@ const {
   cloneVoiceProfileValidator,
 } = require('../validators/voiceProfile.validator')
 const { ROLES } = require('../constants/roles')
+const { requireAnyBackendMenuPermission } = require('../middleware/backendPermission')
+const { requireAnyClientPermission } = require('../middleware/clientPermission')
+const { CLIENT_API_PERMISSIONS } = require('../constants/clientApiPermissions')
 
 router.use(authenticate)
+router.use(requireEntitlement)
+router.use(requireAnyBackendMenuPermission('voice-profiles'))
+router.use(requireAnyClientPermission(...CLIENT_API_PERMISSIONS.RESOURCE_READ))
 
 /**
  * @swagger
@@ -169,7 +176,12 @@ router.use(authenticate)
  *                     total: 1
  *                     totalPages: 1
  */
-router.get('/', getVoiceProfilesValidator, validate, voiceProfileController.getVoiceProfiles.bind(voiceProfileController))
+router.get(
+  '/',
+  getVoiceProfilesValidator,
+  validate,
+  voiceProfileController.getVoiceProfiles.bind(voiceProfileController),
+)
 
 /**
  * @swagger
@@ -235,7 +247,7 @@ router.get(
   '/:id',
   getVoiceProfileDetailValidator,
   validate,
-  voiceProfileController.getVoiceProfileDetail.bind(voiceProfileController)
+  voiceProfileController.getVoiceProfileDetail.bind(voiceProfileController),
 )
 
 /**
@@ -247,7 +259,7 @@ router.get(
  *       创建音色记录。
  *
  *       **说明**：
- *       - `voiceId` 全局唯一
+ *       - voiceId 全局唯一
  *       - `scope=system` 仅管理员可创建
  *       - `scope=user` 将强制绑定当前用户（后端忽略/禁止传 userId）
  *       - `modelIds` 支持绑定多个模型；不传或空数组表示公共音色
@@ -339,9 +351,10 @@ router.get(
  */
 router.post(
   '/',
+  requireAnyClientPermission(...CLIENT_API_PERMISSIONS.VOICE_PROFILE_WRITE),
   createVoiceProfileValidator,
   validate,
-  voiceProfileController.createVoiceProfile.bind(voiceProfileController)
+  voiceProfileController.createVoiceProfile.bind(voiceProfileController),
 )
 
 /**
@@ -617,9 +630,10 @@ router.post(
 router.post(
   '/clone',
   authorize(ROLES.SUPER_ADMIN, ROLES.PLATFORM_ADMIN, ROLES.USER, ROLES.BASIC_USER),
+  requireAnyClientPermission(...CLIENT_API_PERMISSIONS.VOICE_PROFILE_WRITE),
   cloneVoiceProfileValidator,
   validate,
-  voiceProfileController.cloneVoiceProfile.bind(voiceProfileController)
+  voiceProfileController.cloneVoiceProfile.bind(voiceProfileController),
 )
 
 /**
@@ -738,13 +752,14 @@ router.post(
  *       404:
  *         description: 音色不存在
  *       409:
- *         description: `voiceId` 冲突（已存在）
+ *         description: voiceId 冲突（已存在）
  */
 router.put(
   '/:id',
+  requireAnyClientPermission(...CLIENT_API_PERMISSIONS.VOICE_PROFILE_WRITE),
   updateVoiceProfileValidator,
   validate,
-  voiceProfileController.updateVoiceProfile.bind(voiceProfileController)
+  voiceProfileController.updateVoiceProfile.bind(voiceProfileController),
 )
 
 /**
@@ -786,10 +801,10 @@ router.put(
  */
 router.delete(
   '/:id',
+  requireAnyClientPermission(...CLIENT_API_PERMISSIONS.VOICE_PROFILE_WRITE),
   deleteVoiceProfileValidator,
   validate,
-  voiceProfileController.deleteVoiceProfile.bind(voiceProfileController)
+  voiceProfileController.deleteVoiceProfile.bind(voiceProfileController),
 )
 
 module.exports = router
-

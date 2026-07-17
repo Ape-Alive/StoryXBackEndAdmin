@@ -5,9 +5,11 @@ const { authenticate, authorize } = require('../middleware/auth');
 const validate = require('../middleware/validate');
 const { body, param, query } = require('express-validator');
 const { ROLES } = require('../constants/roles');
+const { requireBackendMenuPermission } = require('../middleware/backendPermission');
 
 // 所有路由需要认证
 router.use(authenticate);
+router.use(requireBackendMenuPermission('billing-logs'));
 
 /**
  * @swagger

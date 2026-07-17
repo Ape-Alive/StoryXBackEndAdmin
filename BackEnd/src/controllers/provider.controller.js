@@ -1,5 +1,11 @@
 const providerService = require('../services/provider.service');
 const ResponseHandler = require('../utils/response');
+const { sanitizeProviderForClient } = require('../utils/providerSanitizer');
+const { resolveCatalogRoleContext } = require('../utils/resolveCatalogRoleContext');
+
+function isTerminalUser(req) {
+  return req.user?.type === 'user';
+}
 
 /**
  * 提供商控制器
@@ -36,9 +42,14 @@ class ProviderController {
         createdAt: req.query.order === 'asc' ? 'asc' : 'desc'
       };
 
-      const result = await providerService.getProviders(filters, pagination, sort);
+      const catalogRoleContext = await resolveCatalogRoleContext(req);
+      const result = await providerService.getProviders(filters, pagination, sort, catalogRoleContext);
 
-      return ResponseHandler.paginated(res, result.data, {
+      const data = isTerminalUser(req)
+        ? result.data.map(sanitizeProviderForClient)
+        : result.data;
+
+      return ResponseHandler.paginated(res, data, {
         page: result.page,
         pageSize: result.pageSize,
         total: result.total
@@ -54,8 +65,10 @@ class ProviderController {
   async getProviderDetail(req, res, next) {
     try {
       const { id } = req.params;
-      const provider = await providerService.getProviderDetail(id);
-      return ResponseHandler.success(res, provider, 'Provider detail retrieved successfully');
+      const catalogRoleContext = await resolveCatalogRoleContext(req);
+      const provider = await providerService.getProviderDetail(id, catalogRoleContext);
+      const data = isTerminalUser(req) ? sanitizeProviderForClient(provider) : provider;
+      return ResponseHandler.success(res, data, 'Provider detail retrieved successfully');
     } catch (error) {
       next(error);
     }

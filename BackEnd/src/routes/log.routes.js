@@ -10,9 +10,11 @@ const {
   getAICallLogDetailValidator
 } = require('../validators/log.validator');
 const { ROLES } = require('../constants/roles');
+const { requireAnyBackendMenuPermission } = require('../middleware/backendPermission');
 
 // 所有路由需要认证
 router.use(authenticate);
+router.use(requireAnyBackendMenuPermission('operation-logs', 'ai-call-logs'));
 
 /**
  * @swagger

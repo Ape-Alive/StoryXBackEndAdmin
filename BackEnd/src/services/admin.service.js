@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const adminRepository = require('../repositories/admin.repository');
 const { NotFoundError, BadRequestError, ConflictError, ForbiddenError } = require('../utils/errors');
 const { ROLES } = require('../constants/roles');
+const { assertAssignableAdminRole } = require('../utils/adminRole');
 
 /**
  * 管理员业务逻辑层
@@ -90,22 +91,11 @@ class AdminService {
       throw new ForbiddenError('Only super admin can create administrators');
     }
 
-    // 验证角色（不能是超级管理员）
+    // 验证角色（不能是超级管理员，且必须存在于角色库）
     if (data.role === ROLES.SUPER_ADMIN) {
       throw new BadRequestError('Super admin cannot be created through this method');
     }
-
-    // 验证角色是否有效
-    const validRoles = [
-      ROLES.PLATFORM_ADMIN,
-      ROLES.OPERATOR,
-      ROLES.RISK_CONTROL,
-      ROLES.FINANCE,
-      ROLES.READ_ONLY
-    ];
-    if (!validRoles.includes(data.role)) {
-      throw new BadRequestError('Invalid role');
-    }
+    await assertAssignableAdminRole(data.role);
 
     // 检查用户名是否已存在
     const existingUsername = await adminRepository.findByUsername(data.username);
@@ -182,16 +172,10 @@ class AdminService {
 
     // 验证角色是否有效（如果提供了角色）
     if (data.role) {
-      const validRoles = [
-        ROLES.PLATFORM_ADMIN,
-        ROLES.OPERATOR,
-        ROLES.RISK_CONTROL,
-        ROLES.FINANCE,
-        ROLES.READ_ONLY
-      ];
-      if (!validRoles.includes(data.role)) {
-        throw new BadRequestError('Invalid role');
+      if (data.role === ROLES.SUPER_ADMIN) {
+        throw new BadRequestError('Cannot change role to super_admin');
       }
+      await assertAssignableAdminRole(data.role);
     }
 
     const updated = await adminRepository.update(adminId, updateData);
@@ -264,16 +248,7 @@ class AdminService {
     }
 
     // 验证角色是否有效
-    const validRoles = [
-      ROLES.PLATFORM_ADMIN,
-      ROLES.OPERATOR,
-      ROLES.RISK_CONTROL,
-      ROLES.FINANCE,
-      ROLES.READ_ONLY
-    ];
-    if (!validRoles.includes(role)) {
-      throw new BadRequestError('Invalid role');
-    }
+    await assertAssignableAdminRole(role);
 
     // 如果当前是 super_admin，不能修改（必须至少保留一个）
     if (admin.role === ROLES.SUPER_ADMIN) {

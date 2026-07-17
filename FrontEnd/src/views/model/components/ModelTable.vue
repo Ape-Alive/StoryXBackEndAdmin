@@ -61,6 +61,23 @@
         </template>
       </el-table-column>
 
+      <el-table-column label="客户端角色" min-width="160" show-overflow-tooltip>
+        <template #default="{ row }">
+          <el-tag v-if="row.clientRoleBindAll" type="success" size="small">全部角色</el-tag>
+          <template v-else-if="row.clientRoles?.length">
+            <el-tag
+              v-for="role in row.clientRoles"
+              :key="role.id"
+              size="small"
+              class="role-tag"
+            >
+              {{ role.name || role.roleKey }}
+            </el-tag>
+          </template>
+          <span v-else class="no-key">未绑定</span>
+        </template>
+      </el-table-column>
+
       <el-table-column label="状态" width="120" align="center">
         <template #default="{ row }">
           <div :class="['status-badge', row.isActive ? 'status-enabled' : 'status-disabled']">
@@ -249,6 +266,11 @@ function handleDelete(row) {
 .key-icon {
   color: #f59e0b;
   font-size: 18px;
+}
+
+.role-tag {
+  margin-right: 4px;
+  margin-bottom: 2px;
 }
 
 .no-key {

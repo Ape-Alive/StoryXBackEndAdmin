@@ -70,6 +70,7 @@ model User {
   quotas               UserQuota[]
   voiceProfiles        VoiceProfile[]
   voiceCloneCreditLogs VoiceCloneCreditLog[]
+  activationCodesUsed  ActivationCode[]      @relation("ActivationCodeUsedBy")
 
   @@index([email])
   @@index([phone])
@@ -166,11 +167,14 @@ model AIProvider {
   models                    AIModel[]
   userApiKeys               UserApiKey[]
   voiceCloneCreditLogs      VoiceCloneCreditLog[]
+  /// true=对全部客户端角色可见；false=见 catalog_role_bindings
+  clientRoleBindAll         Boolean      @default(true)
 
   @@index([name])
   @@index([isActive])
   @@index([quotaUnit])
   @@index([supportsApiKeyCreation])
+  @@index([clientRoleBindAll])
   @@map("ai_providers")
 }
 
@@ -226,12 +230,14 @@ model AIModel {
   authorizations     Authorization[]
   prices             ModelPrice[]
   voiceProfileModels VoiceProfileModel[]
+  clientRoleBindAll  Boolean             @default(false)
 
   @@unique([providerId, name])
   @@index([providerId])
   @@index([type])
   @@index([category])
   @@index([isActive])
+  @@index([clientRoleBindAll])
   @@map("ai_models")
 }
 
@@ -291,11 +297,13 @@ model VoiceProfile {
   models               VoiceProfileModel[]
   user                 User?                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   voiceCloneCreditLogs VoiceCloneCreditLog[]
+  clientRoleBindAll    Boolean              @default(true)
 
   @@index([voiceId])
   @@index([scope])
   @@index([userId])
   @@index([isActive])
+  @@index([clientRoleBindAll])
   @@map("voice_profiles")
 }
 
@@ -305,12 +313,15 @@ model Package {
   displayName     String
   description     String?
   type            String
+  clientRoleId    String?
   duration        Int?
   quota           Decimal?      @map("totalQuota") @db.Decimal(20, 2)
   availableModels String?
   isStackable     Boolean       @default(false)
   priority        Int           @default(0)
   isActive        Boolean       @default(true)
+  isRecommend     Boolean       @default(false)
+  guideScene      String?
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   maxDevices      Int?
@@ -318,14 +329,52 @@ model Package {
   price           Decimal?      @db.Decimal(20, 2)
   priceUnit       String?
   durationUnit    String?
-  orders          Order[]
-  quotaRecords    QuotaRecord[]
-  userPackages    UserPackage[]
+  clientRole       ClientRole?      @relation(fields: [clientRoleId], references: [id], onDelete: SetNull)
+  orders           Order[]
+  quotaRecords     QuotaRecord[]
+  userPackages     UserPackage[]
+  activationCodes  ActivationCode[]
 
   @@index([name])
   @@index([type])
   @@index([isActive])
+  @@index([clientRoleId])
   @@map("packages")
+}
+
+/// 客户端注册激活码：未使用到期销毁；创建人归属后台管理员便于绩效
+model ActivationCode {
+  id           String    @id @default(cuid())
+  code         String    @unique @db.VarChar(64)
+  packageId    String
+  /// 可选绑定邮箱：注册时必须用此邮箱
+  email        String?
+  /// 可选绑定手机：注册时必须用此手机
+  phone        String?
+  /// unused | used | expired | revoked
+  status       String    @default("unused")
+  expiresAt    DateTime
+  usedAt       DateTime?
+  usedByUserId String?
+  /// 创建该激活码的后台管理员
+  createdBy    String
+  batchId      String?
+  remark       String?   @db.VarChar(500)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  package      Package   @relation(fields: [packageId], references: [id], onDelete: Restrict)
+  usedByUser   User?     @relation("ActivationCodeUsedBy", fields: [usedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([expiresAt])
+  @@index([createdBy])
+  @@index([packageId])
+  @@index([batchId])
+  @@index([deletedAt])
+  @@index([email])
+  @@index([phone])
+  @@map("activation_codes")
 }
 
 model UserPackage {
@@ -479,8 +528,10 @@ model Prompt {
   stylePromptKey String?
   versions       PromptVersion[]
   category       PromptCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
-  system         Prompt?         @relation("SystemPrompts", fields: [systemId], references: [id])
-  children       Prompt[]        @relation("SystemPrompts")
+  system              Prompt?                    @relation("SystemPrompts", fields: [systemId], references: [id])
+  children            Prompt[]                   @relation("SystemPrompts")
+  styleLibraryLinks   StyleLibrarySystemPrompt[]
+  clientRoleBindAll   Boolean                    @default(true)
 
   @@index([categoryId])
   @@index([type])
@@ -489,6 +540,7 @@ model Prompt {
   @@index([isActive])
   @@index([title])
   @@index([functionKey])
+  @@index([clientRoleBindAll])
   @@map("prompts")
 }
 
@@ -505,6 +557,224 @@ model PromptVersion {
   @@index([promptId])
   @@index([createdAt])
   @@map("prompt_versions")
+}
+
+model StyleLibrarySystemPrompt {
+  styleLibraryItemId String
+  systemPromptId     String
+  createdAt          DateTime         @default(now())
+  styleLibraryItem   StyleLibraryItem @relation(fields: [styleLibraryItemId], references: [id], onDelete: Cascade)
+  systemPrompt       Prompt           @relation(fields: [systemPromptId], references: [id], onDelete: Restrict)
+
+  @@id([styleLibraryItemId, systemPromptId])
+  @@index([styleLibraryItemId])
+  @@index([systemPromptId])
+  @@map("style_library_system_prompts")
+}
+
+model StyleLibraryItem {
+  id             String                     @id @default(cuid())
+  name           String
+  summary        String?
+  coverUrl       String?                    @db.Text
+  mediaType      String
+  stylePromptKey String?
+  content        String                     @db.Text
+  tags           Json
+  usageCount     Int                        @default(0)
+  recommendScore Int                        @default(0)
+  sortOrder      Int                        @default(0)
+  isActive       Boolean                    @default(false)
+  isFeatured     Boolean                    @default(false)
+  publishedAt    DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+  systemPrompts      StyleLibrarySystemPrompt[]
+  clientRoleBindAll  Boolean                    @default(true)
+
+  @@index([mediaType])
+  @@index([isActive])
+  @@index([isFeatured])
+  @@index([recommendScore])
+  @@index([sortOrder])
+  @@index([createdAt])
+  @@index([clientRoleBindAll])
+  @@map("style_library_items")
+}
+
+model CameraMovementItem {
+  id          String   @id @default(cuid())
+  movementKey String   @unique
+  name        String
+  tagLabel    String?
+  prompt      String   @db.Text
+  previewUrl  String?  @db.Text
+  type        String   @default("custom")
+  isActive    Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  clientRoleBindAll Boolean  @default(true)
+
+  @@index([type])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@index([createdAt])
+  @@index([clientRoleBindAll])
+  @@map("camera_movement_items")
+}
+
+model BackendMenu {
+  id                     String              @id @default(cuid())
+  name                   String
+  i18nNames              Json                @default("[]")
+  path                   String?
+  frontendPermissionCode String?
+  backendPermissionCode  String?
+  parentId               String              @default("0")
+  sortOrder              Int                 @default(0)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+  buttons                BackendMenuButton[]
+
+  @@index([parentId])
+  @@index([sortOrder])
+  @@map("backend_menus")
+}
+
+model BackendMenuButton {
+  id                     String      @id @default(cuid())
+  menuId                 String
+  name                   String
+  i18nNames              Json        @default("[]")
+  isVisible              Boolean     @default(true)
+  isDisabled             Boolean     @default(false)
+  frontendPermissionCode String?
+  backendPermissionCode  String?
+  sortOrder              Int         @default(0)
+  createdAt              DateTime    @default(now())
+  updatedAt              DateTime    @updatedAt
+  menu                   BackendMenu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@index([menuId])
+  @@index([sortOrder])
+  @@map("backend_menu_buttons")
+}
+
+model BackendRole {
+  id          String                  @id @default(cuid())
+  roleKey     String                  @unique
+  name        String
+  description String?                 @db.Text
+  isSystem    Boolean                 @default(true)
+  sortOrder   Int                     @default(0)
+  status      String                  @default("active")
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  permissions BackendRolePermission[]
+
+  @@index([status])
+  @@index([sortOrder])
+  @@map("backend_roles")
+}
+
+model BackendRolePermission {
+  id         String      @id @default(cuid())
+  roleId     String
+  targetType String
+  targetId   String
+  createdAt  DateTime    @default(now())
+  role       BackendRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, targetType, targetId])
+  @@index([roleId])
+  @@index([targetType, targetId])
+  @@map("backend_role_permissions")
+}
+
+model ClientMenu {
+  id                     String             @id @default(cuid())
+  name                   String
+  i18nNames              Json               @default("[]")
+  path                   String?
+  frontendPermissionCode String?
+  backendPermissionCode  String?
+  parentId               String             @default("0")
+  sortOrder              Int                @default(0)
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  buttons                ClientMenuButton[]
+
+  @@index([parentId])
+  @@index([sortOrder])
+  @@map("client_menus")
+}
+
+model ClientMenuButton {
+  id                     String     @id @default(cuid())
+  menuId                 String
+  name                   String
+  i18nNames              Json       @default("[]")
+  isVisible              Boolean    @default(true)
+  isDisabled             Boolean    @default(false)
+  frontendPermissionCode String?
+  backendPermissionCode  String?
+  sortOrder              Int        @default(0)
+  createdAt              DateTime   @default(now())
+  updatedAt              DateTime   @updatedAt
+  menu                   ClientMenu @relation(fields: [menuId], references: [id], onDelete: Cascade)
+
+  @@index([menuId])
+  @@index([sortOrder])
+  @@map("client_menu_buttons")
+}
+
+model ClientRole {
+  id          String                 @id @default(cuid())
+  roleKey     String                 @unique
+  name        String
+  description String?                @db.Text
+  priority    Int                    @default(0)
+  sortOrder   Int                    @default(0)
+  status      String                 @default("active")
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  permissions ClientRolePermission[]
+  packages    Package[]
+  catalogRoleBindings CatalogRoleBinding[]
+
+  @@index([status])
+  @@index([sortOrder])
+  @@index([priority])
+  @@map("client_roles")
+}
+
+model CatalogRoleBinding {
+  id         String     @id @default(cuid())
+  targetType String
+  targetId   String
+  roleId     String
+  createdAt  DateTime   @default(now())
+  role       ClientRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([targetType, targetId, roleId])
+  @@index([targetType, targetId])
+  @@index([roleId])
+  @@map("catalog_role_bindings")
+}
+
+model ClientRolePermission {
+  id         String     @id @default(cuid())
+  roleId     String
+  targetType String
+  targetId   String
+  createdAt  DateTime   @default(now())
+  role       ClientRole @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([roleId, targetType, targetId])
+  @@index([roleId])
+  @@index([targetType, targetId])
+  @@map("client_role_permissions")
 }
 
 model UserApiKey {
@@ -648,4 +918,61 @@ model RiskTrigger {
   @@index([status])
   @@index([createdAt])
   @@map("risk_triggers")
+}
+
+model OtaRelease {
+  id              String    @id @default(cuid())
+  layer           String
+  platform        String
+  bundleType      String?
+  updateMethod    String?
+  channel         String    @default("stable")
+  version         String
+  buildNumber     Int
+  minBaseBuild    Int?
+  minBackendBuild Int?
+  downloadUrl     String    @db.Text
+  feedUrl         String?   @db.Text
+  fileSize        BigInt
+  sha256          String
+  signature       String?   @db.Text
+  releaseNotes    String?   @db.Text
+  forceUpdate     Boolean   @default(false)
+  rolloutPercent  Int       @default(100)
+  /// { deviceIds?: string[] } — 非空时仅名单内设备可拉取；再叠加 rolloutPercent
+  rolloutRule     Json?
+  isPublished     Boolean   @default(false)
+  /// 对客户端生效时间；null 视为立即。定时发布时 isPublished=true 且 publishAt 为未来时间
+  publishAt       DateTime?
+  publishedAt     DateTime?
+  createdBy       String?
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@unique([layer, platform, channel, buildNumber, bundleType, updateMethod], map: "ota_releases_layer_platform_channel_build_bundle_key")
+  @@index([layer, platform, channel, isPublished, buildNumber])
+  @@index([isPublished])
+  @@index([publishAt])
+  @@index([deletedAt])
+  @@map("ota_releases")
+}
+
+model OtaReport {
+  id        String   @id @default(cuid())
+  deviceId  String
+  event     String
+  layer     String?
+  fromBuild Int?
+  toBuild   Int?
+  platform  String?
+  channel   String?
+  error     String?  @db.Text
+  createdAt DateTime @default(now())
+
+  @@index([deviceId])
+  @@index([event])
+  @@index([layer])
+  @@index([createdAt])
+  @@map("ota_reports")
 }

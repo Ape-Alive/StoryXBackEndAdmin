@@ -1,5 +1,21 @@
 const prisma = require('../config/database');
 const { NotFoundError } = require('../utils/errors');
+const {
+  classifyUserPackages,
+  pickEffectiveRole,
+} = require('../services/userEntitlement.service');
+
+function serializeEffectiveClientRole(userPackages, now = new Date()) {
+  const { active } = classifyUserPackages(userPackages, now);
+  const pick = pickEffectiveRole(active);
+  if (!pick?.role) return null;
+  return {
+    id: pick.role.id,
+    roleKey: pick.role.roleKey,
+    name: pick.role.name,
+    priority: pick.role.priority,
+  };
+}
 
 /**
  * 用户数据访问层
@@ -60,12 +76,14 @@ class UserRepository {
         include: {
           packages: {
             include: {
-              package: true
+              package: {
+                include: { clientRole: true },
+              },
             },
-            take: 1,
-            orderBy: {
-              priority: 'desc'
-            }
+            orderBy: [
+              { priority: 'desc' },
+              { createdAt: 'desc' },
+            ],
           },
           _count: {
             select: {
@@ -78,13 +96,24 @@ class UserRepository {
       prisma.user.count({ where })
     ]);
 
-    // 格式化数据
-    const formattedData = data.map(user => ({
-      ...user,
-      currentPackage: user.packages[0]?.package || null,
-      deviceCount: user._count.devices,
-      quotaRecordCount: user._count.quotaRecords
-    }));
+    const now = new Date();
+    // 格式化数据：角色展示以套餐绑定的客户端角色为准
+    const formattedData = data.map(user => {
+      const effectiveClientRole = serializeEffectiveClientRole(user.packages, now);
+      const { active } = classifyUserPackages(user.packages, now);
+      const currentUserPackage = pickEffectiveRole(active)?.userPackage
+        || active[0]
+        || user.packages[0]
+        || null;
+
+      return {
+        ...user,
+        currentPackage: currentUserPackage?.package || null,
+        effectiveClientRole,
+        deviceCount: user._count.devices,
+        quotaRecordCount: user._count.quotaRecords
+      };
+    });
 
     return {
       data: formattedData,
@@ -147,11 +176,14 @@ class UserRepository {
       include: {
         packages: {
           include: {
-            package: true
+            package: {
+              include: { clientRole: true },
+            },
           },
-          orderBy: {
-            priority: 'desc'
-          }
+          orderBy: [
+            { priority: 'desc' },
+            { createdAt: 'desc' },
+          ],
         },
         devices: {
           orderBy: {
@@ -167,7 +199,10 @@ class UserRepository {
       throw new NotFoundError('User not found');
     }
 
-    return user;
+    return {
+      ...user,
+      effectiveClientRole: serializeEffectiveClientRole(user.packages),
+    };
   }
 
   /**

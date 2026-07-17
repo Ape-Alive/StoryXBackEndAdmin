@@ -1,19 +1,43 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { login, getCurrentAdmin } from '@/api/auth'
+import { login, getCurrentAdmin, getMyPermissions } from '@/api/auth'
 import { getToken, setToken, removeToken, getAdmin, setAdmin, removeAdmin } from '@/utils/auth'
+import { setAdminPermissions, clearAdminPermissions } from '@/utils/permission'
 
 export const useAuthStore = defineStore('auth', () => {
-  // 从 localStorage 恢复 token 和 admin 信息
   const token = ref(getToken() || '')
   const admin = ref(getAdmin() || null)
+  const permissionsLoaded = ref(false)
 
   const isAuthenticated = computed(() => !!token.value)
 
-  // user 别名，指向 admin（为了兼容性）
   const user = computed(() => admin.value)
 
-  // 登录
+  async function loadPermissions() {
+    if (!token.value) {
+      permissionsLoaded.value = false
+      return { success: false }
+    }
+
+    try {
+      const response = await getMyPermissions()
+      if (response.success && response.data) {
+        setAdminPermissions(response.data)
+        permissionsLoaded.value = true
+        return { success: true }
+      }
+      return { success: false }
+    } catch (error) {
+      return { success: false }
+    }
+  }
+
+  async function ensurePermissions(force = false) {
+    if (!token.value) return { success: false }
+    if (!force && permissionsLoaded.value) return { success: true }
+    return loadPermissions()
+  }
+
   async function loginAction(loginData) {
     try {
       const response = await login(loginData)
@@ -21,10 +45,10 @@ export const useAuthStore = defineStore('auth', () => {
         token.value = response.data.token
         setToken(response.data.token)
         admin.value = response.data.admin
-        // 保存管理员信息到 localStorage
         if (response.data.admin) {
           setAdmin(response.data.admin)
         }
+        await loadPermissions()
         return { success: true }
       }
       return { success: false, message: response.message || '登录失败' }
@@ -36,14 +60,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 获取当前管理员信息
   async function fetchCurrentAdmin() {
     try {
       const response = await getCurrentAdmin()
       if (response.success && response.data) {
         admin.value = response.data
-        // 更新 localStorage 中的管理员信息
         setAdmin(response.data)
+        await loadPermissions()
         return { success: true }
       }
       return { success: false }
@@ -52,12 +75,13 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // 登出
   function logout() {
     token.value = ''
     admin.value = null
+    permissionsLoaded.value = false
     removeToken()
     removeAdmin()
+    clearAdminPermissions()
   }
 
   return {
@@ -65,8 +89,11 @@ export const useAuthStore = defineStore('auth', () => {
     admin,
     user,
     isAuthenticated,
+    permissionsLoaded,
     loginAction,
     fetchCurrentAdmin,
+    loadPermissions,
+    ensurePermissions,
     logout
   }
 })

@@ -1,5 +1,17 @@
 const voiceProfileService = require('../services/voiceProfile.service')
 const ResponseHandler = require('../utils/response')
+const { resolveCatalogRoleContext } = require('../utils/resolveCatalogRoleContext')
+const { stripCatalogRoleMeta } = require('../utils/providerSanitizer')
+
+function isTerminalUser(req) {
+  return req.user?.type === 'user'
+}
+
+function sanitizeCatalogPayload(req, payload) {
+  if (!isTerminalUser(req) || payload == null) return payload
+  if (Array.isArray(payload)) return payload.map(stripCatalogRoleMeta)
+  return stripCatalogRoleMeta(payload)
+}
 
 class VoiceProfileController {
   async getVoiceProfiles(req, res, next) {
@@ -35,6 +47,11 @@ class VoiceProfileController {
 
       const userRole = req.user?.role
       const userId = req.user?.id
+      const catalogRoleContext = await resolveCatalogRoleContext(req)
+      // query.userId 用于角色上下文；音色可见范围由登录 userId + includeAll 决定
+      if (catalogRoleContext) {
+        delete filters.userId
+      }
 
       const result = await voiceProfileService.getVoiceProfiles(
         filters,
@@ -42,10 +59,11 @@ class VoiceProfileController {
         sort,
         userRole,
         userId,
-        includeAll
+        includeAll,
+        catalogRoleContext,
       )
 
-      return ResponseHandler.paginated(res, result.data, {
+      return ResponseHandler.paginated(res, sanitizeCatalogPayload(req, result.data), {
         page: result.page,
         pageSize: result.pageSize,
         total: result.total,
@@ -60,8 +78,18 @@ class VoiceProfileController {
       const { id } = req.params
       const userRole = req.user?.role
       const userId = req.user?.id
-      const profile = await voiceProfileService.getVoiceProfileDetail(id, userRole, userId)
-      return ResponseHandler.success(res, profile, 'Voice profile retrieved successfully')
+      const catalogRoleContext = await resolveCatalogRoleContext(req)
+      const profile = await voiceProfileService.getVoiceProfileDetail(
+        id,
+        userRole,
+        userId,
+        catalogRoleContext,
+      )
+      return ResponseHandler.success(
+        res,
+        sanitizeCatalogPayload(req, profile),
+        'Voice profile retrieved successfully',
+      )
     } catch (error) {
       next(error)
     }

@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const compression = require('compression');
+const path = require('path');
 const swaggerUi = require('swagger-ui-express');
 const swaggerSpec = require('./src/config/swagger');
 
@@ -36,6 +37,15 @@ const paymentCallbackRoutes = require('./src/routes/paymentCallback.routes');
 const userApiRoutes = require('./src/routes/userApi.routes');
 const userApiKeyRoutes = require('./src/routes/userApiKey.routes');
 const voiceProfileRoutes = require('./src/routes/voiceProfile.routes');
+const styleLibraryRoutes = require('./src/routes/styleLibrary.routes');
+const cameraMovementLibraryRoutes = require('./src/routes/cameraMovementLibrary.routes');
+const otaRoutes = require('./src/routes/ota.routes');
+const otaReleaseRoutes = require('./src/routes/otaRelease.routes');
+const backendMenuRoutes = require('./src/routes/backendMenu.routes');
+const clientMenuRoutes = require('./src/routes/clientMenu.routes');
+const backendRoleRoutes = require('./src/routes/backendRole.routes');
+const clientRoleRoutes = require('./src/routes/clientRole.routes');
+const activationCodeRoutes = require('./src/routes/activationCode.routes');
 
 const app = express();
 
@@ -105,6 +115,21 @@ app.get('/health', (req, res) => {
   });
 });
 
+// OTA 产物：默认需签名 query（expires+sig）；OTA_ARTIFACT_PUBLIC=true 时开放
+const { verifyArtifactAccess, isPublicArtifacts } = require('./src/utils/otaArtifactAccess');
+app.use('/uploads/ota', (req, res, next) => {
+  if (isPublicArtifacts()) return next();
+  const relativePath = `uploads/ota${req.path}`.replace(/\\/g, '/').replace(/\/+/g, '/');
+  const ok = verifyArtifactAccess(relativePath, req.query.expires, req.query.sig);
+  if (!ok) {
+    return res.status(403).json({
+      success: false,
+      message: 'OTA artifact URL is missing, invalid, or expired. Re-check update from API.',
+    });
+  }
+  return next();
+}, express.static(path.join(__dirname, 'uploads/ota'), { fallthrough: false }));
+
 // Swagger UI
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
   customCss: '.swagger-ui .topbar { display: none }',
@@ -143,6 +168,15 @@ app.use('/api/payment/callback', paymentCallbackRoutes);
 app.use('/api/user', userApiRoutes);
 app.use('/api/user/api-keys', userApiKeyRoutes);
 app.use('/api/voice-profiles', voiceProfileRoutes);
+app.use('/api/style-library', styleLibraryRoutes);
+app.use('/api/camera-movement-library', cameraMovementLibraryRoutes);
+app.use('/api/ota', otaRoutes);
+app.use('/api/ota/admin', otaReleaseRoutes);
+app.use('/api/backend-menus', backendMenuRoutes);
+app.use('/api/client-menus', clientMenuRoutes);
+app.use('/api/backend-roles', backendRoleRoutes);
+app.use('/api/client-roles', clientRoleRoutes);
+app.use('/api/activation-codes', activationCodeRoutes);
 
 // 404 handler
 app.use((req, res, next) => {
