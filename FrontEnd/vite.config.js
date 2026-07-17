@@ -48,7 +48,7 @@ export default defineConfig(({ mode }) => {
             outDir: 'dist',
             assetsDir: 'assets',
             sourcemap: mode === 'development',
-            minify: mode === 'production' ? 'terser' : false,
+            minify: mode === 'production' ? 'esbuild' : false,
             chunkSizeWarningLimit: 1000,
             rollupOptions: {
                 output: {
