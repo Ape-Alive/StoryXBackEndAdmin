@@ -1,15 +1,41 @@
-# 放到 Nginx sites，按实际路径调整 root / 证书
+# 宝塔路径示例：
+#   /www/server/panel/vhost/nginx/admin.huihuoai.com.conf
+#   /www/server/panel/vhost/nginx/api.huihuoai.com.conf
+#
+# 没有源站证书时：只保留 listen 80，Cloudflare SSL 用「灵活」或源站未开 443 时不要写 ssl。
+# 宝塔申请 Let’s Encrypt 成功后，再由面板自动加 443 + ssl_certificate，或手动取消下面注释。
+
+# ---------- 管理后台前端 admin.huihuoai.com ----------
 server {
     listen 80;
-    server_name 152.32.190.93;
+    server_name admin.huihuoai.com;
 
     root /opt/storyx-admin/frontend/dist;
     index index.html;
+    client_max_body_size 50m;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    access_log /www/wwwlogs/admin.huihuoai.com.log;
+    error_log  /www/wwwlogs/admin.huihuoai.com.error.log;
+
+    # 有证书后再加（路径以宝塔实际为准）：
+    # listen 443 ssl http2;
+    # ssl_certificate     /www/server/panel/vhost/cert/admin.huihuoai.com/fullchain.pem;
+    # ssl_certificate_key /www/server/panel/vhost/cert/admin.huihuoai.com/privkey.pem;
+}
+
+# ---------- API api.huihuoai.com ----------
+server {
+    listen 80;
+    server_name api.huihuoai.com;
 
     client_max_body_size 50m;
 
-    location /api/ {
-        proxy_pass http://127.0.0.1:5800/api/;
+    location / {
+        proxy_pass http://127.0.0.1:5800;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -17,12 +43,11 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location /health {
-        proxy_pass http://127.0.0.1:5800/health;
-        proxy_set_header Host $host;
-    }
+    access_log /www/wwwlogs/api.huihuoai.com.log;
+    error_log  /www/wwwlogs/api.huihuoai.com.error.log;
 
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
+    # 有证书后再加：
+    # listen 443 ssl http2;
+    # ssl_certificate     /www/server/panel/vhost/cert/api.huihuoai.com/fullchain.pem;
+    # ssl_certificate_key /www/server/panel/vhost/cert/api.huihuoai.com/privkey.pem;
 }
