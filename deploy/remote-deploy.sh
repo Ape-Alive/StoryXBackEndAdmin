@@ -96,6 +96,11 @@ rsync "${RSYNC_OPTS[@]}" "${RELEASE_DIR}/frontend/dist/" "${FRONTEND_DIR}/dist/"
 
 echo "==> Install backend dependencies"
 cd "${BACKEND_DIR}"
+# 避免使用宝塔全局 cache（常为 root 属主，deploy 无写权限）
+export npm_config_cache="${npm_config_cache:-${HOME}/.npm}"
+mkdir -p "${npm_config_cache}"
+# 若上次残留半损坏 node_modules，先清掉再装更稳
+rm -rf node_modules
 npm ci --omit=dev
 
 echo "==> Prisma generate & migrate"
