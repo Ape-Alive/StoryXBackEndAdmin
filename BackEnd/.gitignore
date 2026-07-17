@@ -6,8 +6,11 @@ yarn-error.log*
 
 # Environment variables
 .env
+.prod.env
 .env.local
 .env.*.local
+.env*.local
+env.example
 
 # Logs
 logs/
@@ -37,3 +40,4 @@ coverage/
 tmp/
 temp/
 uploads/
+

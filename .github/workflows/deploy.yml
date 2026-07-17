@@ -1,0 +1,101 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - prod
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            FrontEnd/package-lock.json
+            BackEnd/package-lock.json
+
+      - name: Install & build frontend
+        working-directory: FrontEnd
+        env:
+          # 同域 Nginx 反代时用 /api；也可在 Secrets 里覆盖为完整 URL
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_USE_MOCK: 'false'
+          VITE_USE_PROXY: 'false'
+        run: |
+          npm ci
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            export VITE_API_BASE_URL=/api
+          fi
+          echo "Building frontend with VITE_API_BASE_URL=$VITE_API_BASE_URL"
+          npm run build
+
+      - name: Prepare release package
+        run: |
+          mkdir -p release/frontend release/backend
+          cp -R FrontEnd/dist release/frontend/dist
+          rsync -a \
+            --exclude node_modules \
+            --exclude .env \
+            --exclude logs \
+            --exclude uploads \
+            --exclude coverage \
+            --exclude tmp \
+            --exclude temp \
+            BackEnd/ release/backend/
+          cp deploy/remote-deploy.sh release/remote-deploy.sh
+          chmod +x release/remote-deploy.sh
+
+      - name: Setup SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known_hosts
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          mkdir -p ~/.ssh
+          PORT="${SSH_PORT:-22}"
+          ssh-keyscan -p "$PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          PORT="${SSH_PORT:-22}"
+          DEST="${DEPLOY_PATH:-/opt/storyx-admin}"
+          ssh -p "$PORT" "${SSH_USER}@${SSH_HOST}" "mkdir -p '${DEST}/release' '${DEST}/frontend' '${DEST}/backend'"
+          rsync -az --delete \
+            -e "ssh -p ${PORT}" \
+            release/ \
+            "${SSH_USER}@${SSH_HOST}:${DEST}/release/"
+
+      - name: Run remote deploy
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          PORT="${SSH_PORT:-22}"
+          DEST="${DEPLOY_PATH:-/opt/storyx-admin}"
+          ssh -p "$PORT" "${SSH_USER}@${SSH_HOST}" \
+            "DEPLOY_PATH='${DEST}' bash '${DEST}/release/remote-deploy.sh'"
